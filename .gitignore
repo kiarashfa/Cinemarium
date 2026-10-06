@@ -1,2 +1,19 @@
 node_modules/
 GlassRoom/
+docs/
+
+# build output
+dist/
+.astro/
+
+# local tools and downloaded source assets (fetched by scripts, never committed)
+.tools/
+pipeline/cache/
+pipeline/out/
+*.blend1
+
+# screenshots for checking work
+shots/
+
+# light-map masters (float EXR) never ship; the site uses the WebP versions
+public/rooms/**/*.exr

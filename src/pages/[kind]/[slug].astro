@@ -1,0 +1,37 @@
+---
+import Scene from '../../layouts/Scene.astro';
+import { TITLES, KIND_PATH, label, type Title } from '../../data/titles';
+
+export function getStaticPaths() {
+  return TITLES.map(t => ({ params: { kind: KIND_PATH[t.kind], slug: t.slug }, props: { t } }));
+}
+const { t } = Astro.props as { t: Title };
+---
+<Scene title={`${label(t)} · Cinemarium`} theme="light" here="case" loading="Opening the hall…"
+  description={`${label(t)}: ${t.scene}, a small living room under glass in a sunlit stone hall.`}>
+  <section class="cap fade" id="cap" aria-live="polite">
+    <div class="k" id="k"></div>
+    <h1 id="nm">{label(t)}</h1>
+    <div class="sc" id="sc">{t.scene}</div>
+  </section>
+  <div class="pills" id="pills" aria-label="Titles"></div>
+  <button class="zoom" id="zoom" aria-pressed="false">Look closer</button>
+  <div class="hint">Drag to walk around the case</div>
+  <script is:inline type="application/json" id="title" set:html={JSON.stringify(t)} />
+  <script>
+    import { startSpecimen } from '../../scene/apps/specimen';
+    const t = JSON.parse(document.getElementById('title')!.textContent!);
+    startSpecimen(document.getElementById('gl') as HTMLCanvasElement, t).catch(err => {
+      console.error(err); const l = document.getElementById('loading')!; l.classList.add('error');
+      l.textContent = 'The case could not be lit on this device. (' + (err?.message ?? err) + ')';
+    });
+  </script>
+  <style>
+    .pills{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(34px + env(safe-area-inset-bottom,0px));z-index:3;display:flex;gap:8px;max-width:calc(100vw - 32px);overflow-x:auto;scrollbar-width:none}
+    .pills :global(button){flex:none;border:1px solid var(--hair);background:rgba(255,250,240,.55);color:var(--fg);border-radius:22px;padding:10px 16px;font:12px var(--sans);letter-spacing:.06em;cursor:pointer;backdrop-filter:blur(6px)}
+    .pills :global(button.on){background:var(--fg);color:#f3ebdd;border-color:var(--fg)}
+    .hint{position:fixed;right:clamp(16px,3vw,44px);bottom:calc(40px + env(safe-area-inset-bottom,0px));z-index:3;font-family:var(--italic);font-style:italic;font-size:16px;color:var(--dim)}
+    .zoom{position:fixed;right:clamp(16px,3vw,44px);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:3;border:1px solid var(--hair);background:rgba(255,250,240,.55);color:var(--fg);border-radius:22px;padding:10px 18px;font:11px var(--sans);letter-spacing:.18em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(6px)}
+    @media (max-width:760px){ .hint{display:none} .zoom{bottom:auto;top:calc(118px + env(safe-area-inset-top,0px))} .cap{bottom:calc(100px + env(safe-area-inset-bottom,0px))} }
+  </style>
+</Scene>

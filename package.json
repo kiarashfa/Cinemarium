@@ -1,0 +1,25 @@
+{
+  "name": "cinemarium",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Kia's top ten series and top ten films, each a small living room under glass.",
+  "scripts": {
+    "dev": "astro dev --host 127.0.0.1 --port 4321",
+    "build": "astro build",
+    "preview": "astro preview --host 127.0.0.1 --port 4321",
+    "check": "astro check",
+    "fit": "node tools/fit-check.mjs",
+    "shot": "node tools/shots/shot.mjs"
+  },
+  "dependencies": {
+    "astro": "^7.3.6",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/three": "^0.186.0",
+    "playwright-core": "^1.63.0",
+    "typescript": "^6.0.3"
+  }
+}

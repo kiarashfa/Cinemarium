@@ -1,0 +1,41 @@
+---
+import Scene from '../layouts/Scene.astro';
+---
+<Scene title="Cinemarium · The Tower" theme="dark" here="tower" loading="Lighting the tower…"
+  description="A glass tower standing in still water at dusk; each of its ten floors is a small living room for one of Kia's favourite series or films.">
+  <section class="cap fade" id="cap" aria-live="polite">
+    <div class="k" id="k"></div>
+    <h1 id="nm"></h1>
+    <div class="sc" id="sc"></div>
+    <a id="open" href="#">Open the case →</a>
+  </section>
+  <div class="switch" role="group" aria-label="Which list">
+    <button data-kind="series" aria-pressed="true">Series</button><button data-kind="film" aria-pressed="false">Films</button>
+  </div>
+  <div class="floors" id="floors" aria-label="Floors"></div>
+  <script>
+    import { startTower } from '../scene/apps/tower';
+    startTower(document.getElementById('gl') as HTMLCanvasElement).catch(err => {
+      console.error(err); const l = document.getElementById('loading')!; l.classList.add('error');
+      l.textContent = 'The tower could not be lit on this device. (' + (err?.message ?? err) + ')';
+    });
+  </script>
+  <style>
+    .switch{position:fixed;left:50%;transform:translateX(-50%);top:calc(70px + env(safe-area-inset-top,0px));z-index:3;display:flex;border:1px solid var(--hair);border-radius:22px;padding:3px;background:rgba(0,0,0,.25);backdrop-filter:blur(6px)}
+    .switch button{background:none;border:0;color:var(--dim);font:11px var(--sans);letter-spacing:.22em;text-transform:uppercase;padding:9px 18px;border-radius:19px;cursor:pointer}
+    .switch button[aria-pressed=true]{background:var(--fg);color:#111}
+    .floors{position:fixed;right:clamp(16px,3vw,44px);top:50%;transform:translateY(-50%);z-index:3;display:flex;flex-direction:column;gap:9px;align-items:flex-end}
+    .floors :global(button){background:none;border:0;color:var(--dim);font:11px var(--sans);letter-spacing:.18em;text-transform:uppercase;cursor:pointer;display:flex;gap:12px;align-items:center;padding:3px 0}
+    .floors :global(button .n){font-variant-numeric:tabular-nums;color:var(--hair);transition:color .4s}
+    .floors :global(button::after){content:'';width:16px;height:1px;background:var(--hair);transition:width .4s,background .4s}
+    .floors :global(button.empty .t){opacity:.45}
+    .floors :global(button.on){color:var(--fg)}
+    .floors :global(button.on .n){color:var(--brass)}
+    .floors :global(button.on::after){width:38px;background:var(--brass)}
+    @media (max-width:760px){
+      .switch{top:auto;bottom:calc(196px + env(safe-area-inset-bottom,0px))}
+      .floors{top:calc(118px + env(safe-area-inset-top,0px));transform:none;gap:4px}
+      .floors :global(button .t){display:none}
+    }
+  </style>
+</Scene>
