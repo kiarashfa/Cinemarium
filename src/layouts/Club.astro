@@ -1,0 +1,200 @@
+---
+// The club: one full-screen 3D page for every address. It carries the panels of all four places (home, the case, the
+// board, About); the body's data-view shows the one in use, so each address reads right before the scene starts.
+import { TITLES, sorted, label, KIND_NAME } from '../data/titles';
+import { head, path, titleOf, type Route } from '../data/routes';
+interface Props { route: Route }
+const { route } = Astro.props;
+const { title, description } = head(route);
+const base = import.meta.env.BASE_URL;
+const t = route.view === 'case' ? titleOf(route.slug) : undefined;
+const first = sorted('series')[0] ?? TITLES[0];
+const list = sorted('series');
+const BOARD_SLOTS = 10;
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>{title}</title>
+  <meta name="description" content={description}>
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..600;1,6..96,400&family=Cormorant+Garamond:ital,wght@1,300;1,400&family=Manrope:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body data-view={route.view}>
+  <div class="loading" id="loading">Opening the club…</div>
+  <canvas id="gl" aria-label={description}></canvas>
+  <div class="scrim"></div>
+  <div class="scrim deep" data-for="board about"></div>
+  <header>
+    <a class="mk" href={base}>Cinem<i>arium</i></a>
+    <nav aria-label="The club">
+      <a href={path({ view: 'board' })} data-nav="board">The Board</a>
+      <a href={path({ view: 'about' })} data-nav="about">About</a>
+      <button class="snd" id="snd" aria-pressed="false" title="Room tone">Sound off</button>
+    </nav>
+  </header>
+
+  <section class="panel" data-for="home" aria-label="Welcome">
+    <div class="k">Ten series · ten films</div>
+    <h1 class="brand">Cinem<i>arium</i></h1>
+    <p class="sc">A small video club of favourite stories, each one a living room under glass.</p>
+    <div class="switch" role="group" aria-label="Which list"><button data-kind="series" aria-pressed="true">Series</button><button data-kind="film" aria-pressed="false">Films</button></div>
+    <div class="go">
+      <a id="enter" href={path({ view: 'case', slug: first.slug })}>Step up to the case</a>
+      <a id="to-board" href={path({ view: 'board' })}>See the board</a>
+    </div>
+  </section>
+
+  <section class="cap fade" id="cap" data-for="case" aria-live="polite">
+    <div class="k" id="k">{t ? KIND_NAME[t.kind] : ''}</div>
+    <h1 id="nm">{t ? label(t) : ''}</h1>
+    <div class="sc" id="sc">{t?.scene}</div>
+    <div class="rt" id="rt"></div>
+  </section>
+  <div class="deck" data-for="case">
+    <div class="row">
+      <div class="switch" role="group" aria-label="Which list"><button data-kind="series" aria-pressed="true">Series</button><button data-kind="film" aria-pressed="false">Films</button></div>
+      <div class="order" role="group" aria-label="Order"><span>Order</span><button data-sort="rank" aria-pressed="true">Mine</button><button data-sort="year" aria-pressed="false">Year</button><button data-sort="imdb" aria-pressed="false">IMDb</button></div>
+    </div>
+    <div class="row">
+      <button class="step" id="prev" aria-label="Previous title">‹</button>
+      <div class="pills" id="pills" aria-label="Titles"></div>
+      <button class="step" id="next" aria-label="Next title">›</button>
+    </div>
+  </div>
+  <button class="zoom" id="zoom" data-for="case">Look closer</button>
+
+  <section class="panel" data-for="board" aria-label="The board">
+    <div class="k">The Board</div>
+    <h1 id="bk">Series</h1>
+    <p class="sc">The board is still being built; for now, the list.</p>
+    <div class="row">
+      <div class="switch" role="group" aria-label="Which list"><button data-kind="series" aria-pressed="true">Series</button><button data-kind="film" aria-pressed="false">Films</button></div>
+      <div class="order" role="group" aria-label="Order"><span>Order</span><button data-sort="rank" aria-pressed="true">Mine</button><button data-sort="year" aria-pressed="false">Year</button><button data-sort="imdb" aria-pressed="false">IMDb</button></div>
+    </div>
+    <ol class="list" id="list">
+      {Array.from({ length: BOARD_SLOTS }, (_, i) => list[i]).map((x, i) => x
+        ? <li><span class="n">{String(i + 1).padStart(2, '0')}</span><a href={path({ view: 'case', slug: x.slug })}>{x.title} <em>{x.year}</em></a></li>
+        : <li class="empty"><span class="n">{String(i + 1).padStart(2, '0')}</span><span>To come</span></li>)}
+    </ol>
+  </section>
+
+  <section class="panel about" data-for="about" aria-label="About">
+    <div class="k">About</div>
+    <h1 class="brand">Cinem<i>arium</i></h1>
+    <p>A small museum of favourite series and films. Each title becomes a real room from one early, iconic scene, built to scale and kept under glass, with its people still going about their day.</p>
+    <p>Ten series and ten films from a personal list. The first rooms are open; the rest are being built.</p>
+    <p class="fine">Ratings from <a href="https://www.imdb.com" rel="noopener">IMDb</a> via the <a href="https://www.omdbapi.com" rel="noopener">OMDb API</a>, title details from <a href="https://www.themoviedb.org" rel="noopener">TMDB</a>. This product uses the TMDB API but is not endorsed or certified by TMDB. People built on the Microsoft Rocketbox library (MIT); textures and props from Poly Haven and ambientCG (CC0).</p>
+    <p class="fine">A personal, non-commercial fan project, not affiliated with any studio, network or rights holder. Titles, characters and the scenes they recall belong to their owners.</p>
+    <div class="go">
+      <a href={base}>Back into the club</a>
+      <a href="https://github.com/kiarashfa/Cinemarium" rel="noopener">The source</a>
+    </div>
+  </section>
+
+  <div class="hint" id="hint" data-for="home case board"></div>
+
+  <script>
+    import { startClub } from '../scene/club';
+    import { roomTone } from '../scene/sound';
+    const b = document.getElementById('snd')!, tone = roomTone('office');
+    b.addEventListener('click', () => { tone.playing ? tone.stop() : tone.start(); b.textContent = tone.playing ? 'Sound on' : 'Sound off'; b.setAttribute('aria-pressed', String(tone.playing)); });
+    startClub(document.getElementById('gl') as HTMLCanvasElement).catch(err => {
+      console.error(err); const l = document.getElementById('loading')!; l.classList.add('error');
+      l.textContent = 'The club could not be lit on this device. (' + (err?.message ?? err) + ')';
+    });
+  </script>
+  <style is:global>
+    :root{
+      --display:'Bodoni Moda',ui-serif,Didot,Georgia,serif; --italic:'Cormorant Garamond',ui-serif,Georgia,serif; --sans:'Manrope',ui-sans-serif,system-ui,sans-serif;
+      --bg:#070707; --fg:#EFE8DC; --dim:rgba(239,232,220,.56); --hair:rgba(239,232,220,.16); --brass:#D2AE6C; --veil:4,6,10; --chip:rgba(0,0,0,.28); --on:#111;
+      --gut:clamp(16px,3vw,44px); color-scheme:dark;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);overflow:hidden;font-family:var(--sans)}
+    canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+    a{color:inherit}
+    .scrim{position:fixed;inset:0;pointer-events:none !important;z-index:1;background:linear-gradient(180deg,rgba(var(--veil),.5) 0,transparent 13%),linear-gradient(90deg,rgba(var(--veil),.55) 0,rgba(var(--veil),.2) 24%,transparent 38%),linear-gradient(0deg,rgba(var(--veil),.45) 0,transparent 18%)}
+    .scrim.deep{background:linear-gradient(90deg,rgba(var(--veil),.8) 0,rgba(var(--veil),.55) 30%,transparent 52%)}
+    header{position:fixed;inset:0 0 auto 0;display:flex;justify-content:space-between;align-items:baseline;padding:calc(24px + env(safe-area-inset-top,0px)) var(--gut) 0;z-index:3;font-size:12.5px;letter-spacing:.04em}
+    .mk{font-family:var(--display);font-size:22px;color:var(--fg);text-decoration:none}
+    .mk i,.brand i{font-family:var(--italic);font-weight:300}
+    nav{display:flex;gap:26px;align-items:baseline}
+    nav a{color:var(--dim);text-decoration:none}
+    nav a[aria-current=page]{color:var(--fg)}
+    .snd{background:none;border:0;color:var(--dim);font:inherit;letter-spacing:inherit;cursor:pointer;padding:0}
+    .snd[aria-pressed=true]{color:var(--fg)}
+    a:focus-visible,button:focus-visible{outline:1px solid var(--brass);outline-offset:3px}
+
+    /* each place shows its own panels */
+    [data-for]{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .45s,visibility 0s .45s}
+    [data-view=home] [data-for~=home],[data-view=case] [data-for~=case],[data-view=board] [data-for~=board],[data-view=about] [data-for~=about]{opacity:1;visibility:visible;pointer-events:auto;transition:opacity .7s .35s,visibility 0s}
+
+    .panel,.cap{position:fixed;left:var(--gut);top:50%;transform:translateY(-46%);z-index:2;width:min(440px,calc(100vw - 32px))}
+    .k{font-size:10.5px;letter-spacing:.3em;text-transform:uppercase;color:var(--brass)}
+    .panel h1,.cap h1{font-family:var(--display);font-weight:400;font-size:clamp(40px,4.4vw,64px);line-height:1.02;margin:10px 0 8px}
+    .sc{font-family:var(--italic);font-style:italic;font-size:20px;color:var(--dim);margin:0}
+    .cap .rt{margin-top:10px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);font-variant-numeric:tabular-nums}
+    .cap .rt b{font-weight:500;color:var(--fg)}
+    .go{display:flex;gap:26px;flex-wrap:wrap;margin-top:26px}
+    .go a{color:var(--fg);text-decoration:none;font-size:12px;letter-spacing:.2em;text-transform:uppercase;border-bottom:1px solid var(--brass);padding-bottom:3px}
+    .go a:last-child{border-bottom-color:var(--hair)}
+    .panel .switch{margin-top:24px}
+    .row{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+    .panel .row{margin-top:22px}
+    .panel .row .switch{margin-top:0}
+    .switch{display:inline-flex;border:1px solid var(--hair);border-radius:22px;padding:3px;background:rgba(0,0,0,.25);backdrop-filter:blur(6px)}
+    .switch button{background:none;border:0;color:var(--dim);font:11px var(--sans);letter-spacing:.22em;text-transform:uppercase;padding:8px 16px;border-radius:19px;cursor:pointer}
+    .switch button[aria-pressed=true]{background:var(--fg);color:var(--on)}
+    .order{display:flex;gap:14px;align-items:baseline;font:10.5px var(--sans);letter-spacing:.22em;text-transform:uppercase;color:var(--hair)}
+    .order button{background:none;border:0;color:var(--dim);font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;padding:2px 0;border-bottom:1px solid transparent}
+    .order button[aria-pressed=true]{color:var(--fg);border-bottom-color:var(--brass)}
+
+    .deck{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(30px + env(safe-area-inset-bottom,0px));z-index:3;display:flex;flex-direction:column;gap:12px;align-items:center;max-width:calc(100vw - 32px)}
+    .pills{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;max-width:min(720px,calc(100vw - 120px))}
+    .pills button{flex:none;border:1px solid var(--hair);background:var(--chip);color:var(--fg);border-radius:22px;padding:10px 16px;font:12px var(--sans);letter-spacing:.06em;cursor:pointer;backdrop-filter:blur(6px)}
+    .pills button.on{background:var(--fg);color:var(--on);border-color:var(--fg)}
+    .step{flex:none;width:38px;height:38px;border-radius:50%;border:1px solid var(--hair);background:var(--chip);color:var(--fg);font:20px/1 var(--display);cursor:pointer;backdrop-filter:blur(6px)}
+    .zoom{position:fixed;right:var(--gut);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:3;border:1px solid var(--hair);background:var(--chip);color:var(--fg);border-radius:22px;padding:10px 18px;font:11px var(--sans);letter-spacing:.18em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(6px)}
+    .hint{position:fixed;right:var(--gut);bottom:calc(40px + env(safe-area-inset-bottom,0px));z-index:3;font-family:var(--italic);font-style:italic;font-size:16px;color:var(--dim)}
+
+    .list{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:2px;max-height:46vh;overflow-y:auto;scrollbar-width:thin}
+    .list li{display:flex;gap:16px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--hair);font-size:14px}
+    .list .n{font-variant-numeric:tabular-nums;font-size:11px;letter-spacing:.18em;color:var(--brass);width:22px}
+    .list a{text-decoration:none;font-family:var(--display);font-size:19px}
+    .list a em{font-family:var(--italic);color:var(--dim);font-size:16px}
+    .list .empty{color:var(--dim);font-family:var(--italic);font-style:italic}
+    .about p{color:var(--dim);line-height:1.6;font-size:14px;margin:12px 0 0}
+    .about p.fine{font-size:12px;line-height:1.55}
+    .about p a{color:var(--fg);text-decoration-color:var(--hair)}
+
+    .fade{transition:opacity .45s,transform .55s,visibility 0s}
+    .fade.out{opacity:0 !important}
+    .loading{position:fixed;inset:0;display:grid;place-items:center;z-index:5;font-family:var(--italic);font-style:italic;font-size:22px;color:var(--dim);background:var(--bg);transition:opacity .8s}
+    .loading.done{opacity:0;pointer-events:none}
+    .loading.error{font-family:var(--sans);font-style:normal;font-size:14px;padding:24px;text-align:center;line-height:1.6}
+    @media (max-width:760px){
+      header{flex-direction:column;gap:10px}
+      .scrim{background:linear-gradient(180deg,rgba(var(--veil),.6) 0,transparent 16%),linear-gradient(0deg,rgba(var(--veil),.9) 0,rgba(var(--veil),.45) 34%,transparent 54%)}
+      .scrim.deep{background:linear-gradient(0deg,rgba(var(--veil),.95) 0,rgba(var(--veil),.82) 55%,transparent 78%)}
+      .panel,.cap{top:auto;transform:none;bottom:calc(36px + env(safe-area-inset-bottom,0px))}
+      .cap{bottom:calc(132px + env(safe-area-inset-bottom,0px))}
+      .deck{gap:10px} .deck .row{gap:12px;flex-wrap:nowrap} .deck .order span{display:none} .deck .order{gap:10px}
+      .deck .switch button{padding:7px 12px}
+      .panel h1,.cap h1{font-size:36px}
+      .sc{font-size:18px}
+      .list{max-height:34vh}
+      .hint{display:none}
+      .zoom{bottom:auto;top:calc(104px + env(safe-area-inset-top,0px))}
+      .deck{bottom:calc(20px + env(safe-area-inset-bottom,0px));width:calc(100vw - 32px)}
+      .pills{max-width:calc(100vw - 120px)}
+    }
+    @media (prefers-reduced-motion:reduce){ .fade,[data-for]{transition:none} }
+  </style>
+</body>
+</html>

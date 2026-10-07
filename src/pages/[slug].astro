@@ -1,0 +1,11 @@
+---
+// One address per title, /<slug>/: the club, opened at that title's case.
+import Club from '../layouts/Club.astro';
+import { TITLES } from '../data/titles';
+
+export function getStaticPaths() {
+  return TITLES.map(t => ({ params: { slug: t.slug } }));
+}
+const { slug } = Astro.params as { slug: string };
+---
+<Club route={{ view: 'case', slug }} />

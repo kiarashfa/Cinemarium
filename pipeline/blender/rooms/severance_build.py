@@ -171,7 +171,7 @@ def build(args):
         elif 'UVMap' not in o.data.uv_layers: o.data.uv_layers[0].name = 'UVMap'
     for o in phantom.objects: cine.bake_ready([o]); cine.world_uv(o, 1.0); cine.phantom(o)
     cine.check_module(objs)
-    # the web camera's view, at room scale (the case shot from the one-at-a-time layout, and a closer one)
+    # the web camera's view, at room scale (the case view, and the closer one)
     cams = {'case': camera('cam_case', (11.14, -18.16, 7.95), (-2.30, -1.49, 0.63), 32),
             'close': camera('cam_close', (5.6, -6.2, 3.7), (0.2, 0.35, 0.75), 30),
             'dylan': camera('cam_dylan', (1.95, 0.3, 1.5), (0.98, -0.45, 0.92), 36),

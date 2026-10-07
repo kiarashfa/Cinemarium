@@ -1,6 +1,6 @@
 // Study models: white card maquettes of each title's room at its true wall height, each with a 1.75 m
 // scale figure. They stand in until a title's realistic room is built, and they prove the module:
-// MDR's 2.36 m ceiling, the Swan's 2.7 m and the Construct's full 3 m all sit under the same glass.
+// MDR's 2.36 m ceiling, the Swan's 2.7 m and the hotel room's full 3 m all sit under the same glass.
 import * as THREE from 'three/webgpu';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { MODULE } from '../module';
@@ -38,11 +38,12 @@ function shell(g: THREE.Group, wallH: number, floorHex: number, wallHex: number)
   return box;
 }
 
+// kept soft: the card is white and the club's own key light falls on it too
 function light(g: THREE.Group, wallH: number) {
-  const panel = new THREE.RectAreaLight(0xfff6ea, 2.2, 7, 5.4); panel.position.set(0, wallH + 0.4, 0.2); panel.lookAt(0, 0, 0.2); g.add(panel);
-  const key = new THREE.SpotLight(0xfff1e0, 90, 16, 0.7, 1, 2); key.position.set(-2.4, 7, 3.4); key.target.position.set(0.3, 0, -0.4);
+  const panel = new THREE.RectAreaLight(0xfff6ea, 1.1, 7, 5.4); panel.position.set(0, wallH + 0.4, 0.2); panel.lookAt(0, 0, 0.2); g.add(panel);
+  const key = new THREE.SpotLight(0xfff1e0, 50, 16, 0.7, 1, 2); key.position.set(-2.4, 7, 3.4); key.target.position.set(0.3, 0, -0.4);
   key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0002; key.shadow.normalBias = 0.03; key.shadow.radius = 6;
-  g.add(key, key.target, new THREE.HemisphereLight(0xffffff, 0xd8d4cc, 0.35));
+  g.add(key, key.target, new THREE.HemisphereLight(0xffffff, 0xd8d4cc, 0.18));
 }
 
 const still: Room['update'] = () => {};

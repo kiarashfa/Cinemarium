@@ -1,5 +1,5 @@
 // The two lists: ten series and ten films, each with its room. `rank` is the personal order (1 = best);
-// the tower can also sort by year or by IMDb rating. Ratings and other facts come from src/data/meta.json,
+// the lists can also be ordered by year or by IMDb rating. Ratings and other facts come from src/data/meta.json,
 // written at build time by tools/meta.mjs (IMDb ratings via OMDb).
 import META from './meta.json';
 
@@ -7,6 +7,7 @@ export type Kind = 'series' | 'film';
 export type Sort = 'rank' | 'year' | 'imdb';
 
 export interface Title {
+  /** Its address, /<slug>/: unique across both lists, never one of RESERVED. */
   slug: string;
   kind: Kind;
   title: string;
@@ -25,10 +26,15 @@ const LIST: Title[] = [
   { slug: 'the-matrix', kind: 'film', title: 'The Matrix', year: 1999, scene: 'The red pill', imdb: { id: 'tt0133093' }, room: 'the-matrix' },
 ];
 
+/** Addresses the club itself uses. */
+export const RESERVED = ['board', 'about'];
+LIST.forEach((t, i) => {
+  if (RESERVED.includes(t.slug) || LIST.findIndex(u => u.slug === t.slug) !== i) throw new Error(`The address /${t.slug}/ is already taken`);
+});
+
 const facts = META.titles as Record<string, { imdb?: { rating?: number; votes?: number } }>;
 export const TITLES: Title[] = LIST.map(t => ({ ...t, imdb: { ...t.imdb, ...facts[t.slug]?.imdb, asOf: META.asOf } }));
 
-export const KIND_PATH: Record<Kind, string> = { series: 'series', film: 'films' };
 export const KIND_NAME: Record<Kind, string> = { series: 'Series', film: 'Films' };
 
 /** The list for one kind in the chosen order: best first. */

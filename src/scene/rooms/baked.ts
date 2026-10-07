@@ -6,7 +6,7 @@ import { lights, vec3 } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import type { Room } from './types';
-import { RENDERER } from '../stage';
+import { RENDERER, QUERY } from '../stage';
 import { perform, type PersonMeta } from './performers';
 
 const gltf = new GLTFLoader(), exr = new EXRLoader(), image = new THREE.TextureLoader();
@@ -54,7 +54,10 @@ interface Meta {
   people: PersonMeta[];
 }
 
-export async function bakedRoom(id: string, screen?: (q: number) => { canvas: HTMLCanvasElement; draw(t: number): void }): Promise<Room> {
+/** A live screen: a canvas drawn each tick (`q` tells the screens of one room apart). */
+export type Screen = (q: number) => { canvas: HTMLCanvasElement; draw(t: number): void };
+
+export async function bakedRoom(id: string, screen?: Screen): Promise<Room> {
   const meta: Meta = await (await fetch(asset(id, 'room.json'))).json();
   const [scene, ...maps] = await Promise.all([
     gltf.loadAsync(asset(id, 'room.glb')).then(g => g.scene),
@@ -110,7 +113,7 @@ export async function bakedRoom(id: string, screen?: (q: number) => { canvas: HT
   });
 
   // the room's own light, captured once: the desks reflect it and the people are lit by it
-  const env = captureRoom(group, meta);
+  const capture = captureRoom(group, meta), env = capture?.texture ?? null;
   if (env) for (const m of cache.values()) { (m as RoomMaterial).envMap = env; }
   const bodies = await Promise.all(meta.people.map(async p => {
     const g = await gltf.loadAsync(asset(id, `people/${p.file}`));
@@ -131,7 +134,7 @@ export async function bakedRoom(id: string, screen?: (q: number) => { canvas: HT
   }));
   // each person's acts, crossfaded at random by weight; Milchick on his rounds
   const cast = perform(bodies);
-  if (new URLSearchParams(location.search).has('debug')) (window as any).__cast = cast;
+  if (QUERY.has('debug')) (window as any).__cast = cast;
 
   let last = -1;
   return {
@@ -142,6 +145,7 @@ export async function bakedRoom(id: string, screen?: (q: number) => { canvas: HT
       const now = new Date(), sec = now.getSeconds() + now.getMilliseconds() / 1000, min = now.getMinutes() + sec / 60, hr = (now.getHours() % 12) + min / 60;
       for (const h of clock) h.pivot.rotation.z = -((h.kind === 'h' ? hr / 12 : h.kind === 'm' ? min / 60 : Math.floor(sec) / 60) * Math.PI * 2 - h.rest);
     },
+    dispose() { capture?.dispose(); },
   };
 }
 
@@ -166,5 +170,5 @@ function captureRoom(group: THREE.Group, meta: Meta) {
   cam.update(RENDERER, scene);
   scene.remove(group); parent?.add(group);
   extra.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh) { m.geometry.dispose(); (m.material as THREE.Material).dispose(); } });
-  return rt.texture;
+  return rt;
 }

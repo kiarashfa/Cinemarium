@@ -41,7 +41,6 @@ Released into the public domain under [CC0 1.0](https://creativecommons.org/publ
   *white_plaster_02*, *ceiling_interior*; models *wall_clock*, *office_notepads*, *stationery_supplies*,
   *vintage_stapler*, *binder_notebook*, *fire_alarm*.
 - [ambientCG](https://ambientcg.com): *Carpet012*, *Carpet013*.
-- [pmndrs/assets](https://github.com/pmndrs/assets): the *apartment* environment map (`public/env/apartment.exr`).
 
 ## Title data
 

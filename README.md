@@ -1,14 +1,14 @@
 # Cinemarium
 
-**Cinemarium** (cinema + vivarium) is a small museum of favourite series and films that runs entirely in your browser. Each title becomes a real room from one early, iconic scene, built to scale and kept under glass, with its people still going about their day. A ten-storey glass tower holds one title per floor; open any floor and its room stands alone in its own case, where you can walk around it and lean in until it reads as a miniature. Every visit opens on the whole room: click to step in, scroll to come closer.
+**Cinemarium** (cinema + vivarium) is a small museum of favourite series and films that runs entirely in your browser. Each title becomes a real room from one early, iconic scene, built to scale and kept under glass, with its people still going about their day. The rooms are kept in a circular video club: walk in, step up to the case, and lean in until the room reads as a miniature.
 
 ## What's inside
 
 - **Ten series and ten films**, one room each, chosen from a personal list. The first room is Lumon's Macrodata Refinement floor from *Severance*; more are under construction, and the collection is still growing.
-- **The Tower.** A glass building standing in a grand library hall, No. 1 at the top. Switch between series and films, or order the floors by personal rank, by year or by IMDb rating; the building re-dresses itself floor by floor, lights going out and coming back on.
-- **The Case.** One case at a time on a lacquer plinth in a circular video club, its walls lined floor to ceiling with films under a crown of light. Drag to walk around it, step in to lean closer, and pick another title to watch the room sink into the plinth and the next one rise.
+- **The club.** A round video club, its walls lined floor to ceiling with films under a crown of light. Every visit begins at the door.
+- **The case.** One room at a time on a lacquer plinth. Drag to walk around it and lean in close; switch between series and films, order them by personal rank, by year or by IMDb rating, and watch the room sink into the plinth as the next one rises. Every title has its own address.
 - **Rooms that are alive.** Path-traced light baked from real fixtures, real materials, and motion-captured people who work, pause, stretch and do their rounds. The terminals run, and the clock on the wall keeps your time.
-- **Works on desktop and on your phone.** Real-time WebGPU (WebGL 2 where WebGPU is not available), lighter on phones.
+- **Works on desktop and on your phone.** Real-time WebGPU (WebGL 2 where WebGPU is not available). It adapts its quality to the graphics it runs on, from a gaming laptop to integrated graphics and phones, and loads each room only when you visit it.
 - **Completely static.** No backend, no accounts, no trackers.
 
 ## Data & credits

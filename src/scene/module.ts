@@ -1,15 +1,14 @@
 // The room module and the one model scale.
 //
 // Every room, for every title, is built inside MODULE at real size (metres, people 1.75 m tall)
-// and shown at SCALE in every layout. The case and the tower floor are derived from these numbers
-// only, so every case and every floor is identical, and the glass always clears the tallest room.
-// Pick the numbers once; never scale a room on its own (that is how cases and floors drift apart in size).
+// and shown at SCALE. The case is derived from these numbers only, so it is the same for every title
+// and its glass always clears the tallest room. Pick the numbers once; never scale a room on its own.
 import * as THREE from 'three/webgpu';
 
 /** The box every room is built in, in real metres. Origin at the centre of the floor; x right, y up, z toward the viewer. */
 export const MODULE = { W: 9.6, D: 7.6, H: 3.0 } as const;
 
-/** One model scale for every room, case and floor. At 1:6 a person is 0.29 m tall. */
+/** One model scale for every room. At 1:6 a person is 0.29 m tall. */
 export const SCALE = 1 / 6;
 
 /** Glass, in model metres: the gap around the room, the headroom above it, and the pane thickness. */
@@ -22,10 +21,7 @@ export const CASE = {
   h: MODULE.H * SCALE + GLASS.head,
 } as const;
 
-/** A tower floor: a lacquer slab, then exactly one case height of room and glass. */
-export const FLOOR = { slab: 0.04, h: 0.04 + CASE.h } as const;
-
-/** Lift the room 1.5 mm off its stage so the two floors never z-fight. */
+/** Lift the room 1.5 mm off its stage so the room's floor and the stage never z-fight. */
 export const STAGE_LIFT = 0.0015;
 
 export interface FitReport {

@@ -1,7 +1,7 @@
 // Watch who does what for a while: samples the cast's current acts every two seconds (needs the dev server).
-// Usage: node tools/shots/acts.mjs "/Cinemarium/series/severance/" 60
+// Usage: node tools/shots/acts.mjs "/Cinemarium/severance/" 60
 import { chromium } from 'playwright-core';
-const [, , rel = '/Cinemarium/series/severance/', secs = '60'] = process.argv;
+const [, , rel = '/Cinemarium/severance/', secs = '60'] = process.argv;
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true,
   args: ['--enable-gpu', '--use-angle=d3d11', '--enable-unsafe-webgpu', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });

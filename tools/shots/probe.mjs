@@ -1,5 +1,5 @@
 // Load a page with ?debug on the real GPU, wait for frames, then run a JS expression against window.__scene.
-// Usage: node tools/shots/probe.mjs "/Cinemarium/series/severance/?still" "<js expression using s = scene>"
+// Usage: node tools/shots/probe.mjs "/Cinemarium/severance/?still" "<js expression using s = scene>"
 import { chromium } from 'playwright-core';
 const [, , rel, expr] = process.argv;
 const browser = await chromium.launch({ executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe', headless: true,

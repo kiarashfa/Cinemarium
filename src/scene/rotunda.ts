@@ -1,17 +1,26 @@
 // The Rotunda: a circular video club after the round wine cellar of the Cité du Vin in Bordeaux. One ring of racks
 // makes the wall, floor to ceiling, every cell holding DVD and VHS cases in runs with air between them, lit by the
 // strip under the shelf above; brass rods between the columns of cells; curved light-oak display counters around the
-// subject; four concrete columns; a dark satin floor; and a stack of luminous rings hanging over the centre.
+// case; four concrete columns; a dark satin floor; a stack of luminous rings hanging over the centre; and the
+// entrance, a doorway through the racks to a short vestibule and glass doors onto the street at night.
 // It is kept dark, as the cellar is: the racks are a quiet texture, the rings and the counters carry the light.
-// Two finishes: noir (dark-stained racks, as in Bordeaux; the Case) and oak (honey oak, brass, a gallery).
+// The centre of the room is the origin; angles run round it from +z (the entrance).
 import * as THREE from 'three/webgpu';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { abs, dot, float, normalView, positionViewDirection, pow, reflector } from 'three/tsl';
 import { canvasTexture, noise, rng } from './materials';
-import { capture, dim, keySpot, polishedFloor, type Subject } from './ambient-kit';
 
-export type Finish = 'noir' | 'oak';
+/** Where things stand round the room: the entrance, and the board across from it. */
+export const DOOR = 0, BOARD = Math.PI;
+/** The radius of the wall of racks (their faces). */
+export const RADIUS = 9;
+/** The room is built around one subject (the case): its centre, height and width, in metres. */
+export interface Subject { centre: THREE.Vector3; height: number; width: number }
+export interface Rotunda { group: THREE.Group; setMirror(on: boolean): void }
+
 const ROWS = 16;                   // shelf rows in the media texture
 const CELL = 0.62, SHELF = 0.3;    // a rack cell: 62 cm of arc, 30 cm between shelves
+const DOOR_W = 2.0, DOOR_H = 2.9;  // the doorway through the racks (the lintel above it, up to the next shelf line)
 
 // a collector's palette: black, ivory and gilt, deep burgundy, navy and green; a little silver
 const SPINES = [[12, 12, 13], [16, 15, 15], [20, 18, 17], [10, 10, 11], [226, 216, 194], [214, 202, 178], [104, 18, 24], [74, 14, 20],
@@ -91,6 +100,30 @@ function coversTexture(seed: number) {
   t.anisotropy = 8; return t;
 }
 
+/** The street beyond the glass doors at night: a dark facade across the road, a few lit windows, a lamp's glow. */
+function streetTexture() {
+  return canvasTexture(512, 512, (c, w, h) => {
+    const r = rng(81), sky = c.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, '#05070d'); sky.addColorStop(0.55, '#0b0d14'); sky.addColorStop(1, '#1c140c'); c.fillStyle = sky; c.fillRect(0, 0, w, h);
+    c.filter = 'blur(6px)';
+    for (let k = 0; k < 9; k++) { c.fillStyle = `rgba(255,${190 + r() * 40},${120 + r() * 50},${0.25 + r() * 0.35})`; c.fillRect(r() * w, h * (0.1 + r() * 0.4), 18 + r() * 26, 26 + r() * 30); }
+    const lamp = c.createRadialGradient(w * 0.72, h * 0.3, 2, w * 0.72, h * 0.3, w * 0.4);
+    lamp.addColorStop(0, 'rgba(255,196,120,.55)'); lamp.addColorStop(1, 'rgba(255,196,120,0)'); c.fillStyle = lamp; c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(255,190,120,.12)'; c.fillRect(0, h * 0.82, w, h * 0.18);   // the wet pavement
+    c.filter = 'none';
+  }, { repeat: [1, 1] });
+}
+
+/** The sign over the doorway: EXIT in spaced capitals, warm white on black glass. */
+function exitTexture() {
+  const t = canvasTexture(512, 144, (c, w, h) => {
+    c.fillStyle = '#050403'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#fff1d6'; c.font = '64px "Bodoni Moda", Didot, Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('E X I T', w / 2, h / 2 + 4);
+  }, { repeat: [1, 1] });
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;
+}
+
 /** Cells on a ring of radius R between angles a0 and a1: quads facing the centre, each a different stretch of shelf. */
 function cellRing(R: number, a0: number, a1: number, cols: number, y0: number, rows: number, r: () => number) {
   const pos: number[] = [], uvs: number[] = [], idx: number[] = [], da = (a1 - a0) / cols, uw = CELL * 427 / 2048, gap = 0.012 / R;
@@ -106,9 +139,11 @@ function cellRing(R: number, a0: number, a1: number, cols: number, y0: number, r
 }
 const lathe = (profile: number[][], a0 = 0, span = Math.PI * 2, seg = 180) => new THREE.LatheGeometry(profile.map(([x, y]) => new THREE.Vector2(x, y)), seg, a0, span);
 const at = (geo: THREE.BufferGeometry, a: number, y: number, R: number) => { geo.translate(0, y, R); geo.rotateY(a); return geo; };
+type Parts = { wood: THREE.BufferGeometry[]; brass: THREE.BufferGeometry[]; led: THREE.BufferGeometry[]; media: THREE.BufferGeometry[]; bronze: THREE.BufferGeometry[] };
 
-/** A ring of racks: cells, shelves, uprights, brass rods, LED strips, back and cornice, between angles a0..a0+span. */
-function rackRing(R: number, depth: number, y0: number, rows: number, a0: number, span: number, r: () => number, out: { wood: THREE.BufferGeometry[]; brass: THREE.BufferGeometry[]; led: THREE.BufferGeometry[]; media: THREE.BufferGeometry[] }, cornice = true) {
+/** A run of racks: cells, shelves, uprights, brass rods, LED strips, back, plinth and cornice, between angles a0..a0+span.
+ * The back and the plinth start at `base` (above a doorway, the run starts in the air). */
+function rackRing(R: number, depth: number, y0: number, rows: number, a0: number, span: number, r: () => number, out: Parts, base = 0) {
   const cols = Math.max(1, Math.round(span * R / CELL)), top = y0 + rows * SHELF, full = span >= Math.PI * 2 - 1e-6;
   out.media.push(cellRing(R + 0.12, a0, a0 + span, cols, y0, rows, r));
   for (let k = 0; k <= rows; k++) {
@@ -121,28 +156,119 @@ function rackRing(R: number, depth: number, y0: number, rows: number, a0: number
     out.wood.push(at(new THREE.BoxGeometry(0.024, top - y0 + 0.02, depth), a, (y0 + top) / 2, R + depth / 2));
     out.brass.push(at(new THREE.CylinderGeometry(0.006, 0.006, top - y0, 6), a, (y0 + top) / 2, R - 0.022));
   }
-  out.wood.push(lathe([[R + depth, 0], [R + depth, top + 0.2]], a0, span));                                   // the back
-  out.wood.push(lathe([[R - 0.03, 0], [R - 0.03, y0], [R + depth, y0], [R + depth, 0]], a0, span));             // the plinth
-  if (cornice) out.wood.push(lathe([[R - 0.05, top], [R + depth, top], [R + depth, top + 0.2], [R - 0.05, top + 0.2], [R - 0.05, top]], a0, span));
+  out.wood.push(lathe([[R + depth, base], [R + depth, top + 0.2]], a0, span));                                   // the back
+  if (y0 > base) out.wood.push(lathe([[R - 0.03, base], [R - 0.03, y0], [R + depth, y0], [R + depth, base]], a0, span));   // the plinth
+  out.wood.push(lathe([[R - 0.05, top], [R + depth, top], [R + depth, top + 0.2], [R - 0.05, top + 0.2], [R - 0.05, top]], a0, span));
 }
 
-export async function rotunda(scene: THREE.Scene, renderer: THREE.WebGPURenderer, s: Subject, finish: Finish) {
-  const g = new THREE.Group(), cz = s.centre.z, top = s.centre.y + s.height / 2, oak = finish === 'oak';
-  const R = 9, depth = 0.42, H = Math.max(8.6, top + 3), r = rng(oak ? 77 : 71);
+/** The entrance at angle DOOR: bronze reveals and lintel through the racks, a short vestibule, a pair of glass doors
+ * with brass push bars, the street beyond, the sign over the doorway and a warm light in the vestibule. */
+function entrance(g: THREE.Group, R: number, depth: number, half: number, out: Parts) {
+  const turn = (geo: THREE.BufferGeometry) => geo.rotateY(DOOR);
+  const box = (w: number, h: number, d: number, x: number, y: number, z: number) => new THREE.BoxGeometry(w, h, d).translate(x, y, z);
+  // the reveals: bronze cheeks on the cut ends of the racks, a soffit, the lintel band that carries the sign
+  for (const s of [-1, 1]) out.bronze.push(turn(box(0.06, DOOR_H, depth + 0.16, 0, DOOR_H / 2, R + depth / 2 + 0.02).rotateY(s * half)));
+  out.bronze.push(turn(lathe([[R - 0.06, DOOR_H - 0.02], [R + depth + 0.1, DOOR_H - 0.02], [R + depth + 0.1, DOOR_H + 0.3], [R - 0.06, DOOR_H + 0.3], [R - 0.06, DOOR_H - 0.02]], -half - 0.004, 2 * half + 0.008, 24)));
+  out.brass.push(turn(box(DOOR_W, 0.012, 0.14, 0, 0.006, R + depth + 0.04)));                                   // the threshold
+  // the vestibule: dark plaster, a concrete floor, a coir mat
+  const zIn = R + depth, L = 1.5, zDoor = zIn + L - 0.12, w = DOOR_W;
+  const plaster = new THREE.MeshStandardMaterial({ color: 0x17130f, roughness: 0.92 });
+  const vest = [box(0.1, DOOR_H, L, -w / 2 - 0.05, DOOR_H / 2, zIn + L / 2), box(0.1, DOOR_H, L, w / 2 + 0.05, DOOR_H / 2, zIn + L / 2), box(w + 0.2, 0.1, L, 0, DOOR_H + 0.05, zIn + L / 2)];
+  g.add(new THREE.Mesh(turn(mergeGeometries(vest)), plaster));
+  const floor = new THREE.Mesh(turn(box(w, 0.02, L + 0.2, 0, -0.011, zIn + L / 2 - 0.1)), new THREE.MeshStandardMaterial({ color: 0x1a1714, roughness: 0.55 }));
+  const mat = new THREE.Mesh(turn(box(1.5, 0.012, 0.85, 0, 0.006, zDoor - 0.6)), new THREE.MeshStandardMaterial({ color: 0x2a1f15, roughness: 1 }));
+  floor.receiveShadow = mat.receiveShadow = true; g.add(floor, mat);
+  // the doors: two leaves of dark glass in bronze frames, a transom, brass push bars
+  const leaf = (w - 0.04) / 2, lh = DOOR_H - 0.16, f = 0.05;
+  for (const s of [-1, 1]) {
+    const cx = s * (leaf / 2 + 0.01);
+    out.bronze.push(turn(box(leaf, f, 0.05, cx, f / 2, zDoor)), turn(box(leaf, f, 0.05, cx, lh - f / 2, zDoor)), turn(box(f, lh, 0.05, cx - leaf / 2 + f / 2, lh / 2, zDoor)), turn(box(f, lh, 0.05, cx + leaf / 2 - f / 2, lh / 2, zDoor)));
+    out.brass.push(turn(new THREE.CylinderGeometry(0.018, 0.018, leaf - 0.22, 12).rotateZ(Math.PI / 2).translate(cx, 1.05, zDoor - 0.09)));
+    for (const dx of [-1, 1]) out.brass.push(turn(box(0.02, 0.02, 0.07, cx + dx * (leaf / 2 - 0.13), 1.05, zDoor - 0.055)));
+  }
+  out.bronze.push(turn(box(w, DOOR_H - lh, 0.06, 0, lh + (DOOR_H - lh) / 2, zDoor)));
+  const pane = new THREE.MeshPhysicalMaterial({ color: 0x0c0f0e, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.32, envMapIntensity: 1.2 });
+  g.add(new THREE.Mesh(turn(box(w - 0.06, lh - 0.1, 0.012, 0, lh / 2, zDoor)), pane));
+  const street = new THREE.Mesh(turn(new THREE.PlaneGeometry(4.5, 4).rotateY(Math.PI).translate(0, 1.6, zDoor + 1.4)), new THREE.MeshBasicMaterial({ map: streetTexture(), color: new THREE.Color(0.9, 0.9, 0.9) }));
+  g.add(street);
+  const sign = new THREE.Mesh(turn(new THREE.PlaneGeometry(0.62, 0.17).rotateY(Math.PI).translate(0, DOOR_H + 0.15, R - 0.066)), new THREE.MeshBasicMaterial({ map: exitTexture(), color: new THREE.Color(1.4, 1.35, 1.25) }));
+  g.add(sign);
+  const lamp = new THREE.PointLight(0xffcf98, 2.2, 6, 2); lamp.position.set(Math.sin(DOOR) * (zIn + 0.7), DOOR_H - 0.3, Math.cos(DOOR) * (zIn + 0.7)); g.add(lamp);
+}
+
+/** A warm key spot from `from` that covers the subject with a soft edge; casts the shadow. */
+function keySpot(hex: number, from: THREE.Vector3, s: Subject, candela: number, cover = 0.75) {
+  const dist = from.distanceTo(s.centre), half = Math.max(s.height, s.width) * cover;
+  const spot = new THREE.SpotLight(hex, candela * (dist / 5) ** 1.6, dist * 2.5, Math.min(1.0, Math.atan(half / dist) * 1.35), 0.7, 1.6);
+  spot.position.copy(from); spot.target.position.copy(s.centre); spot.castShadow = true;
+  spot.shadow.mapSize.set(2048, 2048); spot.shadow.bias = -0.0004; spot.shadow.radius = 6;
+  return spot;
+}
+
+/** The room's own reflections: everything built so far, seen once from the subject. */
+function capture(scene: THREE.Scene, renderer: THREE.WebGPURenderer, at: THREE.Vector3, intensity: number) {
+  const rt = new THREE.CubeRenderTarget(256, { type: THREE.HalfFloatType, generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter });
+  const cam = new THREE.CubeCamera(0.05, 200, rt); cam.position.copy(at); scene.add(cam);
+  cam.update(renderer, scene); scene.remove(cam);
+  scene.environment = rt.texture; scene.environmentIntensity = intensity;
+}
+
+/** Dark satin concrete: faint veins, a clear coat, and (when the quality allows) a faint mirror of the room in it,
+ * strongest at a glancing angle. Keep the mirror low: a strong one turns the floor into a second room below. */
+function satinFloor(radius: number, mirror: number) {
+  const t = canvasTexture(1024, 1024, (c, w, h) => {
+    c.fillStyle = '#161412'; c.fillRect(0, 0, w, h); const r = rng(4);
+    for (let k = 0; k < 60; k++) {
+      c.strokeStyle = `rgba(150,140,128,${0.02 + r() * 0.04})`; c.lineWidth = 0.6 + r() * 1.5; c.beginPath();
+      let x = r() * w, y = r() * h; c.moveTo(x, y); for (let q = 0; q < 8; q++) { x += (r() - 0.4) * 160; y += (r() - 0.5) * 90; c.lineTo(x, y); } c.stroke();
+    }
+    noise(c, w, h, 10, 2);
+  }, { repeat: [7, 7] });
+  const mat = new THREE.MeshPhysicalNodeMaterial({ map: t, roughness: 0.38, clearcoat: 0.35, clearcoatRoughness: 0.38 });
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(radius, 160), mat); floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true;
+  let mirrorNode: ReturnType<typeof reflector> | null = null;
+  const setMirror = (on: boolean) => {
+    if (on === !!mat.emissiveNode) return;
+    if (on) {
+      mirrorNode ??= reflector({ resolutionScale: 0.5, bounces: false });
+      const cos = abs(dot(normalView, positionViewDirection)), fresnel = float(0.04).add(pow(float(1).sub(cos), 5).mul(0.6));   // a mirror only at a glance
+      mat.emissiveNode = mirrorNode.rgb.mul(fresnel.mul(mirror)); floor.add(mirrorNode.target);
+    } else { mat.emissiveNode = null; if (mirrorNode) floor.remove(mirrorNode.target); }
+    mat.needsUpdate = true;
+  };
+  return { floor, setMirror };
+}
+
+/** Scale the room's light: its lamps and everything that glows (unlit materials), once each. */
+function dim(root: THREE.Object3D, k: number) {
+  const seen = new Set<THREE.Material>();
+  root.traverse(o => {
+    if ((o as THREE.Light).isLight) (o as THREE.Light).intensity *= k;
+    const m = (o as THREE.Mesh).material as THREE.MeshBasicMaterial | undefined;
+    if (m && !seen.has(m) && m.isMeshBasicMaterial && !m.transparent) { seen.add(m); m.color.multiplyScalar(k); }
+  });
+}
+
+export function buildRotunda(scene: THREE.Scene, renderer: THREE.WebGPURenderer, s: Subject, { mirror = true } = {}): Rotunda {
+  const g = new THREE.Group(), top = s.centre.y + s.height / 2, R = RADIUS, depth = 0.42, H = Math.max(8.6, top + 3), r = rng(71);
   scene.background = new THREE.Color(0x040302); scene.fog = new THREE.FogExp2(0x050403, 0.024);
-  const rackWood = new THREE.MeshPhysicalMaterial(oak ? { color: 0x8a5c33, roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.35 } : { color: 0x1b1310, roughness: 0.45, clearcoat: 0.5, clearcoatRoughness: 0.3 });
-  const counterWood = new THREE.MeshPhysicalMaterial({ color: oak ? 0xa6764a : 0xb88c5c, roughness: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.4 });
-  const brass = new THREE.MeshPhysicalMaterial({ color: oak ? 0xc39a56 : 0xa98348, metalness: 1, roughness: 0.3 });
-  const led = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.78, 0.5).multiplyScalar(oak ? 0.7 : 0.55), side: THREE.DoubleSide });
-  const media = new THREE.MeshBasicMaterial({ map: mediaTexture(oak ? 13 : 11), color: new THREE.Color(1, 0.92, 0.82).multiplyScalar(oak ? 0.42 : 0.32), side: THREE.DoubleSide });
-  const parts = { wood: [] as THREE.BufferGeometry[], brass: [] as THREE.BufferGeometry[], led: [] as THREE.BufferGeometry[], media: [] as THREE.BufferGeometry[] };
-  // the wall: racks from the floor to the ceiling, all the way round
-  rackRing(R, depth, 0.2, Math.floor((H - 0.7) / SHELF), 0, Math.PI * 2, r, parts);
+  const rackWood = new THREE.MeshPhysicalMaterial({ color: 0x1b1310, roughness: 0.45, clearcoat: 0.5, clearcoatRoughness: 0.3 });
+  const counterWood = new THREE.MeshPhysicalMaterial({ color: 0xb88c5c, roughness: 0.55, clearcoat: 0.25, clearcoatRoughness: 0.4 });
+  const brass = new THREE.MeshPhysicalMaterial({ color: 0xa98348, metalness: 1, roughness: 0.3 });
+  const bronze = new THREE.MeshPhysicalMaterial({ color: 0x2c231a, metalness: 0.85, roughness: 0.34 });
+  const led = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.78, 0.5).multiplyScalar(0.55), side: THREE.DoubleSide });
+  const media = new THREE.MeshBasicMaterial({ map: mediaTexture(11), color: new THREE.Color(1, 0.92, 0.82).multiplyScalar(0.32), side: THREE.DoubleSide });
+  const parts: Parts = { wood: [], brass: [], led: [], media: [], bronze: [] };
+  // the wall: racks from the floor to the ceiling, all the way round but for the doorway, and over its lintel
+  const rows = Math.floor((H - 0.7) / SHELF), half = Math.asin(DOOR_W / 2 / R), over = Math.round((DOOR_H + 0.3 - 0.2) / SHELF);
+  rackRing(R, depth, 0.2, rows, DOOR + half, Math.PI * 2 - 2 * half, r, parts);
+  rackRing(R, depth, 0.2 + over * SHELF, rows - over, DOOR - half, 2 * half, r, parts, 0.2 + over * SHELF);
+  entrance(g, R, depth, half, parts);
   const counters: THREE.BufferGeometry[] = [], slants: THREE.BufferGeometry[] = [];
-  // curved display counters around the subject: DVDs on two shelves in front, covers on the slanted top
+  // curved display counters around the case: DVDs on two shelves in front, covers on the slanted top
   const Rc = 4.4, span = 0.9;
   for (let k = 0; k < 4; k++) {
-    const a0 = k * Math.PI / 2 - span / 2 + Math.PI / 4 * (oak ? 1 : 0);
+    const a0 = k * Math.PI / 2 - span / 2;
     // the body: a kick plate, two open shelves set back, a lip, the slanted display, the back
     const body = [[Rc, 0], [Rc, 0.12], [Rc + 0.22, 0.12], [Rc + 0.22, 0.8], [Rc, 0.8], [Rc, 0.86], [Rc + 0.6, 1.07], [Rc + 0.68, 1.07], [Rc + 0.68, 0], [Rc, 0]];
     counters.push(lathe(body, a0, span, 72));
@@ -151,29 +277,18 @@ export async function rotunda(scene: THREE.Scene, renderer: THREE.WebGPURenderer
     }
     slants.push(lathe([[Rc + 0.03, 0.875], [Rc + 0.58, 1.068]], a0 + 0.012, span - 0.024, 72));
     parts.media.push(cellRing(Rc + 0.2, a0 + 0.02, a0 + span - 0.02, Math.round(span * Rc / CELL), 0.12, 2, r));
-    for (const y of [0.42]) counters.push(lathe([[Rc - 0.004, y], [Rc + 0.22, y], [Rc + 0.22, y + 0.025], [Rc - 0.004, y + 0.025], [Rc - 0.004, y]], a0, span, 72));
+    counters.push(lathe([[Rc - 0.004, 0.42], [Rc + 0.22, 0.42], [Rc + 0.22, 0.445], [Rc - 0.004, 0.445], [Rc - 0.004, 0.42]], a0, span, 72));
     parts.led.push(lathe([[Rc - 0.006, 0.83], [Rc - 0.006, 0.85]], a0, span, 72));
   }
-  if (oak) {   // a gallery round the wall, with a brass rail
-    const gy = 4.3;
-    parts.wood.push(lathe([[R - 1.25, gy], [R, gy], [R, gy + 0.16], [R - 1.25, gy + 0.16], [R - 1.25, gy]]));
-    parts.brass.push(lathe([[R - 1.22, gy + 1.02], [R - 1.2, gy + 1.04], [R - 1.18, gy + 1.02], [R - 1.2, gy + 1.0], [R - 1.22, gy + 1.02]], 0, Math.PI * 2, 240));
-    const n = Math.round(2 * Math.PI * (R - 1.2) / 0.5);
-    for (let k = 0; k < n; k++) parts.brass.push(at(new THREE.CylinderGeometry(0.008, 0.008, 0.86, 6), k * 2 * Math.PI / n, gy + 0.59, R - 1.2));
-    parts.led.push(lathe([[R - 1.255, gy + 0.01], [R - 1.255, gy + 0.03]]));
-  }
-  const place = (geo: THREE.BufferGeometry) => geo.translate(0, 0, cz);
-  const add = (list: THREE.BufferGeometry[], m: THREE.Material) => { const mesh = new THREE.Mesh(place(mergeGeometries(list.map(x => x.index ? x.toNonIndexed() : x))), m); g.add(mesh); return mesh; };
-  add(parts.wood, rackWood); add(parts.brass, brass); add(parts.led, led); add(parts.media, media);
+  const add = (list: THREE.BufferGeometry[], m: THREE.Material) => { const mesh = new THREE.Mesh(mergeGeometries(list.map(x => x.index ? x.toNonIndexed() : x)), m); g.add(mesh); return mesh; };
+  add(parts.wood, rackWood); add(parts.brass, brass); add(parts.led, led); add(parts.media, media); add(parts.bronze, bronze);
   add(counters, counterWood);
-  const cov = coversTexture(oak ? 23 : 21); cov.repeat.set(span * (Rc + 0.3) / 2, 1);
+  const cov = coversTexture(21); cov.repeat.set(span * (Rc + 0.3) / 2, 1);
   add(slants, new THREE.MeshBasicMaterial({ map: cov, color: new THREE.Color(1, 0.95, 0.88).multiplyScalar(0.95), side: THREE.DoubleSide }));
-  // the floor, polished; the ceiling, dark; three concrete columns
-  // dark polished concrete, satin: it holds the glow of the rings and the counters, not a copy of the racks
-  const floor = polishedFloor(new THREE.CircleGeometry(R + 0.5, 160), { base: oak ? '#1c1713' : '#161412', vein: '150,140,128', mirror: 0.12, coat: 0.35, coatRough: 0.38 });
-  floor.position.z = cz; g.add(floor);
+  // the floor, satin; the ceiling, dark; four concrete columns
+  const { floor, setMirror } = satinFloor(R + 0.5, 0.12); setMirror(mirror); g.add(floor);
   const ceil = new THREE.Mesh(new THREE.CircleGeometry(R + depth + 0.3, 160), new THREE.MeshStandardMaterial({ color: 0x0b0a09, roughness: 0.9 }));
-  ceil.rotation.x = Math.PI / 2; ceil.position.set(0, H, cz); g.add(ceil);
+  ceil.rotation.x = Math.PI / 2; ceil.position.y = H; g.add(ceil);
   // four columns of fair-faced concrete, standing out from the racks between the counters
   const formwork = canvasTexture(256, 1024, (c, w, h) => {
     c.fillStyle = '#8f8c87'; c.fillRect(0, 0, w, h); noise(c, w, h, 14, 9);
@@ -183,15 +298,15 @@ export async function rotunda(scene: THREE.Scene, renderer: THREE.WebGPURenderer
   const concrete = new THREE.MeshStandardMaterial({ map: formwork, roughness: 0.82 });
   for (let k = 0; k < 4; k++) {
     const a = Math.PI / 4 + k * Math.PI / 2, col = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, H, 48), concrete);
-    col.position.set(Math.sin(a) * 7.2, H / 2, cz + Math.cos(a) * 7.2); col.castShadow = col.receiveShadow = true; g.add(col);
+    col.position.set(Math.sin(a) * 7.2, H / 2, Math.cos(a) * 7.2); col.castShadow = col.receiveShadow = true; g.add(col);
   }
   // the chandelier: luminous bands stacked and gently tilted, the lowest but one spoked like a wheel
   const ringLight = new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.86, 0.62).multiplyScalar(2.3), side: THREE.DoubleSide });
   const housing = new THREE.MeshPhysicalMaterial({ color: 0x1a1714, metalness: 0.8, roughness: 0.35 });
-  const wires: THREE.BufferGeometry[] = [], base = s.height > 3 ? top + 0.95 : 3.0;
+  const wires: THREE.BufferGeometry[] = [], base = 3.0;
   const RINGS = [[2.6, 1.7, 0.12, 0.4], [2.45, 1.35, -0.07, 1.9], [2.2, 0.85, 0.05, 0.9], [2.35, 0.4, -0.035, 2.6], [2.0, 0, 0.025, 1.2]];
   RINGS.forEach(([rad, dy, tilt, dir], k) => {
-    const ring = new THREE.Group(); ring.position.set(0, base + dy, cz); ring.rotation.set(tilt * Math.cos(dir), 0, tilt * Math.sin(dir)); g.add(ring);
+    const ring = new THREE.Group(); ring.position.set(0, base + dy, 0); ring.rotation.set(tilt * Math.cos(dir), 0, tilt * Math.sin(dir)); g.add(ring);
     ring.add(new THREE.Mesh(new THREE.CylinderGeometry(rad, rad, 0.085, 180, 1, true), ringLight));          // an LED band, lit all round
     if (k === 3) for (let q = 0; q < 16; q++) {
       const sp = new THREE.CylinderGeometry(0.004, 0.004, rad, 4); sp.rotateZ(Math.PI / 2); sp.translate(rad / 2, 0, 0); sp.rotateY(q * Math.PI / 8);
@@ -199,17 +314,17 @@ export async function rotunda(scene: THREE.Scene, renderer: THREE.WebGPURenderer
     }
     for (let q = 0; q < 4; q++) {
       const a = q * Math.PI / 2 + k * 0.4, x = Math.sin(a) * rad, z = Math.cos(a) * rad, y = base + dy, len = H - y;
-      const wire = new THREE.CylinderGeometry(0.003, 0.003, len, 4); wire.translate(x, y + len / 2, cz + z); wires.push(wire);
+      wires.push(new THREE.CylinderGeometry(0.003, 0.003, len, 4).translate(x, y + len / 2, z));
     }
   });
   g.add(new THREE.Mesh(mergeGeometries(wires), housing));
   for (let q = 0; q < 8; q++) {
-    const a = q * Math.PI / 4, pl = new THREE.PointLight(0xffd8a0, oak ? 11 : 9, 20, 2); pl.position.set(Math.sin(a) * 2.1, base, cz + Math.cos(a) * 2.1); g.add(pl);
+    const a = q * Math.PI / 4, pl = new THREE.PointLight(0xffd8a0, 9, 20, 2); pl.position.set(Math.sin(a) * 2.1, base, Math.cos(a) * 2.1); g.add(pl);
   }
-  const key = keySpot(0xffe6c4, new THREE.Vector3(0.3, base + 0.6, cz + 0.4), s, oak ? 55 : 45, 0.8);
-  g.add(key, key.target, new THREE.HemisphereLight(0x2a1d12, 0x050403, oak ? 0.26 : 0.18));
+  const key = keySpot(0xffe6c4, new THREE.Vector3(0.3, base + 0.6, s.centre.z + 0.4), s, 45, 0.8);
+  g.add(key, key.target, new THREE.HemisphereLight(0x2a1d12, 0x050403, 0.18));
   dim(g, 0.8);   // a cellar's light: a fifth darker than first drafted
   scene.add(g);
   capture(scene, renderer, s.centre, 0.7);
-  return g;
+  return { group: g, setMirror };
 }

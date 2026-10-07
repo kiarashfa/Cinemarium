@@ -2,6 +2,7 @@
 // (the tilt-shift miniature read), a little bloom for screens and lamps, vignette and grain.
 // Glass lives on its own layer and is left out of the depth/normal pre-pass, so focus and AO look
 // through it at the room instead of stopping at the pane.
+// Tiers: high has everything; medium drops the AO; low also drops the temporal AA and softens the bokeh.
 import * as THREE from 'three/webgpu';
 import {
   builtinAOContext, float, length, mrt, normalView, packNormalToRGB, pass, sample, screenUV, smoothstep, uniform,
@@ -16,42 +17,45 @@ import { film } from 'three/addons/tsl/display/FilmNode.js';
 /** Layer for glass: rendered in the beauty pass, skipped in the pre-pass. */
 export const GLASS_LAYER = 2;
 
-export interface PostOptions { quality: 'high' | 'low'; aoRadius?: number; bloom?: [number, number, number] }
+export type Tier = 'high' | 'medium' | 'low';
+export interface PostOptions { tier: Tier; aoRadius?: number; bloom?: [number, number, number] }
+export type Post = ReturnType<typeof createPost>;
 
 export function createPost(renderer: THREE.WebGPURenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, opts: PostOptions) {
   camera.layers.enable(GLASS_LAYER);
   const pipeline = new THREE.RenderPipeline(renderer);
-  const high = opts.quality === 'high';
+  const withAO = opts.tier === 'high', withAA = opts.tier !== 'low';
+  const nodes: { dispose(): void }[] = [];
+  const keep = <T extends { dispose(): void }>(n: T) => { nodes.push(n); return n; };
 
   const solid = new THREE.Layers(); solid.set(0);
-  const pre = pass(scene, camera); pre.transparent = false; pre.setLayers(solid);
+  const pre = keep(pass(scene, camera)); pre.transparent = false; pre.setLayers(solid);
   pre.setMRT(mrt({ output: packNormalToRGB(normalView), velocity }));
   pre.getTexture('output').type = THREE.UnsignedByteType;
   const preNormal = sample(uv => unpackRGBToNormal(pre.getTextureNode().sample(uv)));
   const preDepth = pre.getTextureNode('depth'), preVelocity = pre.getTextureNode('velocity');
 
-  const beauty = pass(scene, camera);
-  let aoNode: ReturnType<typeof ao> | null = null;
-  if (high) {
-    aoNode = ao(preDepth, preNormal, camera);
+  const beauty = keep(pass(scene, camera));
+  if (withAO) {
+    const aoNode = keep(ao(preDepth, preNormal, camera));
     aoNode.resolutionScale = 0.5; aoNode.radius.value = opts.aoRadius ?? 0.05; aoNode.distanceExponent.value = 1.4; aoNode.thickness.value = 0.03; aoNode.samples.value = 16;
     beauty.contextNode = builtinAOContext(aoNode.getTextureNode().sample(screenUV).r);
   }
-  const resolved = high ? traa(beauty, preDepth, preVelocity, camera) : beauty;
+  const resolved = withAA ? keep(traa(beauty, preDepth, preVelocity, camera)) : beauty;
 
-  const focus = { distance: uniform(3), range: uniform(0.35), bokeh: uniform(high ? 0.95 : 0.7) };
+  const focus = { distance: uniform(3), range: uniform(0.35), bokeh: uniform(opts.tier === 'low' ? 0.7 : 0.95) };
   const Q = new URLSearchParams(location.search);   // ?nodof ?nobloom: switches for judging the finish
-  const focused: any = Q.has('nodof') ? resolved : dof(resolved, pre.getViewZNode(), focus.distance, focus.range, focus.bokeh);
+  const focused: any = Q.has('nodof') ? resolved : keep(dof(resolved, pre.getViewZNode(), focus.distance, focus.range, focus.bokeh));
   const [bs, br, bt] = opts.bloom ?? [0.18, 0.4, 1.1];
-  const lit = Q.has('nobloom') ? focused : focused.add(bloom(focused, bs, br, bt));
+  const lit = Q.has('nobloom') ? focused : focused.add(keep(bloom(focused, bs, br, bt)));
   // a light vignette and grain, as a lens and a sensor would leave them
   const d = length(screenUV.sub(0.5)), vig = float(1).sub(smoothstep(0.35, 0.95, d).mul(0.28));
-  pipeline.outputNode = film(vec4(lit.rgb.mul(vig), 1), float(high ? 0.06 : 0.04));
+  pipeline.outputNode = film(vec4(lit.rgb.mul(vig), 1), float(opts.tier === 'high' ? 0.06 : 0.04));
 
   return {
     pipeline, focus,
     render() { pipeline.render(); },
-    dispose() { aoNode?.dispose(); pipeline.dispose(); },
+    dispose() { for (const n of nodes) n.dispose(); pipeline.dispose(); },
   };
 }
 
