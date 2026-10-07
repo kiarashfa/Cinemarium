@@ -17,6 +17,7 @@ const baked = (id: string, screen?: () => Promise<Screen>): RoomLoader => async 
 export const ROOMS: Record<string, RoomLoader> = {
   'severance': baked('severance', () => import('./mdr-screen').then(m => m.mdrScreen)),
   'the-matrix': baked('the-matrix'),
+  'lost': baked('lost', () => import('./swan-screen').then(m => m.swanScreen)),
 };
 
 const cache = new Map<string, Promise<Room>>();

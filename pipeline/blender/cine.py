@@ -25,6 +25,9 @@ def reset(samples=256):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
     sc.unit_settings.system = 'METRIC'
+    # 30 fps, as the clips are keyed: the glTF exporter turns frames into seconds by the scene's rate (a cast loaded
+    # from its cache never imports an FBX, which is what used to set it; at Blender's 24 every act played 1.25x slow)
+    sc.render.fps, sc.render.fps_base = 30, 1.0
     sc.render.engine = 'CYCLES'
     prefs = bpy.context.preferences.addons['cycles'].preferences
     for kind in ('OPTIX', 'CUDA'):
@@ -232,6 +235,44 @@ def lathe(name, profile, mat, loc=(0, 0, 0), seg=32, collection=None, **props):
     ob.location = loc
     for k, v in props.items(): ob[k] = v
     return ob
+
+
+def place(ob, M):
+    """Move an object built about the origin into a frame M (a chair's). matrix_world is stale right after
+    setting location or rotation, so compose with matrix_basis."""
+    ob.matrix_basis = M @ ob.matrix_basis
+    return ob
+
+
+def slab_profile(name, pts, axis, t, mats, col, inward=None, bev=0.025, **props):
+    """A shaped panel: the 2D outline `pts` (smooth points) in the plane across `axis` ('x', 'y' or 'z'), `t` thick,
+    centred on that plane; edges rounded. mats = [inner, outer]: faces whose normal points along `inward` get the
+    first (tufted leather on the side a sitter sees), the rest the second."""
+    bm = bmesh.new()
+    def co(p, d): return (d, p[0], p[1]) if axis == 'x' else (p[0], d, p[1]) if axis == 'y' else (p[0], p[1], d)
+    a = [bm.verts.new(co(p, -t / 2)) for p in pts]; b = [bm.verts.new(co(p, t / 2)) for p in pts]
+    n = len(pts)
+    bm.faces.new(a); bm.faces.new(list(reversed(b)))
+    for i in range(n): bm.faces.new((a[i], b[i], b[(i + 1) % n], a[(i + 1) % n]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    ob = _mesh_obj(name, bm, mats[0], col, smooth=False)
+    ob.data.materials.append(mats[1])
+    inward = Vector(inward) if inward is not None else None
+    for f in ob.data.polygons: f.material_index = 0 if inward is not None and f.normal.dot(inward) > 0.7 else 1
+    bevel(ob, bev, 4, 40)
+    for k, v in props.items(): ob[k] = v
+    return ob
+
+
+def outline(ctrl, n=10):
+    """A smooth outline through control points (Catmull-Rom), closed."""
+    pts = []; m = len(ctrl)
+    for i in range(m):
+        p0, p1, p2, p3 = (Vector(ctrl[(i + k) % m]) for k in (-1, 0, 1, 2))
+        for s in range(n):
+            t = s / n; t2, t3 = t * t, t * t * t
+            pts.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3))
+    return [(p.x, p.y) for p in pts]
 
 
 def apply_modifiers(ob):

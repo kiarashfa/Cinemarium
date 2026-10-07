@@ -368,5 +368,181 @@ def the_matrix():
     for k, v in made.items(): print(k, [os.path.basename(p) for p in v])
 
 
+def _bald(h, Hd, shine=0.18):
+    """Shave a head: everything above the hairline (sideburns and nape too) becomes the face's own skin."""
+    H, S, V = hsv(h)
+    brow = Hd.J['Bip01 MMiddleEyebrow'][2]; ax = np.abs(Hd.x)
+    line = brow + 0.05 - 0.028 * smooth(0.03, 0.062, ax)
+    line = line + (brow - 0.04 - line) * smooth(-0.075, -0.035, Hd.y) * smooth(0.045, 0.06, ax)
+    line = line + (brow - 0.092 - line) * smooth(-0.005, 0.05, Hd.y)
+    ear = (ax > 0.066) & (Hd.z < brow + 0.008) & (Hd.z > brow - 0.07) & (np.abs(Hd.y) < 0.04)
+    face = Hd.where((Hd.y < -0.055) & (Hd.z < brow + 0.02) & (ax < 0.055))
+    dark = Hd.where((Hd.z > brow - 0.065) & (V < 0.3) & ~face & ~((ax > 0.07) & (np.abs(Hd.y) < 0.025) & (Hd.z < brow - 0.005)))
+    scalp = soft(Hd.grow(Hd.where(((Hd.z > line - 0.006) & ~ear) | dark).astype(np.float32), 3), 2.0)
+    face = Hd.where((Hd.y < -0.05) & (Hd.z < brow) & (Hd.z > Hd.J['Bip01 MUpperLip'][2]))
+    tone = h[face].mean(0) if face.any() else np.array([0.6, 0.45, 0.38])
+    tone = tone.mean() + (tone - tone.mean()) * 1.05
+    skin = tone[None, None, :] * (0.9 + 0.2 * noise(h.shape, 3, 21)[..., None])
+    skin = skin * (1 + shine * smooth(brow + 0.07, brow + 0.11, Hd.z)[..., None] * (Hd.y < 0)[..., None])
+    return h * (1 - scalp[..., None]) + skin * scalp[..., None]
+
+
+def _beard_mask(Hd, moustache=True, cheeks=0.6):
+    """Where a beard grows, on the body, with soft edges: the chin and jaw back toward the ears, thinning up the
+    cheeks; the upper lip; the lips themselves bare."""
+    J = Hd.J; ax = np.abs(Hd.x)
+    lip, low, nose = J['Bip01 MUpperLip'][2], J['Bip01 MBottomLip'][2], J['Bip01 MNose'][2]
+    chin = low - 0.05
+    front = smooth(0.03, -0.01, Hd.y)
+    jaw = smooth(chin - 0.045, chin - 0.012, Hd.z) * smooth(0.082, 0.062, ax) * front
+    jaw *= cheeks * smooth(nose + 0.005, nose - 0.025, Hd.z) + (1 - cheeks) * smooth(lip - 0.004, lip - 0.024, Hd.z)
+    m = jaw
+    if moustache:
+        m = np.maximum(m, smooth(lip - 0.002, lip + 0.006, Hd.z) * smooth(nose - 0.004, nose - 0.012, Hd.z) * smooth(0.034, 0.022, ax) * smooth(-0.08, -0.1, Hd.y))
+    m *= 1 - smooth(0.012, 0.0, np.minimum(np.abs(Hd.z - (lip + low) / 2) - 0.007, 0.03) + 0.0) * smooth(0.03, 0.02, ax) * smooth(-0.09, -0.11, Hd.y)
+    return blur(np.where(Hd.ok, m, 0).astype(np.float32), 3)
+
+
+def _hair_on(h, mask, rng, colour, strength):
+    """Short dense hair (a beard, stubble) over skin, as sparse dark hairs rather than a flat fill."""
+    n = rng.random(h.shape[:2]).astype(np.float32); n = np.clip((blur(n, 0.6) - 0.35) * 2.2, 0, 1)
+    hair = np.array(colour, np.float32)[None, None, :] / 255 * (0.7 + 0.6 * n[..., None])
+    k = np.clip(mask * strength * (0.75 + 0.5 * n), 0, 1)[..., None]
+    return h * (1 - k) + hair * k
+
+
+def _sleeves(B, hem):
+    """Bare arms below a sleeve's hem: hem as a fraction from shoulder (0) to wrist (1)."""
+    J = B.J; ax = np.abs(B.x)
+    s, w = J['Bip01 L UpperArm'][0], J['Bip01 L Hand'][0]
+    return B.where(B.part('UpperArm', 'Forearm') & (ax > s + (w - s) * hem))
+
+
+def _skin_paint(b, B, mask, rng, warm=(1.0, 1.0, 1.0)):
+    """Bare skin painted where cloth was: the hands' own tone (warmed by `warm`), faintly mottled."""
+    H, S, V = hsv(b)
+    hands = B.where(B.part('Hand') & (S > 0.15) & (V > 0.25))
+    tone = (b[hands].mean(0) if hands.any() else np.array([0.62, 0.45, 0.36])) * np.array(warm, np.float32)
+    skin = tone[None, None, :] * (0.92 + 0.14 * noise(b.shape, 2.5, int(rng.integers(1000)))[..., None])
+    m = soft(B.grow(mask.astype(np.float32), 3), 1.0)
+    return b * (1 - m[..., None]) + skin * m[..., None]
+
+
+def _flat_normals(avatar, name, who, mask, amount=1.0):
+    """A copy of a normal map with its relief smoothed away where `mask` is (skin painted over a sleeve, a knit made
+    plain): the cloth's folds and stitches must not show through what replaced it."""
+    n = load(avatar, name)
+    flat = np.array([0.5, 0.5, 1.0], np.float32)[None, None, :]
+    k = (np.clip(mask, 0, 1) * amount)[..., None]
+    return save(n * (1 - k) + flat * k, who, name)
+
+
+def lost():
+    """The Swan's people, after Roland Sanchez's costumes for season two."""
+    rng = np.random.default_rng(19)
+    made = {}
+
+    # Desmond (Sports_Male_03): the DHARMA jumpsuit, pale grey-blue, long-sleeved and open over a white tee, the Swan
+    # patch on the chest, work boots; long dark wavy hair, a short beard, his skin a shade lighter
+    h = load('Sports_Male_03', 'm300_head_color.tga'); Hd = Body('m300_head_color.tga')
+    eyes = Hd.where(Hd.part('Eye')).astype(np.float32)
+    h = skin_tone(h, Hd.grow(Hd.ok.astype(np.float32)) * (1 - eyes), (1.1, 1.06, 1.03))
+    h = _hair_on(h, _beard_mask(Hd), rng, (34, 25, 19), 0.62)
+    made['desmond'] = [save(h, 'desmond', 'm300_head_color.tga')]
+    o = load('Sports_Male_03', 'm300_opacity_color.tga'); oV = hsv(o)[2]
+    made['desmond'].append(save(recolour(o, soft((oV > 0.03).astype(np.float32), 1), (84, 62, 44), contrast=1.35), 'desmond', 'm300_opacity_color.tga',
+                                load_alpha('Sports_Male_03', 'm300_opacity_color.tga')))
+    b = load('Sports_Male_03', 'm300_body_color.tga'); B = Body('m300_body_color.tga')
+    J = B.J; neck = J['Bip01 Neck'][2]
+    hands, feet = B.part('Hand', 'Finger'), B.part('Foot', 'Toe')
+    suit = B.where(~hands & ~feet & ~B.part('Head') & ~(B.part('Neck') & (B.z > neck - 0.01)))
+    depth = np.clip((neck + 0.01 - B.z) / 0.24, 0, 1)                    # the jumpsuit open from the collar to the sternum
+    tee = B.where(suit & (B.y < -0.03) & (np.abs(B.x) < 0.035 + 0.05 * depth) & (B.z > neck - 0.24))
+    b = recolour(b, B.grow((suit & ~tee).astype(np.float32), 8), (150, 160, 168), contrast=0.12, flatten=24)
+    b = recolour(b, soft(tee.astype(np.float32), 0.8), (214, 212, 204), contrast=0.3, flatten=6)
+    patch = B.where((B.y < -0.06) & (np.hypot(B.x - 0.09, B.z - (neck - 0.15)) < 0.035))   # the Swan patch, over his heart
+    ring = B.where((B.y < -0.06) & (np.abs(np.hypot(B.x - 0.09, B.z - (neck - 0.15)) - 0.03) < 0.005))
+    b = recolour(b, soft(patch.astype(np.float32), 0.6), (210, 206, 192), contrast=0.2)
+    b = recolour(b, soft(ring.astype(np.float32), 0.5), (40, 52, 70), contrast=0.2)
+    b = recolour(b, B.grow(feet.astype(np.float32), 6), (52, 38, 28), contrast=0.6, flatten=3)
+    H, S, V = hsv(b)                                                       # the jersey's orange trims, wherever they are left
+    trim = B.where((((H < 32) | (H > 340)) & (S > 0.45) & (V > 0.25)) & ~hands & ~feet & ~B.part('Head'))
+    b = recolour(b, soft(B.grow(trim.astype(np.float32), 2), 0.8), (150, 160, 168), contrast=0.1)
+    made['desmond'].append(save(b, 'desmond', 'm300_body_color.tga'))
+
+    # Jack (Male_Adult_08): a charcoal shirt, sleeves rolled to the elbow, dark trousers; short dark hair, stubble
+    h = load('Male_Adult_08', 'm014_head_color.tga'); Hd = Body('m014_head_color.tga')
+    h = _hair_on(h, _beard_mask(Hd, cheeks=0.4), rng, (40, 32, 26), 0.3)
+    made['jack'] = [save(h, 'jack', 'm014_head_color.tga')]
+    o = load('Male_Adult_08', 'm014_opacity_color.tga'); oV = hsv(o)[2]
+    made['jack'].append(save(recolour(o, soft((oV > 0.03).astype(np.float32), 1), (46, 35, 27), contrast=1.15), 'jack', 'm014_opacity_color.tga',
+                             load_alpha('Male_Adult_08', 'm014_opacity_color.tga')))
+    b = load('Male_Adult_08', 'm014_body_color.tga'); B = Body('m014_body_color.tga'); H, S, V = hsv(b)
+    shirt = B.where((H > 180) & (H < 240) & (S > 0.12) & (V > 0.35) & ~B.part('Hand', 'Finger'))
+    b = recolour(b, B.grow(shirt.astype(np.float32), 6), (64, 68, 66), contrast=0.8, flatten=1.5)
+    b = _skin_paint(b, B, _sleeves(B, 0.55), rng)
+    made['jack'].append(_flat_normals('Male_Adult_08', 'm014_body_normal.tga', 'jack', B.grow(_sleeves(B, 0.55).astype(np.float32), 3)))
+    legs = B.where(B.part('Thigh', 'Calf') & (V < 0.3))
+    b = recolour(b, B.grow(legs.astype(np.float32), 6), (44, 40, 36), contrast=0.85)
+    made['jack'].append(save(b, 'jack', 'm014_body_color.tga'))
+
+    # Locke (Male_Adult_14): the head shaved, grey stubble; an olive tee, khaki trousers, his belt
+    h = load('Male_Adult_14', 'm012_head_color.tga'); Hd = Body('m012_head_color.tga')
+    h = _bald(h, Hd)
+    h = _hair_on(h, _beard_mask(Hd, cheeks=0.5), rng, (150, 146, 138), 0.32)
+    made['locke'] = [save(h, 'locke', 'm012_head_color.tga')]
+    b = load('Male_Adult_14', 'm012_body_color.tga'); B = Body('m012_body_color.tga'); H, S, V = hsv(b)
+    top = B.where(B.part('Spine', 'Clavicle', 'UpperArm', 'Forearm', 'Neck') & (S < 0.2) & (V > 0.22) & (B.z > B.J['Bip01 Pelvis'][2] - 0.02))
+    b = recolour(b, B.grow(top.astype(np.float32), 6), (88, 86, 54), contrast=0.6, flatten=2.5)
+    b = _skin_paint(b, B, _sleeves(B, 0.32), rng)
+    made['locke'].append(save(b, 'locke', 'm012_body_color.tga'))
+    made['locke'].append(_flat_normals('Male_Adult_14', 'm012_body_normal.tga', 'locke', np.maximum(B.grow(_sleeves(B, 0.32).astype(np.float32), 3), B.grow(top.astype(np.float32)) * 0.6)))
+
+    # Ben (Male_Adult_02, made slight): a burnt-orange tee, khaki trousers; short brown hair close to the head
+    h = load('Male_Adult_02', 'm003_head_color.tga'); Hd = Body('m003_head_color.tga'); H, S, V = hsv(h)
+    brow = Hd.J['Bip01 MMiddleEyebrow'][2]; ax = np.abs(Hd.x)
+    line = brow + 0.05 - 0.026 * smooth(0.03, 0.062, ax)
+    line = line + (brow + 0.0 - line) * smooth(-0.075, -0.035, Hd.y)
+    line = line + (brow - 0.085 - line) * smooth(-0.005, 0.05, Hd.y)
+    ear = (ax > 0.066) & (Hd.z < brow + 0.008) & (Hd.z > brow - 0.07) & (np.abs(Hd.y) < 0.04)
+    curls = Hd.where((Hd.z > brow - 0.07 - 0.05 * smooth(-0.01, 0.04, Hd.y)) & (V < 0.3) & ~((Hd.y < -0.05) & (Hd.z < brow + 0.02) & (ax < 0.055)) & ~ear)   # painted curls below the line
+    hm = soft(Hd.grow(Hd.where(((Hd.z > line) & ~ear) | curls).astype(np.float32), 3), 1.6)
+    crop = np.array([74, 56, 40], np.float32) / 255 * (0.75 + 0.5 * noise(h.shape, 1.4, 41)[..., None])
+    h = h * (1 - hm[..., None]) + crop * hm[..., None]
+    made['ben'] = [save(h, 'ben', 'm003_head_color.tga')]
+    o = load('Male_Adult_02', 'm003_opacity_color.tga')
+    made['ben'].append(save(o, 'ben', 'm003_opacity_color.tga', np.zeros(o.shape[:2], np.float32)))   # no curls
+    b = load('Male_Adult_02', 'm003_body_color.tga'); B = Body('m003_body_color.tga'); H, S, V = hsv(b)
+    knit = B.where(B.part('Spine', 'Clavicle', 'UpperArm', 'Forearm', 'Neck') & (B.z > B.J['Bip01 Pelvis'][2] - 0.02) & (B.z < B.J['Bip01 Neck'][2] + 0.01))
+    knit |= B.where(B.part('Pelvis', 'Spine') & (V > 0.3) & (B.z > B.J['Bip01 Pelvis'][2] - 0.14))      # the sweater's hem over the belt
+    b = recolour(b, B.grow(knit.astype(np.float32), 6), (186, 88, 36), contrast=0.35, flatten=6)
+    H, S, V = hsv(b)
+    cuffs = B.where(B.part('Hand', 'Forearm') & ~((S > 0.18) & (H < 35) & (V > 0.3)) & (np.abs(B.x) > B.J['Bip01 L Hand'][0] - 0.06))
+    bare = _sleeves(B, 0.34) | cuffs
+    b = _skin_paint(b, B, bare, rng, warm=(0.95, 0.86, 0.78))
+    made['ben'].append(_flat_normals('Male_Adult_02', 'm003_body_normal.tga', 'ben', np.maximum(B.grow(bare.astype(np.float32), 3), B.grow(knit.astype(np.float32)) * 0.85)))
+    legs = B.where(B.part('Thigh', 'Calf', 'Pelvis') & (V < 0.3) & ~B.part('Hand', 'Finger'))
+    b = recolour(b, B.grow(legs.astype(np.float32), 6), (138, 120, 92), contrast=0.7)
+    made['ben'].append(save(b, 'ben', 'm003_body_color.tga'))
+
+    # Kate (Female_Adult_07): a fitted olive shirt, sleeves pushed up, jeans and boots; long brown hair
+    o = load('Female_Adult_07', 'f007_opacity_color.tga'); oV = hsv(o)[2]
+    made['kate'] = [save(recolour(o, soft((oV > 0.03).astype(np.float32), 1), (92, 64, 44), contrast=1.15), 'kate', 'f007_opacity_color.tga',
+                         load_alpha('Female_Adult_07', 'f007_opacity_color.tga'))]
+    b = load('Female_Adult_07', 'f007_body_color.tga'); B = Body('f007_body_color.tga'); H, S, V = hsv(b)
+    skin = B.where((S > 0.2) & (S < 0.6) & (V > 0.45) & (H < 35))
+    denim = (H > 190) & (H < 240) & (S > 0.08)
+    leather = (H > 8) & (H < 48) & (S > 0.22) & (V < 0.55)
+    jacket = B.where(~skin & ~denim & B.part('Spine', 'Clavicle', 'UpperArm', 'Forearm', 'Neck'))
+    jacket |= B.where(leather & ~skin & B.part('Pelvis', 'Thigh') & (B.z > B.J['Bip01 Pelvis'][2] - 0.16))
+    b = recolour(b, B.grow(jacket.astype(np.float32), 6), (72, 76, 52), contrast=0.55, flatten=3)
+    cuffs = B.where(B.part('Hand', 'Forearm') & ~skin & (np.abs(B.x) > B.J['Bip01 L Hand'][0] - 0.05))
+    bare = _sleeves(B, 0.6) | cuffs
+    b = _skin_paint(b, B, bare, rng)
+    made['kate'].append(save(b, 'kate', 'f007_body_color.tga'))
+    made['kate'].append(_flat_normals('Female_Adult_07', 'f007_body_normal.tga', 'kate', B.grow(bare.astype(np.float32), 3)))
+    for k, v in made.items(): print(k, [os.path.basename(p) for p in v])
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()

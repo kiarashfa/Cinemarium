@@ -136,6 +136,50 @@ def the_matrix(out):
     tint(ph('ceiling_interior', 'Diffuse'), f'{out}/ceiling_color.jpg', (120, 110, 88), size=1024, contrast=0.6)
 
 
+def lost(out):
+    """The Swan: a DHARMA bunker of the seventies. The dome's plaster panels and dark struts, polished concrete
+    underfoot; the living side in cream tiles set with terracotta, warm plaster, red leather in the booth."""
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    S = 2048
+    # the dome's panels: rough plaster, pale and cool (the hidden lights make them glow green)
+    tint(ph('concrete_wall_008', 'Diffuse'), f'{out}/panel_color.jpg', (128, 140, 122), contrast=1.2)
+    copy(ph('concrete_wall_008', 'nor_gl'), f'{out}/panel_normal.jpg', size=1024)
+    # the dome's floor: dark polished concrete
+    tint(ph('smooth_concrete_floor', 'Diffuse'), f'{out}/concrete_floor_color.jpg', (74, 76, 72), contrast=1.1)
+    copy(ph('smooth_concrete_floor', 'nor_gl'), f'{out}/concrete_floor_normal.jpg', size=1024)
+    copy(ph('smooth_concrete_floor', 'Rough'), f'{out}/concrete_floor_rough.jpg', size=1024, mode='L')
+    # cast concrete: the dome's riser, the columns, the section through the bunker
+    tint(ph('brushed_concrete', 'Diffuse'), f'{out}/concrete_color.jpg', (128, 126, 118), contrast=1.0)
+    copy(ph('brushed_concrete', 'nor_gl'), f'{out}/concrete_normal.jpg', size=1024)
+    # the living side's walls: warm terracotta plaster
+    tint(ph('concrete_wall_008', 'Diffuse'), f'{out}/plaster_color.jpg', (150, 96, 70), size=1024, contrast=0.55)
+    # the struts and the booth's table: dark stained wood
+    tint(ph('wood_table_worn', 'Diffuse'), f'{out}/strut_color.jpg', (30, 24, 20), size=1024, contrast=1.1)
+    tint(ph('wood_table_worn', 'Diffuse'), f'{out}/table_wood_color.jpg', (92, 58, 36), size=1024, contrast=1.2)
+    copy(ph('wood_table_worn', 'nor_gl'), f'{out}/wood_normal.jpg', size=1024)
+    # the booth: red leather, worn paler where people sit
+    lea = _lum(ph('leather_red_02', 'Diffuse'), 1024); lea = (lea / lea.mean()) ** 1.2
+    wear = np.clip((_noise(1024, 26, 5) - 0.6) * 2.5, 0, 1) * 0.25
+    base, rub = lin((112, 34, 26)), lin((140, 70, 52))
+    _save((base[None, None] * (1 - wear[..., None]) + rub[None, None] * wear[..., None]) * lea[..., None], f'{out}/leather_color.jpg')
+    copy(ph('leather_red_02', 'nor_gl'), f'{out}/leather_normal.jpg', size=1024)
+    # the living side's floor: 40 cm cream tiles, every third on the diagonal terracotta; the texture spans 4 x 4 tiles
+    n = 4; t = S // n
+    grain = _lum(ph('worn_tile_floor', 'Diffuse'), S); grain = (grain / grain.mean()) ** 0.5
+    y, x = np.mgrid[0:S, 0:S]; i, j = x // t, y // t; u, v = (x % t) / t, (y % t) / t
+    terra = ((i + j) % 3 == 0) & ((i - j) % 2 == 0)
+    tone = 0.92 + 0.16 * np.random.default_rng(8).random((n, n))[j, i]       # each tile its own firing
+    col = np.where(terra[..., None], lin((150, 72, 48))[None, None], lin((206, 192, 162))[None, None]) * (tone * grain)[..., None]
+    g = np.minimum(np.minimum(u, 1 - u), np.minimum(v, 1 - v)) * t          # texels to the nearest joint
+    grout = np.clip(1 - (g - 3) / 2, 0, 1)[..., None]
+    _save(col * (1 - grout) + lin((96, 90, 80))[None, None] * grout, f'{out}/tile_color.jpg')
+    h = np.clip((g - 2) / 6, 0, 1) * (1 + 0.02 * _noise(S, 6, 9))
+    _normal_from_height(h.astype(np.float32), 1.5).resize((1024, 1024), Image.LANCZOS).save(f'{out}/tile_normal.jpg', quality=92)
+    # the phantom ceiling (bounce light only)
+    tint(ph('concrete_wall_008', 'Diffuse'), f'{out}/ceiling_color.jpg', (120, 112, 98), size=512, contrast=0.4)
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

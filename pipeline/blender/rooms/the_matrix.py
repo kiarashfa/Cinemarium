@@ -6,7 +6,7 @@ import math, os, random
 import bmesh
 from mathutils import Vector, Matrix
 import cine
-from cine import box, cyl, material, moulding, cloth_panel, lathe
+from cine import box, cyl, material, moulding, cloth_panel, lathe, place, slab_profile, outline as _curve
 
 W, D, H = 9.6, 7.6, 3.0           # the room fills the module, at its full height
 T = 0.14                          # wall thickness
@@ -105,13 +105,6 @@ class Wall:
             ob = moulding(f'{name}_v{k}', a, b, self.out, prof, mat, collection=col, **props)
             obs.append(ob)
         return obs
-
-
-def place(ob, M):
-    """Move an object built about the origin into a frame M (a chair's). matrix_world is stale right after
-    setting location or rotation, so compose with matrix_basis."""
-    ob.matrix_basis = M @ ob.matrix_basis
-    return ob
 
 
 # ---------------------------------------------------------------- architecture
@@ -355,37 +348,6 @@ def sconce(name, wall, u, z, M, col):
         bulbs.append(a2 + Vector((0, 0, 0.1)))
     parts.append(cyl(f'{n}_stem', 0.009, 0.1, base + out * 0.03 + Vector((0, 0, -0.06)), M['brass'], seg=10, collection=col, lm='furn'))
     return parts, bulbs
-
-
-def slab_profile(name, pts, axis, t, mats, col, inward=None, bev=0.025, **props):
-    """A shaped panel: the 2D outline `pts` (smooth points) in the plane across `axis` ('x' or 'y'), `t` thick,
-    centred on that plane; edges rounded. mats = [inner, outer]: faces whose normal points along `inward` get the
-    first (tufted leather on the side a sitter sees), the rest the second."""
-    bm = bmesh.new()
-    def co(p, d): return (d, p[0], p[1]) if axis == 'x' else (p[0], d, p[1])
-    a = [bm.verts.new(co(p, -t / 2)) for p in pts]; b = [bm.verts.new(co(p, t / 2)) for p in pts]
-    n = len(pts)
-    bm.faces.new(a); bm.faces.new(list(reversed(b)))
-    for i in range(n): bm.faces.new((a[i], b[i], b[(i + 1) % n], a[(i + 1) % n]))
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    ob = cine._mesh_obj(name, bm, mats[0], col, smooth=False)
-    ob.data.materials.append(mats[1])
-    inward = Vector(inward) if inward is not None else None
-    for f in ob.data.polygons: f.material_index = 0 if inward is not None and f.normal.dot(inward) > 0.7 else 1
-    cine.bevel(ob, bev, 4, 40)
-    for k, v in props.items(): ob[k] = v
-    return ob
-
-
-def _curve(ctrl, n=10):
-    """A smooth outline through control points (Catmull-Rom), closed."""
-    pts = []; m = len(ctrl)
-    for i in range(m):
-        p0, p1, p2, p3 = (Vector(ctrl[(i + k) % m]) for k in (-1, 0, 1, 2))
-        for s in range(n):
-            t = s / n; t2, t3 = t * t, t * t * t
-            pts.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3))
-    return [(p.x, p.y) for p in pts]
 
 
 def chair(name, x, y, facing, M, col):

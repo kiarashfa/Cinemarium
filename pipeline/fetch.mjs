@@ -86,6 +86,23 @@ const ROOMS = {
       'ceiling_interior']) await polyhaven(t, '2k', 'tex');
     for (const m of ['mantel_clock_01', 'ornate_mirror_01']) await polyhaven(m, '1k', 'gltf');
   },
+  async lost() {
+    // Desmond, Jack, Locke, Ben, Kate
+    for (const a of ['Professions/Sports_Male_03', 'Adults/Male_Adult_08', 'Adults/Male_Adult_14', 'Adults/Male_Adult_02', 'Adults/Female_Adult_07']) await avatar(a);
+    const S = 'all_animations_max_motextr_static';
+    // Desmond at the keyboard: the seated table set (cached for Severance)
+    for (const c of ['breathe_01', 'idle_neutral_01', 'idle_look_around', 'idle_scratch_head', 'idle_touch_face', 'idle_roll_head', 'idle_waiting_01',
+      'gestic_thoughtful', 'idle_touch_hair']) await clip(S, `m_sit_table_${c}`);
+    // Jack and Locke standing behind him
+    for (const c of ['m_idle_breathe_01', 'm_idle_breathe_02', 'm_idle_breathe_03', 'm_idle_neutral_01', 'm_idle_neutral_02', 'm_idle_neutral_03',
+      'm_idle_look_around_01', 'm_idle_waiting_01', 'm_gestic_listen_neutral_01', 'm_gestic_talk_neutral_01', 'm_idle_stretch_arms_01']) await clip(S, c);
+    // Ben and Kate in the booth: seated bases, coffee, talk
+    for (const c of ['m_drink_drinking', 'm_drink_idle', 'm_gestic_talk_relaxed_01', 'm_gestic_talk_relaxed_02']) await clip(S, c);
+    for (const c of ['f_drink_drinking', 'f_drink_idle', 'f_gestic_talk_neutral_01', 'f_gestic_talk_relaxed_01', 'f_gestic_talk_relaxed_02']) await clip(S, c);
+    for (const c of ['breathe_01', 'idle_neutral_01', 'idle_touch_face', 'idle_touch_hair', 'idle_look_around', 'gestic_thoughtful']) await clip(S, `f_sit_table_${c}`);
+    for (const t of ['worn_tile_floor', 'brushed_concrete', 'concrete_wall_008', 'leather_red_02', 'wood_table_worn', 'smooth_concrete_floor']) await polyhaven(t, '2k', 'tex');
+    await polyhaven('desk_lamp_arm_01', '1k', 'gltf');
+  },
 };
 
 const room = process.argv[2];

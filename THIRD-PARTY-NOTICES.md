@@ -39,8 +39,9 @@ Released into the public domain under [CC0 1.0](https://creativecommons.org/publ
 
 - [Poly Haven](https://polyhaven.com): textures *rough_linen*, *poly_wool_herringbone*, *jersey_melange*,
   *white_plaster_02*, *ceiling_interior*, *decrepit_wallpaper*, *damaged_plaster*, *leather_red_03*, *old_wood_floor*,
-  *floral_jacquard*; models *wall_clock*, *office_notepads*, *stationery_supplies*, *vintage_stapler*,
-  *binder_notebook*, *fire_alarm*, *mantel_clock_01*, *ornate_mirror_01*.
+  *floral_jacquard*, *concrete_wall_008*, *smooth_concrete_floor*, *brushed_concrete*, *worn_tile_floor*,
+  *leather_red_02*, *wood_table_worn*; models *wall_clock*, *office_notepads*, *stationery_supplies*,
+  *vintage_stapler*, *binder_notebook*, *fire_alarm*, *mantel_clock_01*, *ornate_mirror_01*, *desk_lamp_arm_01*.
 - [ambientCG](https://ambientcg.com): *Carpet012*, *Carpet013*.
 
 ## Title data
