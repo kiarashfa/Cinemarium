@@ -4,14 +4,15 @@
 //   /<slug>/     a title's case
 //   /board/      the board of the lists
 //   /about/      the exit
-import { TITLES, label, type Title } from './titles';
+import { CLUB, label, type Title } from './titles';
 
 export type Route = { view: 'home' } | { view: 'case'; slug: string } | { view: 'board' } | { view: 'about' };
 export type View = Route['view'];
 
 const BASE = import.meta.env.BASE_URL.replace(/\/?$/, '/');
 
-export const titleOf = (slug: string) => TITLES.find(t => t.slug === slug);
+/** A title in the club by its slug (honourable mentions have no address). */
+export const titleOf = (slug: string) => CLUB.find(t => t.slug === slug);
 
 /** The route an address points to (anything unknown is home). */
 export function parse(pathname: string): Route {
@@ -26,7 +27,7 @@ export function path(r: Route) {
 }
 
 const SITE = 'Cinemarium';
-const caseHead = (t: Title) => ({ title: `${label(t)} · ${SITE}`, description: `${label(t)}: ${t.scene}, a small living room under glass in a circular video club.` });
+const caseHead = (t: Title) => ({ title: `${label(t)} · ${SITE}`, description: t.scene ? `${label(t)}: ${t.scene}, a small living room under glass in a circular video club.` : `${label(t)}: its room is being built, in a circular video club.` });
 
 /** The page's title and description. */
 export function head(r: Route): { title: string; description: string } {

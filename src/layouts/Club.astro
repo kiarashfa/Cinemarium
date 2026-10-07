@@ -1,14 +1,14 @@
 ---
 // The club: one full-screen 3D page for every address. It carries the panels of all four places (home, the case, the
 // board, About); the body's data-view shows the one in use, so each address reads right before the scene starts.
-import { TITLES, sorted, label, KIND_NAME } from '../data/titles';
+import { CLUB, sorted, honourable, label, subtitle, KIND_NAME } from '../data/titles';
 import { head, path, titleOf, type Route } from '../data/routes';
 interface Props { route: Route }
 const { route } = Astro.props;
 const { title, description } = head(route);
 const base = import.meta.env.BASE_URL;
 const t = route.view === 'case' ? titleOf(route.slug) : undefined;
-const first = sorted('series')[0] ?? TITLES[0];
+const first = sorted('series').find(x => x.room) ?? sorted('series')[0] ?? CLUB[0];
 const list = sorted('series');
 const BOARD_SLOTS = 10;
 ---
@@ -53,7 +53,7 @@ const BOARD_SLOTS = 10;
   <section class="cap fade" id="cap" data-for="case" aria-live="polite">
     <div class="k" id="k">{t ? KIND_NAME[t.kind] : ''}</div>
     <h1 id="nm">{t ? label(t) : ''}</h1>
-    <div class="sc" id="sc">{t?.scene}</div>
+    <div class="sc" id="sc">{t && subtitle(t)}</div>
     <div class="rt" id="rt"></div>
   </section>
   <div class="deck" data-for="case">
@@ -82,6 +82,7 @@ const BOARD_SLOTS = 10;
         ? <li><span class="n">{String(i + 1).padStart(2, '0')}</span><a href={path({ view: 'case', slug: x.slug })}>{x.title} <em>{x.year}</em></a></li>
         : <li class="empty"><span class="n">{String(i + 1).padStart(2, '0')}</span><span>To come</span></li>)}
     </ol>
+    <p class="also" id="also">Honourable mentions: {honourable('series').map(x => x.title).join(' · ')}</p>
   </section>
 
   <section class="panel about" data-for="about" aria-label="About">
@@ -169,6 +170,8 @@ const BOARD_SLOTS = 10;
     .list a{text-decoration:none;font-family:var(--display);font-size:19px}
     .list a em{font-family:var(--italic);color:var(--dim);font-size:16px}
     .list .empty{color:var(--dim);font-family:var(--italic);font-style:italic}
+    .list li.unbuilt a{color:var(--dim)}
+    .also{margin:14px 0 0;font-size:12px;line-height:1.6;color:var(--dim)}
     .about p{color:var(--dim);line-height:1.6;font-size:14px;margin:12px 0 0}
     .about p.fine{font-size:12px;line-height:1.55}
     .about p a{color:var(--fg);text-decoration-color:var(--hair)}

@@ -18,10 +18,21 @@ def load(avatar, name, size=SIZE):
     return np.asarray(im, np.float32) / 255
 
 
-def save(arr, character, name):
+def load_alpha(avatar, name, size=SIZE):
+    """The alpha of a texture (hair cards cut out their strands with it)."""
+    im = Image.open(os.path.join(AV, avatar, 'Textures', name)).convert('RGBA').getchannel('A')
+    if size and im.size[0] != size: im = im.resize((size, size), Image.LANCZOS)
+    return np.asarray(im, np.float32) / 255
+
+
+def save(arr, character, name, alpha=None):
+    """Write a texture; hair-card ('opacity') textures keep their alpha, or the strands become solid cards."""
     d = os.path.join(OUT, character); os.makedirs(d, exist_ok=True)
     p = os.path.join(d, name.replace('.tga', '.png'))
-    Image.fromarray((np.clip(arr, 0, 1) * 255 + 0.5).astype(np.uint8)).save(p)
+    if alpha is None and 'opacity' in name: raise ValueError(f'{name}: hair cards need their alpha (pass alpha=load_alpha(...))')
+    rgb = (np.clip(arr, 0, 1) * 255 + 0.5).astype(np.uint8)
+    if alpha is not None: Image.fromarray(np.dstack([rgb, (np.clip(alpha, 0, 1) * 255 + 0.5).astype(np.uint8)]), 'RGBA').save(p)
+    else: Image.fromarray(rgb).save(p)
     return p
 
 
@@ -163,7 +174,7 @@ def severance():
     h = h * (1 - hm[..., None]) + grey * hm[..., None]
     made['irving'] = [save(h, 'irving', 'm004_head_color.tga')]
     o = load('Male_Adult_03', 'm004_opacity_color.tga'); oV = hsv(o)[2]
-    made['irving'].append(save(recolour(o, soft((oV > 0.03).astype(np.float32), 1), (118, 116, 112), contrast=1.1), 'irving', 'm004_opacity_color.tga'))
+    made['irving'].append(save(recolour(o, soft((oV > 0.03).astype(np.float32), 1), (118, 116, 112), contrast=1.1), 'irving', 'm004_opacity_color.tga', load_alpha('Male_Adult_03', 'm004_opacity_color.tga')))
     b = load('Male_Adult_03', 'm004_body_color.tga'); B = Body('m004_body_color.tga'); H, S, V = hsv(b)
     shirt = ((((H > 300) | (H < 16)) & (S > 0.2) & (V > 0.08)) & ~B.part('Hand', 'Finger'))
     jacket = B.where((S < 0.32) & (V > 0.06) & ~shirt & ~B.part('Hand', 'Finger', 'Foot', 'Toe'))
@@ -230,7 +241,7 @@ def severance():
     mask = soft(hairy * (1 - protect) * (V > 0.04), 0.8)
     made['helly'] = [save(recolour(h, mask, (124, 46, 28), contrast=1.15), 'helly', 'f018_head_color.tga')]
     o = load('Female_Adult_15', 'f018_opacity_color.tga'); oV = hsv(o)[2]
-    made['helly'].append(save(recolour(o, soft((oV > 0.03).astype(np.float32), 1), (124, 46, 28), contrast=1.15), 'helly', 'f018_opacity_color.tga'))
+    made['helly'].append(save(recolour(o, soft((oV > 0.03).astype(np.float32), 1), (124, 46, 28), contrast=1.15), 'helly', 'f018_opacity_color.tga', load_alpha('Female_Adult_15', 'f018_opacity_color.tga')))
     b = load('Female_Adult_15', 'f018_body_color.tga'); B = Body('f018_body_color.tga'); H, S, V = hsv(b)
     waist, knee = B.J['Bip01 Pelvis'][2] + 0.1, B.J['Bip01 L Calf'][2]
     top = B.where((H > 190) & (H < 270) & (S > 0.1) & (V > 0.1) & ~B.part('Thigh', 'Calf', 'Foot', 'Toe') & (B.z > waist))
@@ -249,5 +260,113 @@ def severance():
     for k, v in made.items(): print(k, [os.path.basename(p) for p in v])
 
 
+def croc(shape, seed, scale=26):
+    """A crocodile-skin relief as luminance: rows of rounded scales, larger down the middle of the back."""
+    h, w = shape[:2]; rng = np.random.default_rng(seed)
+    y, x = np.mgrid[0:h, 0:w].astype(np.float32)
+    jitter = blur(rng.random((h, w)).astype(np.float32), 9) - 0.5; size = 0.7 + 0.6 * blur(rng.random((h, w)).astype(np.float32), 40)
+    u, v = x / (scale * size) + jitter * 1.6, y / (scale * 0.8 * size) + jitter * 1.6 + 0.5 * np.floor(x / (scale * size))
+    cu, cv = u - np.floor(u) - 0.5, v - np.floor(v) - 0.5
+    cell = np.clip(1 - np.hypot(cu * 1.15, cv) * 1.6, 0, 1) ** 0.5           # each scale domes; dark seams between
+    return 0.8 + 0.3 * cell
+
+
+def save_rough(mask, rough_on, rough_off, character, name):
+    """A roughness map (white = rough): `rough_on` where the mask is (a glossy coat), `rough_off` elsewhere."""
+    r = rough_off + (rough_on - rough_off) * np.clip(mask, 0, 1)
+    d = os.path.join(OUT, character); os.makedirs(d, exist_ok=True); p = os.path.join(d, name)
+    Image.fromarray((np.clip(r, 0, 1) * 255 + 0.5).astype(np.uint8), 'L').save(p)
+    return p
+
+
+def leftover_black(a, target=(15, 15, 17)):
+    """Anything still pale and grey (a collar, a shoe's tongue, a tag the texel map does not reach) turns black;
+    skin is warm and saturated, so it stays."""
+    H, S, V = hsv(a); m = ((V > 0.38) & (S < 0.24)).astype(np.float32)
+    m = soft(np.asarray(Image.fromarray((m * 255).astype(np.uint8)).filter(ImageFilter.MaxFilter(3)), np.float32) / 255, 0.5)
+    return recolour(a, m, target, contrast=0.5)
+
+
+def the_matrix():
+    rng = np.random.default_rng(11)
+    made = {}
+
+    # Morpheus (Male_Adult_12, made broad in the mesh): the head shaved; a long crocodile-leather coat in black with a
+    # green cast over a dark shirt, black trousers and shoes; the small round glasses are modelled
+    h = load('Male_Adult_12', 'm007_head_color.tga'); Hd = Body('m007_head_color.tga'); H, S, V = hsv(h)
+    brow = Hd.J['Bip01 MMiddleEyebrow'][2]; ax = np.abs(Hd.x)
+    line = brow + 0.05 - 0.028 * smooth(0.03, 0.062, ax)                         # the hairline, front to sides to nape
+    line = line + (brow - 0.04 - line) * smooth(-0.075, -0.035, Hd.y) * smooth(0.045, 0.06, ax)   # sideburns go too
+    line = line + (brow - 0.092 - line) * smooth(-0.005, 0.05, Hd.y)
+    ear = (ax > 0.066) & (Hd.z < brow + 0.008) & (Hd.z > brow - 0.07) & (np.abs(Hd.y) < 0.04)
+    face = Hd.where((Hd.y < -0.055) & (Hd.z < brow + 0.02) & (ax < 0.055))   # brows, eyes: keep (sideburns go)
+    dark = Hd.where((Hd.z > brow - 0.065) & (V < 0.27) & ~face & ~((ax > 0.07) & (np.abs(Hd.y) < 0.025) & (Hd.z < brow - 0.005)))
+    scalp = soft(Hd.grow(Hd.where(((Hd.z > line - 0.006) & ~ear) | dark).astype(np.float32), 3), 2.0)
+    face = Hd.where((Hd.y < -0.05) & (Hd.z < brow) & (Hd.z > Hd.J['Bip01 MUpperLip'][2]))
+    tone = h[face].mean(0) if face.any() else np.array([0.38, 0.25, 0.18])   # the scalp takes the face's own mean tone
+    tone = tone.mean() + (tone - tone.mean()) * 1.3                            # a little warmer: the mean greys it
+    skin = tone[None, None, :] * (0.9 + 0.2 * noise(h.shape, 3, 21)[..., None])
+    skin = skin * (1 + 0.18 * smooth(brow + 0.07, brow + 0.11, Hd.z)[..., None] * (Hd.y < 0)[..., None])   # a shine on the crown
+    h = h * (1 - scalp[..., None]) + skin * scalp[..., None]
+    made['morpheus'] = [save(h, 'morpheus', 'm007_head_color.tga')]
+    b = load('Male_Adult_12', 'm007_body_color.tga'); B = Body('m007_body_color.tga'); H, S, V = hsv(b)
+    hands = B.part('Hand', 'Finger') & ~((H > 170) & (H < 270) & (S > 0.08))
+    hem = 0.3                                                                       # the coat falls to mid-calf
+    coat = B.where(~hands & ~B.part('Head', 'Foot', 'Toe') & (B.z > hem))
+    tee = B.where(coat & (V > 0.55) & (S < 0.25) & B.part('Spine', 'Neck', 'Clavicle'))   # the shirt at the open front
+    coat &= ~tee
+    scales = croc(b.shape, 3)
+    b = recolour(b, B.grow(coat.astype(np.float32)), (24, 30, 26), contrast=0.6, flatten=2.0)
+    b = b * (1 - B.grow(coat.astype(np.float32))[..., None] * (1 - scales[..., None]) * 0.55)
+    b = recolour(b, soft(tee.astype(np.float32), 0.8), (30, 33, 31), contrast=0.4)
+    legs = B.where(B.part('Calf', 'Thigh', 'Foot', 'Toe') & (B.z <= hem))
+    b = recolour(b, B.grow(legs.astype(np.float32), 10), (16, 16, 18), contrast=0.7)
+    b = leftover_black(b)
+    made['morpheus'].append(save(b, 'morpheus', 'm007_body_color.tga'))
+    made['morpheus'].append(save_rough(B.grow(coat.astype(np.float32)) * (0.6 + 0.4 * scales), 0.36, 0.75, 'morpheus', 'm007_body_rough.png'))
+
+    # Neo (Business_Male_02, made lean): all in black, a plain black coat over a black shirt, black trousers and shoes
+    b = load('Business_Male_02', 'm008_body_color.tga'); B = Body('m008_body_color.tga'); H, S, V = hsv(b)
+    hands = B.part('Hand', 'Finger') & (S > 0.15) & (H < 45)
+    cloth = B.where(~hands & ~B.part('Head'))
+    shirt = B.where(cloth & (V > 0.5) & (S < 0.2))
+    b = recolour(b, B.grow((cloth & ~shirt).astype(np.float32)), (20, 20, 23), contrast=0.85)
+    b = recolour(b, soft(shirt.astype(np.float32), 0.8), (14, 14, 16), contrast=0.5)
+    b = leftover_black(b)
+    made['neo'] = [save(b, 'neo', 'm008_body_color.tga')]
+
+    # Trinity (Female_Adult_04): short black hair slicked back with a sheen, a long black patent coat to the knee,
+    # black trousers and boots
+    h = load('Female_Adult_04', 'f004_head_color.tga'); Hd = Body('f004_head_color.tga'); H, S, V = hsv(h)
+    brow = Hd.J['Bip01 MMiddleEyebrow'][2]; ax = np.abs(Hd.x)
+    line = brow + 0.045 - 0.03 * smooth(0.03, 0.062, ax)                      # her hairline: front, sides, nape
+    line = line + (brow - 0.02 - line) * smooth(-0.07, -0.03, Hd.y)
+    line = line + (brow - 0.075 - line) * smooth(-0.005, 0.05, Hd.y)
+    scalp = Hd.grow(Hd.where(Hd.z > line - 0.01).astype(np.float32), 4)       # where hair can be (texels off the map: by colour)
+    blond = ((H > 22) & (H < 60) & (S > 0.3) & (V > 0.3)).astype(np.float32)
+    hm = soft(np.maximum(scalp, (~Hd.ok) * blond), 1.0)                       # all of the scalp, and pale strands off the map
+    black = np.array([16, 15, 17], np.float32)[None, None, :] / 255 * (0.7 + 0.8 * noise(h.shape, 1.2, 31)[..., None])
+    h = h * (1 - hm[..., None]) + black * hm[..., None]
+    made['trinity'] = [save(h, 'trinity', 'f004_head_color.tga')]
+    o = load('Female_Adult_04', 'f004_opacity_color.tga'); oV = hsv(o)[2]
+    strands = soft((oV > 0.05).astype(np.float32), 0.8)
+    al = load_alpha('Female_Adult_04', 'f004_opacity_color.tga'); Op = Body('f004_opacity_color.tga')
+    fringe = Op.grow(Op.where((Op.y < -0.06) & (Op.z < Hd.J['Bip01 MMiddleEyebrow'][2] + 0.04)).astype(np.float32), 3)   # slicked back: no fringe
+    made['trinity'].append(save(recolour(o, strands, (20, 19, 22), contrast=1.4), 'trinity', 'f004_opacity_color.tga', al * (1 - fringe)))
+    b = load('Female_Adult_04', 'f004_body_color.tga'); B = Body('f004_body_color.tga'); H, S, V = hsv(b)
+    knee = B.J['Bip01 L Calf'][2]
+    skin = B.where((S > 0.2) & (S < 0.6) & (V > 0.45) & (H < 35))
+    coat = B.where(~skin & ~B.part('Head', 'Foot', 'Toe') & (B.z > knee - 0.05))
+    below = B.where(~skin & B.part('Calf', 'Foot', 'Toe', 'Thigh') & (B.z <= knee - 0.05))
+    b = recolour(b, B.grow(coat.astype(np.float32), 10), (14, 14, 16), contrast=1.15)
+    b = recolour(b, B.grow(below.astype(np.float32), 10), (12, 12, 13), contrast=0.8)
+    H, S, V = hsv(b); rim = soft((((H > 15) & (H < 60) & (S > 0.25) & (V > 0.15) & (V < 0.5)) & ~skin).astype(np.float32), 0.8)   # brown and khaki seams
+    b = recolour(b, rim, (14, 14, 16), contrast=0.8)
+    b = leftover_black(b)
+    made['trinity'].append(save(b, 'trinity', 'f004_body_color.tga'))
+    made['trinity'].append(save_rough(B.grow(coat.astype(np.float32)), 0.16, 0.7, 'trinity', 'f004_body_rough.png'))
+    for k, v in made.items(): print(k, [os.path.basename(p) for p in v])
+
+
 if __name__ == '__main__':
-    globals()[sys.argv[1]]()
+    globals()[sys.argv[1].replace('-', '_')]()

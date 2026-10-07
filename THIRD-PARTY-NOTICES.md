@@ -38,8 +38,9 @@ SOFTWARE.
 Released into the public domain under [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/); credited with thanks.
 
 - [Poly Haven](https://polyhaven.com): textures *rough_linen*, *poly_wool_herringbone*, *jersey_melange*,
-  *white_plaster_02*, *ceiling_interior*; models *wall_clock*, *office_notepads*, *stationery_supplies*,
-  *vintage_stapler*, *binder_notebook*, *fire_alarm*.
+  *white_plaster_02*, *ceiling_interior*, *decrepit_wallpaper*, *damaged_plaster*, *leather_red_03*, *old_wood_floor*,
+  *floral_jacquard*; models *wall_clock*, *office_notepads*, *stationery_supplies*, *vintage_stapler*,
+  *binder_notebook*, *fire_alarm*, *mantel_clock_01*, *ornate_mirror_01*.
 - [ambientCG](https://ambientcg.com): *Carpet012*, *Carpet013*.
 
 ## Title data

@@ -99,7 +99,12 @@ function rounds(p: Performer, body: THREE.Object3D, meta: PersonMeta, r: () => n
   };
 }
 
-export interface Cast { update(t: number, dt: number): void; /** who is doing what (for ?debug) */ state(): Record<string, string> }
+export interface Cast {
+  update(t: number, dt: number): void;
+  /** who is doing what (for ?debug) */ state(): Record<string, string>;
+  /** play one act now, no fade (for ?debug: checking every act in place) */ play(who: string, act: string): void;
+  /** the act a person is in now (props that belong to an act follow it: pills in an open hand) */ current(who: string): THREE.AnimationAction | null;
+}
 
 export function perform(people: { body: THREE.Object3D; clips: THREE.AnimationClip[]; meta: PersonMeta }[]): Cast {
   const runs = people.map(({ body, clips, meta }, k) => {
@@ -112,5 +117,7 @@ export function perform(people: { body: THREE.Object3D; clips: THREE.AnimationCl
       for (const { p, step } of runs) { step(t, dt); p.mixer.update(dt); }
     },
     state() { return Object.fromEntries(runs.map(({ p }, k) => [people[k].meta.who, p.current?.getClip().name ?? '-'])); },
+    play(who, act) { const k = people.findIndex(x => x.meta.who === who); if (k >= 0 && runs[k].p.has(act)) runs[k].p.play(act, true, 0, 0); },
+    current(who) { const k = people.findIndex(x => x.meta.who === who); return k >= 0 ? runs[k].p.current : null; },
   };
 }

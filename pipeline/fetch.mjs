@@ -39,7 +39,8 @@ async function polyhaven(id, res = '1k', kind = 'gltf') {
     for (const [rel, f] of Object.entries(g.include ?? {})) await get(f.url, join(out, rel));
   } else {
     for (const map of ['Diffuse', 'nor_gl', 'Rough', 'AO', 'Displacement', 'arm']) {
-      const f = files[map]?.[res]?.png ?? files[map]?.[res]?.jpg; if (f) await get(f.url, join(out, `${map}.${f.url.split('.').pop()}`));
+      const src = map === 'Diffuse' && !files.Diffuse ? files.coll1 : files[map];   // some textures name their colour map coll1
+      const f = src?.[res]?.png ?? src?.[res]?.jpg; if (f) await get(f.url, join(out, `${map}.${f.url.split('.').pop()}`));
     }
   }
   note(`polyhaven/${id}`, `https://polyhaven.com/a/${id}`, 'CC0', kind);
@@ -69,6 +70,21 @@ const ROOMS = {
     for (const t of ['rough_linen', 'poly_wool_herringbone', 'jersey_melange', 'white_plaster_02', 'ceiling_interior']) await polyhaven(t, '2k', 'tex');
     for (const m of ['wall_clock', 'office_notepads', 'stationery_supplies', 'vintage_stapler', 'binder_notebook', 'fire_alarm']) await polyhaven(m, '1k', 'gltf');
     for (const t of ['Carpet012', 'Carpet013']) await ambientcg(t);
+  },
+  async 'the-matrix'() {
+    // Morpheus (Male_Adult_12, cached for Severance), Neo, Trinity
+    for (const a of ['Adults/Male_Adult_12', 'Professions/Business_Male_02', 'Adults/Female_Adult_04']) await avatar(a);
+    const S = 'all_animations_max_motextr_static';
+    // in the wingback chairs: a breathing base and idles; standing talk, its arms layered over the seated base
+    for (const c of ['breathe_01', 'idle_neutral_01', 'idle_neutral_02', 'idle_relaxed_01', 'gestic_thoughtful', 'gestic_shrug_01', 'idle_touch_face',
+      'idle_scratch_head', 'idle_look_around', 'idle_nervous_01', 'idle_waiting_01', 'idle_roll_head']) await clip(S, `m_sit_chair_${c}`);
+    for (const c of ['neutral_01', 'neutral_02', 'neutral_03', 'relaxed_01', 'relaxed_02', 'cool']) await clip(S, `m_gestic_talk_${c}`);
+    // Trinity, standing by the window
+    for (const c of ['f_idle_breathe_01', 'f_idle_neutral_01', 'f_idle_neutral_02', 'f_idle_neutral_03', 'f_idle_look_around_01', 'f_idle_move_01',
+      'f_idle_waiting_01', 'f_idle_roll_head_01', 'f_gestic_listen_self-assured_01', 'f_gestic_listen_neutral_01']) await clip(S, c);
+    for (const t of ['decrepit_wallpaper', 'damaged_plaster', 'leather_red_03', 'old_wood_floor', 'floral_jacquard', 'white_plaster_02',
+      'ceiling_interior']) await polyhaven(t, '2k', 'tex');
+    for (const m of ['mantel_clock_01', 'ornate_mirror_01']) await polyhaven(m, '1k', 'gltf');
   },
 };
 

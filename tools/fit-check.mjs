@@ -1,6 +1,8 @@
 // Checks every room in public/rooms/*/room.glb against the module (9.6 x 7.6 x 3.0 m) without three.js:
 // it reads each mesh's POSITION accessor bounds and the node transforms, and fails if anything pokes out.
-// It also prints what each file carries (UV sets, extras, animations) so a broken export shows up early.
+// It also prints what each file carries (UV sets, extras, animations) so a broken export shows up early, and checks
+// that every act of every person begins where the first act begins (same spot, same heading): the site crossfades
+// acts in place, so an act baked elsewhere makes a person jump.
 // Usage: node tools/fit-check.mjs [room-id]
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -10,8 +12,39 @@ const rooms = join(process.cwd(), 'public', 'rooms');
 const only = process.argv[2];
 
 function glb(path) {
-  const b = readFileSync(path), json = JSON.parse(b.toString('utf8', 20, 20 + b.readUInt32LE(12)));
+  const b = readFileSync(path), n = b.readUInt32LE(12), json = JSON.parse(b.toString('utf8', 20, 20 + n));
+  json.bin = b.subarray(28 + n, 28 + n + b.readUInt32LE(20 + n));
   return json;
+}
+/** The first value an animation sampler outputs (a float VEC3 or VEC4). */
+function first(g, accessor) {
+  const a = g.accessors[accessor], v = g.bufferViews[a.bufferView], k = a.type === 'VEC4' ? 4 : 3, o = (v.byteOffset ?? 0) + (a.byteOffset ?? 0);
+  return Array.from({ length: k }, (_, i) => g.bin.readFloatLE(o + 4 * i));
+}
+const rotate = ([x, y, z, w], [vx, vy, vz]) => {   // quaternion times vector
+  const tx = 2 * (y * vz - z * vy), ty = 2 * (z * vx - x * vz), tz = 2 * (x * vy - y * vx);
+  return [vx + w * tx + y * tz - z * ty, vy + w * ty + z * tx - x * tz, vz + w * tz + x * ty - y * tx];
+};
+/** Problems with a person's acts: each must start within 5 cm and 15 degrees of the first act's start. */
+function actsInPlace(p) {
+  const joints = new Set(p.skins?.[0]?.joints ?? []), parentOf = new Map();
+  p.nodes.forEach((n, i) => (n.children ?? []).forEach(c => parentOf.set(c, i)));
+  const top = [...joints].find(j => !joints.has(parentOf.get(j)));          // the skeleton's top joint (the hips)
+  if (top === undefined) return [];
+  const up = p.nodes[parentOf.get(top)] ?? {}, s = up.scale?.[0] ?? 1, q = up.rotation ?? [0, 0, 0, 1];
+  const starts = (p.animations ?? []).map(a => {
+    const at = path => a.channels.find(c => c.target.node === top && c.target.path === path);
+    const t = at('translation'), r = at('rotation');
+    return { name: a.name, pos: t ? rotate(q, first(p, a.samplers[t.sampler].output)).map(v => v * s) : null, rot: r ? first(p, a.samplers[r.sampler].output) : null };
+  });
+  const ref = starts[0], out = [];
+  for (const x of starts.slice(1)) {
+    const d = x.pos && ref.pos ? Math.hypot(x.pos[0] - ref.pos[0], x.pos[2] - ref.pos[2]) : 0;
+    const dot = x.rot && ref.rot ? Math.abs(x.rot.reduce((sum, v, i) => sum + v * ref.rot[i], 0)) : 1;
+    const ang = 2 * Math.acos(Math.min(1, dot)) * 180 / Math.PI;
+    if (d > 0.05 || ang > 15) out.push(`${x.name} starts ${(d * 100).toFixed(0)} cm and ${ang.toFixed(0)}° from ${ref.name}`);
+  }
+  return out;
 }
 const mul = (a, b) => { const o = new Array(16).fill(0); for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) for (let k = 0; k < 4; k++) o[j * 4 + i] += a[k * 4 + i] * b[j * 4 + k]; return o; };
 function local(n) {
@@ -48,8 +81,9 @@ for (const id of readdirSync(rooms)) {
   if (!ok) console.log('   outside:', [...new Set(out)].slice(0, 12).join(', '));
   const people = join(rooms, id, 'people');
   if (existsSync(people)) for (const f of readdirSync(people)) {
-    const p = glb(join(people, f));
+    const p = glb(join(people, f)), off = actsInPlace(p);
     console.log(`   person ${f}: ${p.skins?.length ?? 0} skin, ${p.skins?.[0]?.joints.length ?? 0} joints, clips ${(p.animations ?? []).map(a => a.name).join(', ')}`);
+    if (off.length) { failed = true; console.log(`   ACTS OUT OF PLACE in ${f}: ${off.join('; ')}`); }
   }
 }
 process.exit(failed ? 1 : 0);

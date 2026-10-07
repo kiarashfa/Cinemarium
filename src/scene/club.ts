@@ -8,7 +8,7 @@ import { buildRotunda, BOARD, DOOR, RADIUS } from './rotunda';
 import { buildCase } from './case';
 import { CASE, STAGE_LIFT } from './module';
 import { loadRoom, mount, release, type Room } from './rooms';
-import { sorted, label, KIND_NAME, type Kind, type Sort, type Title } from '../data/titles';
+import { sorted, honourable, label, subtitle, KIND_NAME, type Kind, type Sort, type Title } from '../data/titles';
 import { parse, path, head, titleOf, type Route } from '../data/routes';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -58,9 +58,15 @@ export async function startClub(canvas: HTMLCanvasElement) {
     if (phase === 'idle' && t !== cur) shown ? phase = 'sinking' : bring();
   }
   function bring() {
-    const t = cur = wanted!; phase = 'loading'; vit.setLabel(t.title); hint();
-    loadRoom(t.room).then(r => {
-      if (r !== shown) { mount(vit.stage, r); release([t.room, shownId]); shown = r; shownId = t.room; lift = -1; }
+    const t = cur = wanted!; vit.setLabel(t.title);
+    if (!t.room) {                     // not built yet: the case stays empty
+      for (const ch of [...vit.stage.children]) vit.stage.remove(ch);
+      shown = null; shownId = ''; phase = 'idle'; hint(); return;
+    }
+    phase = 'loading'; hint();
+    const id = t.room;
+    loadRoom(id).then(r => {
+      if (r !== shown) { mount(vit.stage, r); release([id, shownId]); shown = r; shownId = id; lift = -1; }
       phase = 'rising'; loop?.settle(); hint();
     }, err => { console.error(err); phase = 'idle'; hint(); });
   }
@@ -73,8 +79,9 @@ export async function startClub(canvas: HTMLCanvasElement) {
 
   // ---------- panels ----------
   const listOf = () => sorted(kind, by);
-  /** The title "Step up to the case" leads to: the one already in the case if it is of this list, else its first. */
-  const caseTitle = () => (wanted?.kind === kind ? wanted : listOf()[0]) ?? null;
+  /** The title "Step up to the case" leads to: the one already in the case if it is of this list, else its best
+   * ranked with a room (or its first, while none is built). */
+  const caseTitle = () => (wanted?.kind === kind ? wanted : listOf().filter(x => x.room).sort((a, b) => a.rank - b.rank)[0] ?? listOf()[0]) ?? null;
   function controls() {
     for (const b of $$('[data-kind]')) b.setAttribute('aria-pressed', String(b.dataset.kind === kind));
     for (const b of $$('[data-sort]')) b.setAttribute('aria-pressed', String(b.dataset.sort === by));
@@ -83,8 +90,9 @@ export async function startClub(canvas: HTMLCanvasElement) {
     $('bk').textContent = KIND_NAME[kind];
     $('list').innerHTML = Array.from({ length: 10 }, (_, i) => list[i]).map((x, i) => {
       const n = `<span class="n">${String(i + 1).padStart(2, '0')}</span>`;
-      return x ? `<li>${n}<a href="${path({ view: 'case', slug: x.slug })}">${x.title} <em>${x.year}</em></a></li>` : `<li class="empty">${n}<span>To come</span></li>`;
+      return x ? `<li class="${x.room ? '' : 'unbuilt'}">${n}<a href="${path({ view: 'case', slug: x.slug })}">${x.title} <em>${x.year}</em></a></li>` : `<li class="empty">${n}<span>To come</span></li>`;
     }).join('');
+    const also = honourable(kind); $('also').textContent = also.length ? `Honourable mentions: ${also.map(x => x.title).join(' · ')}` : '';
     const enter = $<HTMLAnchorElement>('enter');
     if (t) { enter.href = path({ view: 'case', slug: t.slug }); enter.hidden = false; } else enter.hidden = true;
     $<HTMLAnchorElement>('to-board').href = path({ view: 'board' }) + query('board');
@@ -94,7 +102,7 @@ export async function startClub(canvas: HTMLCanvasElement) {
     const cap = $('cap'), list = listOf(); cap.classList.add('out');
     setTimeout(() => {
       $('k').textContent = `${KIND_NAME[t.kind]} · ${list.indexOf(t) + 1} of ${list.length}`;
-      $('nm').textContent = label(t); $('sc').textContent = t.scene;
+      $('nm').textContent = label(t); $('sc').textContent = subtitle(t);
       $('rt').innerHTML = t.imdb.rating ? `IMDb <b>${t.imdb.rating.toFixed(1)}</b>` : '';
       cap.classList.remove('out');
     }, STILL ? 0 : 280);
@@ -102,7 +110,7 @@ export async function startClub(canvas: HTMLCanvasElement) {
   }
   function hint() {
     const v = route.view;
-    $('hint').textContent = v === 'case' ? (phase === 'loading' ? 'Bringing up the room…' : zoom ? 'Drag to walk around · scroll back to step away' : 'Drag to walk around the case · scroll to lean in')
+    $('hint').textContent = v === 'case' ? (phase === 'loading' ? 'Bringing up the room…' : cur && !cur.room ? 'This room is being built' : zoom ? 'Drag to walk around · scroll back to step away' : 'Drag to walk around the case · scroll to lean in')
       : v === 'board' ? 'Choose a title to open its case' : 'Click the case to step up to it';
     $('zoom').textContent = zoom ? 'Step back' : 'Look closer';
   }
@@ -157,7 +165,7 @@ export async function startClub(canvas: HTMLCanvasElement) {
   $('pills').addEventListener('click', e => { const b = (e.target as HTMLElement).closest('button'); if (b) go({ view: 'case', slug: b.dataset.slug! }); });
   $('prev').addEventListener('click', () => step(-1)); $('next').addEventListener('click', () => step(1));
   // stepping up to the case starts loading its room while the pointer is still on the way
-  for (const ev of ['pointerenter', 'focus']) $('enter').addEventListener(ev, () => { const t = caseTitle(); if (t) loadRoom(t.room).catch(() => {}); });
+  for (const ev of ['pointerenter', 'focus']) $('enter').addEventListener(ev, () => { const t = caseTitle(); if (t?.room) loadRoom(t.room).catch(() => {}); });
 
   // ---------- moving about: click, wheel, keys, drag ----------
   const enterCase = () => { const t = caseTitle(); if (t) go({ view: 'case', slug: t.slug }); };

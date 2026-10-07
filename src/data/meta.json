@@ -1,24 +1,121 @@
 {
-  "asOf": "2026-10-06",
+  "asOf": "2026-10-07",
   "titles": {
-    "severance": {
+    "breaking-bad": {
       "imdb": {
-        "id": "tt11280740",
-        "rating": 8.6,
-        "votes": 385489
+        "id": "tt0903747",
+        "rating": 9.5,
+        "votes": 2671962
       },
       "tmdb": {
-        "id": 95396,
-        "rating": 8.4,
-        "votes": 3007
+        "id": 1396,
+        "rating": 9,
+        "votes": 18771
       },
-      "year": 2022,
+      "year": 2008,
+      "runtime": "49 min",
+      "genres": [
+        "Crime",
+        "Drama",
+        "Thriller"
+      ],
+      "seasons": 5
+    },
+    "the-leftovers": {
+      "imdb": {
+        "id": "tt2699128",
+        "rating": 8.3,
+        "votes": 128900
+      },
+      "tmdb": {
+        "id": 54344,
+        "rating": 7.7,
+        "votes": 1300
+      },
+      "year": 2014,
+      "runtime": "1 min",
       "genres": [
         "Drama",
-        "Mystery",
-        "Sci-Fi"
+        "Fantasy",
+        "Mystery"
       ],
       "seasons": 3
+    },
+    "seinfeld": {
+      "imdb": {
+        "id": "tt0098904",
+        "rating": 8.9,
+        "votes": 382252
+      },
+      "tmdb": {
+        "id": 1400,
+        "rating": 8.2,
+        "votes": 2469
+      },
+      "year": 1989,
+      "runtime": "22 min",
+      "genres": [
+        "Comedy"
+      ],
+      "seasons": 9
+    },
+    "house-md": {
+      "imdb": {
+        "id": "tt0412142",
+        "rating": 8.7,
+        "votes": 602002
+      },
+      "tmdb": {
+        "id": 1408,
+        "rating": 8.6,
+        "votes": 7932
+      },
+      "year": 2004,
+      "runtime": "44 min",
+      "genres": [
+        "Drama"
+      ],
+      "seasons": 8
+    },
+    "the-americans": {
+      "imdb": {
+        "id": "tt2149175",
+        "rating": 8.4,
+        "votes": 127021
+      },
+      "tmdb": {
+        "id": 46533,
+        "rating": 7.9,
+        "votes": 1119
+      },
+      "year": 2013,
+      "runtime": "44 min",
+      "genres": [
+        "Crime",
+        "Drama",
+        "Mystery"
+      ],
+      "seasons": 6
+    },
+    "mr-robot": {
+      "imdb": {
+        "id": "tt4158110",
+        "rating": 8.5,
+        "votes": 462430
+      },
+      "tmdb": {
+        "id": 62560,
+        "rating": 8.3,
+        "votes": 5615
+      },
+      "year": 2015,
+      "runtime": "49 min",
+      "genres": [
+        "Crime",
+        "Drama",
+        "Thriller"
+      ],
+      "seasons": 4
     },
     "lost": {
       "imdb": {
@@ -40,6 +137,163 @@
       ],
       "seasons": 6
     },
+    "the-sopranos": {
+      "imdb": {
+        "id": "tt0141842",
+        "rating": 9.2,
+        "votes": 582424
+      },
+      "tmdb": {
+        "id": 1398,
+        "rating": 8.7,
+        "votes": 3715
+      },
+      "year": 1999,
+      "runtime": "55 min",
+      "genres": [
+        "Crime",
+        "Drama"
+      ],
+      "seasons": 6
+    },
+    "succession": {
+      "imdb": {
+        "id": "tt7660850",
+        "rating": 8.8,
+        "votes": 369529
+      },
+      "tmdb": {
+        "id": 76331,
+        "rating": 8.3,
+        "votes": 1797
+      },
+      "year": 2018,
+      "runtime": "60 min",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ],
+      "seasons": 4
+    },
+    "severance": {
+      "imdb": {
+        "id": "tt11280740",
+        "rating": 8.6,
+        "votes": 385489
+      },
+      "tmdb": {
+        "id": 95396,
+        "rating": 8.4,
+        "votes": 3007
+      },
+      "year": 2022,
+      "genres": [
+        "Drama",
+        "Mystery",
+        "Sci-Fi"
+      ],
+      "seasons": 3
+    },
+    "game-of-thrones": {
+      "imdb": {
+        "id": "tt0944947",
+        "rating": 9.2,
+        "votes": 2606100
+      },
+      "tmdb": {
+        "id": 1399,
+        "rating": 8.5,
+        "votes": 27888
+      },
+      "year": 2011,
+      "runtime": "57 min",
+      "genres": [
+        "Action",
+        "Adventure",
+        "Drama"
+      ],
+      "seasons": 8
+    },
+    "twin-peaks": {
+      "imdb": {
+        "id": "tt0098936",
+        "rating": 8.7,
+        "votes": 243494
+      },
+      "tmdb": {
+        "id": 1920,
+        "rating": 8.3,
+        "votes": 2727
+      },
+      "year": 1990,
+      "runtime": "1 min",
+      "genres": [
+        "Crime",
+        "Drama",
+        "Mystery"
+      ],
+      "seasons": 2
+    },
+    "sons-of-anarchy": {
+      "imdb": {
+        "id": "tt1124373",
+        "rating": 8.5,
+        "votes": 352705
+      },
+      "tmdb": {
+        "id": 1409,
+        "rating": 8.4,
+        "votes": 3408
+      },
+      "year": 2008,
+      "runtime": "45 min",
+      "genres": [
+        "Crime",
+        "Drama",
+        "Thriller"
+      ],
+      "seasons": 7
+    },
+    "fargo": {
+      "imdb": {
+        "id": "tt2802850",
+        "rating": 8.8,
+        "votes": 476381
+      },
+      "tmdb": {
+        "id": 60622,
+        "rating": 8.3,
+        "votes": 3454
+      },
+      "year": 2014,
+      "runtime": "53 min",
+      "genres": [
+        "Crime",
+        "Drama",
+        "Thriller"
+      ],
+      "seasons": 5
+    },
+    "money-heist": {
+      "imdb": {
+        "id": "tt6468322",
+        "rating": 8.2,
+        "votes": 604616
+      },
+      "tmdb": {
+        "id": 71446,
+        "rating": 8.2,
+        "votes": 19716
+      },
+      "year": 2017,
+      "runtime": "70 min",
+      "genres": [
+        "Action",
+        "Crime",
+        "Drama"
+      ],
+      "seasons": 5
+    },
     "the-matrix": {
       "imdb": {
         "id": "tt0133093",
@@ -49,13 +303,273 @@
       "tmdb": {
         "id": 603,
         "rating": 8.3,
-        "votes": 28886
+        "votes": 28893
       },
       "year": 1999,
       "runtime": "136 min",
       "genres": [
         "Action",
         "Sci-Fi"
+      ]
+    },
+    "la-la-land": {
+      "imdb": {
+        "id": "tt3783958",
+        "rating": 8,
+        "votes": 759966
+      },
+      "tmdb": {
+        "id": 313369,
+        "rating": 7.9,
+        "votes": 18564
+      },
+      "year": 2016,
+      "runtime": "128 min",
+      "genres": [
+        "Comedy",
+        "Drama",
+        "Music"
+      ]
+    },
+    "inception": {
+      "imdb": {
+        "id": "tt1375666",
+        "rating": 8.8,
+        "votes": 2811614
+      },
+      "tmdb": {
+        "id": 27205,
+        "rating": 8.4,
+        "votes": 40354
+      },
+      "year": 2010,
+      "runtime": "148 min",
+      "genres": [
+        "Action",
+        "Adventure",
+        "Sci-Fi"
+      ]
+    },
+    "the-godfather": {
+      "imdb": {
+        "id": "tt0068646",
+        "rating": 9.2,
+        "votes": 2222804
+      },
+      "tmdb": {
+        "id": 238,
+        "rating": 8.7,
+        "votes": 23700
+      },
+      "year": 1972,
+      "runtime": "175 min",
+      "genres": [
+        "Crime",
+        "Drama"
+      ]
+    },
+    "mulholland-drive": {
+      "imdb": {
+        "id": "tt0166924",
+        "rating": 7.9,
+        "votes": 435237
+      },
+      "tmdb": {
+        "id": 1018,
+        "rating": 7.8,
+        "votes": 7332
+      },
+      "year": 2001,
+      "runtime": "147 min",
+      "genres": [
+        "Drama",
+        "Mystery",
+        "Thriller"
+      ]
+    },
+    "vertigo": {
+      "imdb": {
+        "id": "tt0052357",
+        "rating": 8.2,
+        "votes": 458761
+      },
+      "tmdb": {
+        "id": 426,
+        "rating": 8.1,
+        "votes": 6536
+      },
+      "year": 1958,
+      "runtime": "128 min",
+      "genres": [
+        "Mystery",
+        "Romance",
+        "Thriller"
+      ]
+    },
+    "the-florida-project": {
+      "imdb": {
+        "id": "tt5649144",
+        "rating": 7.6,
+        "votes": 149765
+      },
+      "tmdb": {
+        "id": 394117,
+        "rating": 7.4,
+        "votes": 3208
+      },
+      "year": 2017,
+      "runtime": "111 min",
+      "genres": [
+        "Drama"
+      ]
+    },
+    "shutter-island": {
+      "imdb": {
+        "id": "tt1130884",
+        "rating": 8.2,
+        "votes": 1644111
+      },
+      "tmdb": {
+        "id": 11324,
+        "rating": 8.2,
+        "votes": 26538
+      },
+      "year": 2010,
+      "runtime": "138 min",
+      "genres": [
+        "Drama",
+        "Mystery",
+        "Thriller"
+      ]
+    },
+    "about-time": {
+      "imdb": {
+        "id": "tt2194499",
+        "rating": 7.8,
+        "votes": 443834
+      },
+      "tmdb": {
+        "id": 122906,
+        "rating": 7.9,
+        "votes": 9553
+      },
+      "year": 2013,
+      "runtime": "123 min",
+      "genres": [
+        "Comedy",
+        "Drama",
+        "Fantasy"
+      ]
+    },
+    "the-green-mile": {
+      "imdb": {
+        "id": "tt0120689",
+        "rating": 8.6,
+        "votes": 1557536
+      },
+      "tmdb": {
+        "id": 497,
+        "rating": 8.5,
+        "votes": 19914
+      },
+      "year": 1999,
+      "runtime": "189 min",
+      "genres": [
+        "Crime",
+        "Drama",
+        "Fantasy"
+      ]
+    },
+    "interstellar": {
+      "imdb": {
+        "id": "tt0816692",
+        "rating": 8.7,
+        "votes": 2516752
+      },
+      "tmdb": {
+        "id": 157336,
+        "rating": 8.5,
+        "votes": 41397
+      },
+      "year": 2014,
+      "runtime": "169 min",
+      "genres": [
+        "Adventure",
+        "Drama",
+        "Sci-Fi"
+      ]
+    },
+    "2001-a-space-odyssey": {
+      "imdb": {
+        "id": "tt0062622",
+        "rating": 8.3,
+        "votes": 794375
+      },
+      "tmdb": {
+        "id": 62,
+        "rating": 8,
+        "votes": 13014
+      },
+      "year": 1968,
+      "runtime": "149 min",
+      "genres": [
+        "Adventure",
+        "Sci-Fi"
+      ]
+    },
+    "the-intouchables": {
+      "imdb": {
+        "id": "tt1675434",
+        "rating": 8.5,
+        "votes": 1024790
+      },
+      "tmdb": {
+        "id": 77338,
+        "rating": 8.3,
+        "votes": 18899
+      },
+      "year": 2011,
+      "runtime": "112 min",
+      "genres": [
+        "Comedy",
+        "Drama"
+      ]
+    },
+    "terminator-2": {
+      "imdb": {
+        "id": "tt0103064",
+        "rating": 8.6,
+        "votes": 1282391
+      },
+      "tmdb": {
+        "id": 280,
+        "rating": 8.2,
+        "votes": 14966
+      },
+      "year": 1991,
+      "runtime": "137 min",
+      "genres": [
+        "Action",
+        "Adventure",
+        "Sci-Fi"
+      ]
+    },
+    "the-big-lebowski": {
+      "imdb": {
+        "id": "tt0118715",
+        "rating": 8.1,
+        "votes": 925805
+      },
+      "tmdb": {
+        "id": 115,
+        "rating": 7.8,
+        "votes": 12541
+      },
+      "year": 1998,
+      "runtime": "117 min",
+      "genres": [
+        "Comedy",
+        "Crime"
       ]
     }
   }

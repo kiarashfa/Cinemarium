@@ -335,5 +335,6 @@
  "lightmapScale": {
   "arch": 1.1943359375,
   "furn": 1.7470703125
- }
+ },
+ "lightmapEncoding": "sqrt"
 }

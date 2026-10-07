@@ -4,29 +4,19 @@
 // `release` frees the rooms no longer shown.
 import type * as THREE from 'three/webgpu';
 import { measureRoom, shrink } from '../module';
-import { QUERY } from '../stage';
 import type { Room, RoomLoader } from './types';
 import type { Screen } from './baked';
 
-type Study = 'severanceStudy' | 'lostStudy' | 'matrixStudy';
-const study = (name: Study): RoomLoader => () => import('./study').then(m => m[name]());
-
-/** A baked room when its files exist, otherwise the study model (so a missing bake never breaks a page). */
-const baked = (id: string, fallback: Study, screen?: () => Promise<Screen>): RoomLoader => async () => {
-  try {
-    if (QUERY.has('study')) throw new Error('study requested');
-    const [{ bakedRoom }, s] = await Promise.all([import('./baked'), screen?.()]);
-    return await bakedRoom(id, s);
-  } catch (err) {
-    console.warn(`room ${id}: using the study model (${(err as Error).message ?? err})`);
-    return study(fallback)();
-  }
+/** A room baked in Blender (public/rooms/<id>/), with what it draws live (a terminal's screen) loaded alongside. */
+const baked = (id: string, screen?: () => Promise<Screen>): RoomLoader => async () => {
+  const [{ bakedRoom }, s] = await Promise.all([import('./baked'), screen?.()]);
+  return bakedRoom(id, s);
 };
 
+/** Every built room, by id (a title names its room in src/data/titles.ts). */
 export const ROOMS: Record<string, RoomLoader> = {
-  'severance': baked('severance', 'severanceStudy', () => import('./mdr-screen').then(m => m.mdrScreen)),
-  'lost': study('lostStudy'),
-  'the-matrix': study('matrixStudy'),
+  'severance': baked('severance', () => import('./mdr-screen').then(m => m.mdrScreen)),
+  'the-matrix': baked('the-matrix'),
 };
 
 const cache = new Map<string, Promise<Room>>();

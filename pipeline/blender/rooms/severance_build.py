@@ -1,9 +1,10 @@
 # Severance: assemble the room, seat the cast, then preview, bake and export.
-import math, os, json, time
+import math, os, json
 import bpy
 from mathutils import Vector, Matrix
-import cine, people
+import cine, people, stages
 from cine import box, cyl
+from stages import camera
 import rooms.severance as R
 import rooms.severance_island as I
 
@@ -98,28 +99,10 @@ def props(M, col):
 
 def cast(col, quick=True):
     """Seat the four refiners (cached: retargeting and the typing IK take minutes, the cache seconds)."""
-    import hashlib
-    spec = json.dumps({'cast': [{k: v for k, v in c.items() if k != 'acts'} for c in CAST], 'island': list(I.ISLAND), 'pelvis': list(I.PELVIS),
-                       'keys': list(I.KEYS), 'ball': list(I.BALL), 'quick': quick, 'v': 6}, sort_keys=True)
-    path = os.path.join(OUT, f"cast_{hashlib.md5(spec.encode()).hexdigest()[:10]}.blend")
-    if os.path.exists(path):
-        with bpy.data.libraries.load(path, link=False) as (src, dst): dst.objects = list(src.objects); dst.actions = list(src.actions)
-        seated = []
-        for c in CAST:
-            arm = next(o for o in dst.objects if o.type == 'ARMATURE' and o.get('person') == c['who'])
-            mesh = next(o for o in dst.objects if o.type == 'MESH' and o.get('person') == c['who'])
-            for o in (arm, mesh): col.objects.link(o)
-            c['acts'] = {k: bpy.data.actions[v] for k, v in json.loads(arm['acts']).items()}
-            people.pose_at(arm, c['acts']['work'], 30)
-            seated.append((c, arm, mesh))
-        cine.log('cast from cache', os.path.basename(path))
-        return seated
-    seated = _cast(col, quick)
-    keep = set()
-    for c, arm, mesh in seated: arm['acts'] = json.dumps({k: a.name for k, a in c['acts'].items()}); keep |= {arm, mesh, *c['acts'].values()}
-    os.makedirs(OUT, exist_ok=True)
-    bpy.data.libraries.write(path, keep, fake_user=True)
-    cine.log('cast cached', os.path.basename(path))
+    spec = {'cast': [{k: v for k, v in c.items() if k != 'acts'} for c in CAST], 'island': list(I.ISLAND), 'pelvis': list(I.PELVIS),
+            'keys': list(I.KEYS), 'ball': list(I.BALL), 'quick': quick, 'v': 7}
+    seated = stages.cast_cache(OUT, CAST, spec, lambda: _cast(col, quick), col)
+    for c, arm, mesh in seated: people.pose_at(arm, c['acts']['work'], 30)
     return seated
 
 
@@ -146,13 +129,6 @@ def _cast(col, quick):
         people.pose_at(arm, work, 30)
         seated.append((c, arm, mesh))
     return seated
-
-
-def camera(name, loc, look, fov=32):
-    cam = bpy.data.objects.new(name, bpy.data.cameras.new(name)); bpy.context.scene.collection.objects.link(cam)
-    cam.location = loc; cam.rotation_euler = (Vector(look) - Vector(loc)).to_track_quat('-Z', 'Y').to_euler()
-    cam.data.sensor_fit = 'VERTICAL'; cam.data.angle = math.radians(fov); cam.data.clip_end = 200
-    return cam
 
 
 def build(args):
@@ -183,48 +159,21 @@ def build(args):
 
 
 def preview(sc, cams, which, samples, path, size=(1440, 900)):
-    sc.camera = cams[which]; sc.render.resolution_x, sc.render.resolution_y = size; sc.render.resolution_percentage = 100
-    sc.cycles.samples = samples; sc.cycles.use_denoising = True; sc.cycles.denoiser = 'OPENIMAGEDENOISE'
-    sc.view_settings.view_transform = 'AgX'; sc.view_settings.look = 'None'; sc.view_settings.exposure = 0.0
-    sc.render.image_settings.file_format = 'PNG'; sc.render.filepath = path
-    t0 = time.time(); bpy.ops.render.render(write_still=True); cine.log(f'preview {which} {time.time() - t0:.0f}s -> {path}')
+    stages.render(sc, cams[which], samples, path, size)
 
 
 WEB = os.path.join(cine.ROOT, 'public', 'rooms', 'severance')
 
 
 def bake(sc, objs, phantoms, seated, args):
-    size, samples = int(args.get('size', 2048)), int(args.get('samples', 384))
     os.makedirs(WEB, exist_ok=True)
-    screens = [o for o in objs if o.get('role') == 'screen']
-    others = [o for o in objs if not o.get('lm') and o not in screens]
-    lit, exterior = cine.cull_and_split([o for o in objs if o.get('lm') and o not in screens], R.H)
-    objs = lit + exterior + screens + others
-    groups = {g: [o for o in lit if o.get('lm') == g] for g in ('arch', 'furn')}
-    atlases = {}
-    for g, members in groups.items():
-        cine.lightmap_uvs(members, margin=0.003 if g == 'arch' else 0.004)
-        img = cine.bake_atlas(members, g, size, samples)
-        dn = cine.denoise(img)
-        import shutil
-        path = os.path.join(OUT, f'lm_{g}.exr'); shutil.copy(bpy.path.abspath(dn.filepath), path); atlases[g] = path   # masters stay out of the site
-        cine.log('saved', path, f'{os.path.getsize(path) / 1e6:.1f} MB')
-    for m in bpy.data.materials:   # the bake targets must not reach the export
-        if m.node_tree and '__bake' in m.node_tree.nodes: m.node_tree.nodes.remove(m.node_tree.nodes['__bake'])
-    for o in objs:
-        if o in screens: o['lm'] = ''
-    cine.export_glb(objs, os.path.join(WEB, 'room.glb'))
+    export, atlases = stages.bake(objs, R.H, OUT, int(args.get('size', 2048)), int(args.get('samples', 384)))
+    cine.export_glb(export, os.path.join(WEB, 'room.glb'))
     walker, _ = export_people(seated)
-    meta = {
-        'module': cine.MODULE, 'wallHeight': R.H,
-        'lightmaps': {g: os.path.basename(p) for g, p in atlases.items()},
-        # Cycles' diffuse light pass is E/pi; three.js multiplies the light map by albedo/pi, so scale by pi
-        'lightMapIntensity': math.pi,
-        'troffers': [{'x': x, 'y': R.H - 0.005, 'z': -y, 'w': R.TROFFER_SIZE[0], 'd': R.TROFFER_SIZE[1], 'watts': R.TROFFER_W} for x, y in R.TROFFERS],
-        'people': [person_meta(c) for c, arm, mesh in seated] + [walker],
-    }
-    with open(os.path.join(WEB, 'room.json'), 'w') as f: json.dump(meta, f, indent=1)
-    cine.log('wrote room.json')
+    meta = stages.room_meta(R.H, atlases)
+    meta['troffers'] = [{'x': x, 'y': R.H - 0.005, 'z': -y, 'w': R.TROFFER_SIZE[0], 'd': R.TROFFER_SIZE[1], 'watts': R.TROFFER_W} for x, y in R.TROFFERS]
+    meta['people'] = [person_meta(c) for c, arm, mesh in seated] + [walker]
+    stages.write_meta(WEB, meta)
 
 
 def person_meta(c):
@@ -265,10 +214,7 @@ def people_stage(sc, cams, seated, args):
     """Re-export only the people (their glTF files and their part of room.json); the baked room stays as it is.
     Then a look at each of them in the room (Cycles), Milchick at his first stop."""
     walker, (arm, acts) = export_people(seated)
-    path = os.path.join(WEB, 'room.json'); meta = json.load(open(path))
-    meta['people'] = [person_meta(c) for c, a, m in seated] + [walker]; meta.pop('walk', None)
-    with open(path, 'w') as f: json.dump(meta, f, indent=1)
-    cine.log('updated room.json people')
+    stages.update_meta(WEB, people=[person_meta(c) for c, a, m in seated] + [walker])
     (x, y), q = ROUTE[0]
     arm.location = (x, y, arm.location.z); arm.rotation_euler.z += math.pi   # he faces -y as imported: turn him to the refiner
     people.pose_at(arm, acts['stand'], 40)

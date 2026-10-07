@@ -80,8 +80,9 @@ def image(path, colour=True):
 
 
 def material(name, color=(0.8, 0.8, 0.8), rough=0.5, metal=0.0, maps=None, scale=1.0, normal_strength=1.0,
-             emission=None, emission_strength=0.0, alpha=None, specular=0.5, coat=0.0, coat_rough=0.05, sheen=0.0):
-    """Principled material. maps: {'color'|'rough'|'normal'|'ao': path}; textures tile every `scale` metres of UVMap."""
+             emission=None, emission_strength=0.0, alpha=None, specular=0.5, coat=0.0, coat_rough=0.05, sheen=0.0, sheen_tint=(0.3, 0.3, 0.3)):
+    """Principled material. maps: {'color'|'rough'|'normal'|'alpha': path}; textures tile every `scale` metres of UVMap.
+    An 'alpha' map (an RGBA image) cuts the surface out where its alpha is low (lace)."""
     m = bpy.data.materials.get(name)
     if m: return m
     m = bpy.data.materials.new(name)
@@ -92,7 +93,7 @@ def material(name, color=(0.8, 0.8, 0.8), rough=0.5, metal=0.0, maps=None, scale
     p.inputs['Metallic'].default_value = metal
     p.inputs['Specular IOR Level'].default_value = specular
     if coat: p.inputs['Coat Weight'].default_value = coat; p.inputs['Coat Roughness'].default_value = coat_rough
-    if sheen: p.inputs['Sheen Weight'].default_value = sheen
+    if sheen: p.inputs['Sheen Weight'].default_value = sheen; p.inputs['Sheen Tint'].default_value = (*sheen_tint, 1)   # a white sheen washes cloth out at a glance
     if emission is not None:
         p.inputs['Emission Color'].default_value = (*emission, 1); p.inputs['Emission Strength'].default_value = emission_strength
     if alpha is not None: p.inputs['Alpha'].default_value = alpha
@@ -106,6 +107,7 @@ def material(name, color=(0.8, 0.8, 0.8), rough=0.5, metal=0.0, maps=None, scale
             t = nodes.new('ShaderNodeTexImage'); t.image = image(path, colour); links.new(mp.outputs['Vector'], t.inputs['Vector']); return t
         if 'color' in maps: links.new(tex(maps['color'], True).outputs['Color'], p.inputs['Base Color'])
         if 'rough' in maps: links.new(tex(maps['rough'], False).outputs['Color'], p.inputs['Roughness'])
+        if 'alpha' in maps: links.new(tex(maps['alpha'], True).outputs['Alpha'], p.inputs['Alpha'])
         if 'normal' in maps:
             nm = nodes.new('ShaderNodeNormalMap'); nm.inputs['Strength'].default_value = normal_strength
             links.new(tex(maps['normal'], False).outputs['Color'], nm.inputs['Color']); links.new(nm.outputs['Normal'], p.inputs['Normal'])
@@ -162,6 +164,72 @@ def rounded_slab(name, w, d, h, r, loc, mat, rot=(0, 0, 0), seg=8, edge_bev=0.00
     ob = _mesh_obj(name, bm, mat, collection)
     ob.location = loc; ob.rotation_euler = rot
     if edge_bev: bevel(ob, edge_bev, 3, 60)
+    for k, v in props.items(): ob[k] = v
+    return ob
+
+
+def moulding(name, start, end, normal, profile, mat, collection=None, caps=True, **props):
+    """A moulding run: the 2D profile [(out, up), ...] (metres, out along `normal`, up across the run) swept
+    straight from `start` to `end`. Skirting boards, dado rails, cornices, architraves, panel frames."""
+    S, E, N = Vector(start), Vector(end), Vector(normal).normalized()
+    U = (E - S).normalized().cross(N).normalized()
+    if U.z < -0.5 or (abs(U.z) < 0.5 and U.dot(Vector((1, 1, 1))) < 0): U = -U   # 'up' points up (or along +x/+y)
+    bm = bmesh.new()
+    a = [bm.verts.new(S + N * o + U * u) for o, u in profile]; b = [bm.verts.new(E + N * o + U * u) for o, u in profile]
+    n = len(profile)
+    for i in range(n): bm.faces.new((a[i], a[(i + 1) % n], b[(i + 1) % n], b[i]))   # closed: its back lies on the wall
+    if caps and n > 2:
+        bm.faces.new(list(reversed(a))); bm.faces.new(b)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    ob = _mesh_obj(name, bm, mat, collection, smooth=False)
+    for k, v in props.items(): ob[k] = v
+    return ob
+
+
+def cloth_panel(name, width, height, folds, depth, mat, loc=(0, 0, 0), rot=(0, 0, 0), gather=1.0, hem=0.0, seed=1,
+                res=(48, 24), collection=None, **props):
+    """A hanging cloth (a drape, a lace curtain): a sheet in the x-z plane, pleated in `folds` waves of `depth`
+    metres, gathered toward its top by `gather` (1 = flat), its hem ragged by `hem` metres. Origin at the top middle."""
+    import random
+    rnd = random.Random(seed)
+    bm = bmesh.new(); nx, nz = res
+    ph = [rnd.random() * 6.283 for _ in range(4)]
+    grid = []
+    for j in range(nz + 1):
+        t = j / nz; z = -t * height
+        row = []
+        for i in range(nx + 1):
+            s = i / nx - 0.5
+            w = width * (gather + (1 - gather) * t) if gather < 1 else width
+            x = s * w
+            y = depth * (math.sin(s * folds * 2 * math.pi + ph[0]) * (0.7 + 0.3 * t) + 0.25 * math.sin(s * folds * 4.3 * math.pi + ph[1]))
+            if hem and j == nz: z += hem * (0.3 + 0.7 * rnd.random()) * (1 if rnd.random() < 0.6 else 0.2)
+            row.append(bm.verts.new((x, y, z)))
+        grid.append(row)
+    uvl = bm.loops.layers.uv.new('UVMap')                     # in metres of cloth: textures keep their real size
+    for j in range(nz):
+        for i in range(nx):
+            f = bm.faces.new((grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]))
+            for l, (ii, jj) in zip(f.loops, ((i, j), (i + 1, j), (i + 1, j + 1), (i, j + 1))): l[uvl].uv = (ii / nx * width, 1 - jj / nz * height)
+    ob = _mesh_obj(name, bm, mat, collection, smooth=True)
+    ob.location = loc; ob.rotation_euler = rot
+    for k, v in props.items(): ob[k] = v
+    return ob
+
+
+def lathe(name, profile, mat, loc=(0, 0, 0), seg=32, collection=None, **props):
+    """A turned part: profile [(radius, z), ...] revolved about the vertical axis (table columns, glasses, finials)."""
+    bm = bmesh.new()
+    rings = []
+    for r, z in profile:
+        rings.append([bm.verts.new((r * math.cos(2 * math.pi * i / seg), r * math.sin(2 * math.pi * i / seg), z)) for i in range(seg)])
+    for a, b in zip(rings, rings[1:]):
+        for i in range(seg): bm.faces.new((a[i], a[(i + 1) % seg], b[(i + 1) % seg], b[i]))
+    if profile[0][0] > 1e-4: bm.faces.new(list(reversed(rings[0])))
+    if profile[-1][0] > 1e-4: bm.faces.new(rings[-1])
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5); bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    ob = _mesh_obj(name, bm, mat, collection)
+    ob.location = loc
     for k, v in props.items(): ob[k] = v
     return ob
 
