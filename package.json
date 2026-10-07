@@ -3,13 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Kia's top ten series and top ten films, each a small living room under glass.",
+  "description": "Ten series and ten films, each a small living room under glass, rendered in the browser.",
   "scripts": {
     "dev": "astro dev --host 127.0.0.1 --port 4321",
     "build": "astro build",
     "preview": "astro preview --host 127.0.0.1 --port 4321",
     "check": "astro check",
     "fit": "node tools/fit-check.mjs",
+    "meta": "node tools/meta.mjs",
     "shot": "node tools/shots/shot.mjs"
   },
   "dependencies": {

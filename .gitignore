@@ -1,3 +1,6 @@
+# Environment
+.env
+
 node_modules/
 GlassRoom/
 docs/
@@ -12,8 +15,12 @@ pipeline/cache/
 pipeline/out/
 *.blend1
 
-# screenshots for checking work
-shots/
+# screenshots for checking work (the tools in tools/shots/ are kept)
+/shots/
 
 # light-map masters (float EXR) never ship; the site uses the WebP versions
 public/rooms/**/*.exr
+
+# Python bytecode (Blender writes it next to the scripts)
+__pycache__/
+*.pyc

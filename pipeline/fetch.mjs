@@ -27,7 +27,7 @@ async function avatar(path) {
   note(`rocketbox/${name}`, `https://github.com/microsoft/Microsoft-Rocketbox/tree/master/Assets/Avatars/${path}`, 'MIT', files.length);
 }
 async function clip(folder, name) {
-  await get(`${RB}/Animations/${folder}/${name}.max.fbx`, join(CACHE, 'rocketbox', 'animations', `${name}.fbx`));
+  await get(`${RB}/Animations/${folder}/${encodeURIComponent(name)}.max.fbx`, join(CACHE, 'rocketbox', 'animations', `${name.replace(/ /g, '_')}.fbx`));
   note(`rocketbox-anim/${name}`, `https://github.com/microsoft/Microsoft-Rocketbox/tree/master/Assets/Animations/${folder}`, 'MIT', 1);
 }
 
@@ -56,10 +56,16 @@ const ROOMS = {
   async severance() {
     mkdirSync(join(CACHE, 'rocketbox'), { recursive: true });
     if (!existsSync(join(CACHE, 'rocketbox', 'tree.json'))) await get('https://api.github.com/repos/microsoft/Microsoft-Rocketbox/git/trees/master?recursive=1', join(CACHE, 'rocketbox', 'tree.json'));
-    for (const a of ['Professions/Business_Male_06', 'Professions/Business_Male_05', 'Adults/Female_Adult_15', 'Adults/Male_Adult_03']) await avatar(a);
+    for (const a of ['Professions/Business_Male_01', 'Professions/Business_Male_05', 'Adults/Male_Adult_12', 'Adults/Female_Adult_15', 'Adults/Male_Adult_03']) await avatar(a);
     const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy';
-    for (const c of ['m_work_table', 'f_work_table', 'm_work_mid', 'f_work_mid', 'm_sit_table_idle_neutral_01', 'f_sit_table_idle_neutral_01', 'm_sit_table_breathe_01', 'm_sit_table_idle_look_around', 'f_sit_table_idle_touch_hair', 'm_sit_table_gestic_thoughtful', 'm_idle_neutral_01']) await clip(S, c);
-    for (const c of ['m_walk_cool_01', 'm_walk_neutral_01', 'm_walk_slow_01']) await clip(XY, c);
+    // seated at a desk: one breathing base for the work loop, and idles to break it up
+    const seated = ['breathe_01', 'idle_neutral_01', 'idle_neutral_02', 'idle_look_around', 'idle_scratch_head', 'idle_touch_face', 'idle_roll_head',
+      'idle_yawn', 'idle_relaxed_01', 'idle_dust', 'idle_waiting_01', 'gestic_thoughtful', 'gestic_shrug_01'];
+    for (const c of seated) await clip(S, `m_sit_table_${c}`);
+    for (const c of [...seated.filter(c => c !== 'idle_dust'), 'idle_touch_hair', 'idle_stretch arms']) await clip(S, `f_sit_table_${c}`);
+    // standing, for the supervisor on his rounds
+    for (const c of ['m_idle_neutral_01', 'm_idle_neutral_02', 'm_idle_breathe_01', 'm_idle_look_around_01', 'm_idle_waiting_01', 'm_gestic_listen_neutral_01', 'm_gestic_talk_neutral_01']) await clip(S, c);
+    for (const c of ['m_walk_cool_01', 'm_walk_neutral_02']) await clip(XY, c);
     for (const t of ['rough_linen', 'poly_wool_herringbone', 'jersey_melange', 'white_plaster_02', 'ceiling_interior']) await polyhaven(t, '2k', 'tex');
     for (const m of ['wall_clock', 'office_notepads', 'stationery_supplies', 'vintage_stapler', 'binder_notebook', 'fire_alarm']) await polyhaven(m, '1k', 'gltf');
     for (const t of ['Carpet012', 'Carpet013']) await ambientcg(t);

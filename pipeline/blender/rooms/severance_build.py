@@ -10,13 +10,34 @@ import rooms.severance_island as I
 OUT = os.path.join(cine.OUT, 'severance')
 PEOPLE_TEX = os.path.join(cine.OUT, 'people')
 
-# who sits where (desk q of the pinwheel), with which body, clip and costume
+# Who sits where (desk q of the pinwheel): body, build, costume, and what they do. Each seated refiner works
+# (a breathing base with typing and trackball layered on, two cycles long) and now and then breaks off into one
+# of their idles; the web picks the next act at random, by weight, and crossfades. `work` is (min, max) seconds.
 CAST = [
-    dict(q=0, who='dylan', avatar='Business_Male_05', clip='m_sit_table_idle_neutral_01', tex={'m016_head_color.tga': 'dylan/m016_head_color.png', 'm016_body_color.tga': 'dylan/m016_body_color.png'}),
-    dict(q=1, who='mark', avatar='Business_Male_06', clip='m_sit_table_breathe_01', tex={'m025_body_color.tga': 'mark/m025_body_color.png'}),
-    dict(q=2, who='irving', avatar='Male_Adult_03', clip='m_sit_table_gestic_thoughtful', tex={'m004_body_color.tga': 'irving/m004_body_color.png'}),
-    dict(q=3, who='helly', avatar='Female_Adult_15', clip='f_sit_table_idle_neutral_01', tex={'f018_head_color.tga': 'helly/f018_head_color.png', 'f018_opacity_color.tga': 'helly/f018_opacity_color.png', 'f018_body_color.tga': 'helly/f018_body_color.png'}),
+    dict(q=0, who='dylan', avatar='Business_Male_05', shape='heavy', base='m_sit_table_breathe_01', work=(10, 26),
+         idles={'yawn': ('m_sit_table_idle_yawn', 1.0), 'scratch': ('m_sit_table_idle_scratch_head', 1.0),
+                'shrug': ('m_sit_table_gestic_shrug_01', 0.7), 'look': ('m_sit_table_idle_look_around', 1.0)},
+         tex={'m016_head_color.tga': 'dylan/m016_head_color.png', 'm016_body_color.tga': 'dylan/m016_body_color.png'}),
+    dict(q=1, who='mark', avatar='Business_Male_01', shape='lean', base='m_sit_table_breathe_01', work=(18, 45),
+         idles={'look': ('m_sit_table_idle_look_around', 1.2), 'roll': ('m_sit_table_idle_roll_head', 0.8),
+                'face': ('m_sit_table_idle_touch_face', 1.0)},
+         tex={'m005_body_color.tga': 'mark/m005_body_color.png'}),
+    dict(q=2, who='irving', avatar='Male_Adult_03', hair=True, base='m_sit_table_breathe_01', work=(22, 55),
+         idles={'think': ('m_sit_table_gestic_thoughtful', 1.0), 'dust': ('m_sit_table_idle_dust', 1.0),
+                'look': ('m_sit_table_idle_look_around', 0.6)},
+         tex={'m004_head_color.tga': 'irving/m004_head_color.png', 'm004_opacity_color.tga': 'irving/m004_opacity_color.png', 'm004_body_color.tga': 'irving/m004_body_color.png'}),
+    dict(q=3, who='helly', avatar='Female_Adult_15', base='f_sit_table_breathe_01', work=(9, 24),
+         idles={'hair': ('f_sit_table_idle_touch_hair', 1.2), 'look': ('f_sit_table_idle_look_around', 1.0),
+                'stretch': ('f_sit_table_idle_stretch_arms', 0.6), 'face': ('f_sit_table_idle_touch_face', 0.8)},
+         tex={'f018_head_color.tga': 'helly/f018_head_color.png', 'f018_opacity_color.tga': 'helly/f018_opacity_color.png', 'f018_body_color.tga': 'helly/f018_body_color.png'}),
 ]
+# Milchick does his rounds: walks the floor, stops behind each refiner and watches a while, walks on
+WALKER = dict(who='milchick', avatar='Male_Adult_12', shape='athletic', scale=1.04, walk='m_walk_cool_01',
+              idles={'stand': ('m_idle_neutral_01', 1.0), 'look': ('m_idle_look_around_01', 0.8), 'listen': ('m_gestic_listen_neutral_01', 1.0)},
+              tex={'m007_head_color.tga': 'milchick/m007_head_color.png', 'm007_body_color.tga': 'milchick/m007_body_color.png'})
+# his route (Blender x, y), clear of the chairs; at each stop he faces the refiner whose desk it is
+ROUTE = [((1.0, -1.95), 0), ((3.3, -2.5), None), ((2.65, 1.38), 1), ((3.0, 2.85), None), ((-0.68, 2.85), 2), ((-3.1, 2.8), None),
+         ((-2.35, -0.28), 3), ((-3.1, -2.5), None)]
 
 
 def props(M, col):
@@ -78,23 +99,24 @@ def props(M, col):
 def cast(col, quick=True):
     """Seat the four refiners (cached: retargeting and the typing IK take minutes, the cache seconds)."""
     import hashlib
-    spec = json.dumps({'cast': [{k: v for k, v in c.items() if k != 'action'} for c in CAST], 'island': list(I.ISLAND), 'pelvis': list(I.PELVIS),
-                       'keys': list(I.KEYS), 'ball': list(I.BALL), 'quick': quick, 'v': 3}, sort_keys=True)
+    spec = json.dumps({'cast': [{k: v for k, v in c.items() if k != 'acts'} for c in CAST], 'island': list(I.ISLAND), 'pelvis': list(I.PELVIS),
+                       'keys': list(I.KEYS), 'ball': list(I.BALL), 'quick': quick, 'v': 6}, sort_keys=True)
     path = os.path.join(OUT, f"cast_{hashlib.md5(spec.encode()).hexdigest()[:10]}.blend")
     if os.path.exists(path):
-        with bpy.data.libraries.load(path, link=False) as (src, dst): dst.objects = list(src.objects)
+        with bpy.data.libraries.load(path, link=False) as (src, dst): dst.objects = list(src.objects); dst.actions = list(src.actions)
         seated = []
         for c in CAST:
             arm = next(o for o in dst.objects if o.type == 'ARMATURE' and o.get('person') == c['who'])
             mesh = next(o for o in dst.objects if o.type == 'MESH' and o.get('person') == c['who'])
             for o in (arm, mesh): col.objects.link(o)
-            c['action'] = arm['action']; people.pose_at(arm, bpy.data.actions[c['action']], 30)
+            c['acts'] = {k: bpy.data.actions[v] for k, v in json.loads(arm['acts']).items()}
+            people.pose_at(arm, c['acts']['work'], 30)
             seated.append((c, arm, mesh))
         cine.log('cast from cache', os.path.basename(path))
         return seated
     seated = _cast(col, quick)
     keep = set()
-    for c, arm, mesh in seated: arm['action'] = c['action']; keep |= {arm, mesh}
+    for c, arm, mesh in seated: arm['acts'] = json.dumps({k: a.name for k, a in c['acts'].items()}); keep |= {arm, mesh, *c['acts'].values()}
     os.makedirs(OUT, exist_ok=True)
     bpy.data.libraries.write(path, keep, fake_user=True)
     cine.log('cast cached', os.path.basename(path))
@@ -105,17 +127,23 @@ def _cast(col, quick):
     seated = []
     for c in CAST:
         arm, mesh = people.load_avatar(c['avatar'], textures={k: os.path.join(PEOPLE_TEX, v) for k, v in c['tex'].items()}, collection=col)
-        n = 60 if quick else 300
-        base = people.retarget(arm, c['clip'], frames=(1, n), action_name=f"{c['who']}_base")
+        mesh['person'] = c['who']; arm['person'] = c['who']
+        if c.get('shape'): people.reshape(arm, mesh, c['shape'])
+        if c.get('hair'): people.hair_volume(arm, mesh)
+        base, frames, _ = people.retarget(arm, c['base'], cycles=2, action_name=f"{c['who']}_base", limit=60 if quick else None)
         F = I.frame_q(c['q']); p = F @ I.PELVIS
         arm.location = (p.x, p.y, arm.location.z)
         arm.rotation_euler.z = -math.pi / 2 + math.pi + c['q'] * math.pi / 2
         bpy.context.view_layer.update()
         facing = (F.to_3x3() @ Vector((0, 1, 0))).normalized()
-        act = people.desk_work(arm, base, F @ I.KEYS, F @ I.BALL, (1, n), seed=c['q'] + 3, name=f"{c['who']}_work", facing=facing)
-        people.pose_at(arm, act, 30)
-        c['action'] = act.name
-        mesh['person'] = c['who']; arm['person'] = c['who']
+        work = people.desk_work(arm, base, F @ I.KEYS, F @ I.BALL, frames, seed=c['q'] + 3, name=f"{c['who']}_work", facing=facing)
+        people.freeze(work)
+        bpy.data.actions.remove(base)
+        c['acts'] = {'work': work}
+        if not quick:
+            for k, (clip, _w) in c['idles'].items():
+                c['acts'][k] = people.retarget(arm, clip, action_name=f"{c['who']}_{k}")[0]
+        people.pose_at(arm, work, 30)
         seated.append((c, arm, mesh))
     return seated
 
@@ -146,8 +174,11 @@ def build(args):
     # the web camera's view, at room scale (the case shot from the one-at-a-time layout, and a closer one)
     cams = {'case': camera('cam_case', (11.14, -18.16, 7.95), (-2.30, -1.49, 0.63), 32),
             'close': camera('cam_close', (5.6, -6.2, 3.7), (0.2, 0.35, 0.75), 30),
-            'dylan': camera('cam_dylan', (1.75, -1.75, 1.75), (0.95, -0.25, 0.85), 34),
-            'mark': camera('cam_mark', (-0.35, 0.55, 1.75), (1.05, 1.4, 0.9), 34)}
+            'dylan': camera('cam_dylan', (1.95, 0.3, 1.5), (0.98, -0.45, 0.92), 36),
+            'mark': camera('cam_mark', (-0.35, 0.55, 1.75), (1.05, 1.4, 0.9), 34),
+            'irving': camera('cam_irving', (-1.85, 0.75, 1.55), (-0.7, 1.55, 0.95), 34),
+            'helly': camera('cam_helly', (-1.6, -1.35, 1.55), (-0.88, -0.3, 0.95), 34),
+            'milchick': camera('cam_milchick', (1.75, -0.95, 1.72), (1.0, -1.95, 1.4), 34)}
     return sc, M, objs, list(phantom.objects), seated, cams
 
 
@@ -183,42 +214,64 @@ def bake(sc, objs, phantoms, seated, args):
     for o in objs:
         if o in screens: o['lm'] = ''
     cine.export_glb(objs, os.path.join(WEB, 'room.glb'))
-    export_people(seated)
+    walker, _ = export_people(seated)
     meta = {
         'module': cine.MODULE, 'wallHeight': R.H,
         'lightmaps': {g: os.path.basename(p) for g, p in atlases.items()},
         # Cycles' diffuse light pass is E/pi; three.js multiplies the light map by albedo/pi, so scale by pi
         'lightMapIntensity': math.pi,
         'troffers': [{'x': x, 'y': R.H - 0.005, 'z': -y, 'w': R.TROFFER_SIZE[0], 'd': R.TROFFER_SIZE[1], 'watts': R.TROFFER_W} for x, y in R.TROFFERS],
-        'people': [{'who': c['who'], 'file': f"{c['who']}.glb", 'clip': c['action']} for c, arm, mesh in seated] + [{'who': 'milchick', 'file': 'milchick.glb', 'clip': 'milchick_walk', 'walk': True}],
-        'walk': [[-3.2, 2.9], [-3.2, -2.6], [3.4, -2.6], [3.4, 2.9]],
+        'people': [person_meta(c) for c, arm, mesh in seated] + [walker],
     }
     with open(os.path.join(WEB, 'room.json'), 'w') as f: json.dump(meta, f, indent=1)
     cine.log('wrote room.json')
 
 
-def _shrink_images(mesh, size=1024):
-    for slot in mesh.material_slots:
-        for n in slot.material.node_tree.nodes:
-            if n.type == 'TEX_IMAGE' and n.image and n.image.size[0] > size: n.image.scale(size, size)
+def person_meta(c):
+    """What the web needs to run a seated refiner: the acts in their file and how often each comes up."""
+    acts = [{'name': 'work', 'loop': True, 'min': c['work'][0], 'max': c['work'][1]}]
+    acts += [{'name': k, 'w': w} for k, (clip, w) in c['idles'].items()]
+    return {'who': c['who'], 'file': f"{c['who']}.glb", 'acts': acts}
 
 
 def export_people(seated):
-    """One glTF per person: body, rig and its looping action, textures at 1024 px (a figure is 0.29 m at 1:6)."""
+    """One glTF per person (body, rig, every act); the seated export where they sit. Returns the walker's meta."""
     out = os.path.join(WEB, 'people'); os.makedirs(out, exist_ok=True)
-    crowd = [(c['who'], arm, mesh) for c, arm, mesh in seated]
-    # Milchick does his rounds: Business_Male_05 in its own check suit, walking in place (the web moves him)
-    arm, mesh = people.load_avatar('Business_Male_05', collection=bpy.data.collections['people'])
-    walk = people.retarget(arm, 'm_walk_cool_01', inplace=True, action_name='milchick_walk')
-    arm.location = (0, 0, arm.location.z); crowd.append(('milchick', arm, mesh))
-    for who, arm, mesh in crowd:
-        _shrink_images(mesh)
-        keep = arm.matrix_world.copy()   # seated people export where they sit; the walker at the origin, facing +z in three.js
-        bpy.ops.object.select_all(action='DESELECT'); arm.select_set(True); mesh.select_set(True)
-        bpy.context.view_layer.objects.active = arm
-        path = os.path.join(out, f'{who}.glb')
-        bpy.ops.export_scene.gltf(filepath=path, export_format='GLB', use_selection=True, export_animations=True, export_animation_mode='ACTIVE_ACTIONS',
-                                  export_force_sampling=True, export_frame_step=2, export_optimize_animation_size=True, export_def_bones=True,
-                                  export_leaf_bone=False, export_image_format='WEBP', export_image_quality=85, export_extras=True, export_yup=True)
-        arm.matrix_world = keep
-        cine.log('person', who, f'{os.path.getsize(path) / 1e6:.1f} MB')
+    for c, arm, mesh in seated:
+        people.export_person(arm, mesh, c['acts'], os.path.join(out, f"{c['who']}.glb"))
+    w = WALKER
+    arm, mesh = people.load_avatar(w['avatar'], textures={k: os.path.join(PEOPLE_TEX, v) for k, v in w['tex'].items()}, collection=bpy.data.collections['people'])
+    mesh['person'] = w['who']; arm['person'] = w['who']
+    people.reshape(arm, mesh, w['shape'])
+    arm.scale = arm.scale * w['scale']; arm.location = (0, 0, arm.location.z * w['scale'])
+    bpy.context.view_layer.update()
+    walk, _, speed = people.retarget(arm, w['walk'], inplace=True, action_name=f"{w['who']}_walk")
+    acts = {'walk': walk}
+    for k, (clip, _w) in w['idles'].items(): acts[k] = people.retarget(arm, clip, action_name=f"{w['who']}_{k}")[0]
+    for a in acts.values(): people.freeze(a)
+    people.export_person(arm, mesh, acts, os.path.join(out, f"{w['who']}.glb"))   # at the origin, facing +z in three.js
+    route = []
+    for (x, y), q in ROUTE:
+        stop = None
+        if q is not None:
+            p = I.frame_q(q) @ I.PELVIS
+            stop = {'face': [round(p.x, 3), round(p.y, 3)], 'dwell': [7, 15]}
+        route.append({'at': [x, y], 'stop': stop})
+    return {'who': w['who'], 'file': f"{w['who']}.glb", 'walker': True, 'speed': round(speed, 3),
+            'acts': [{'name': 'walk', 'loop': True}] + [{'name': k, 'w': wt} for k, (clip, wt) in w['idles'].items()], 'route': route}, (arm, acts)
+
+
+def people_stage(sc, cams, seated, args):
+    """Re-export only the people (their glTF files and their part of room.json); the baked room stays as it is.
+    Then a look at each of them in the room (Cycles), Milchick at his first stop."""
+    walker, (arm, acts) = export_people(seated)
+    path = os.path.join(WEB, 'room.json'); meta = json.load(open(path))
+    meta['people'] = [person_meta(c) for c, a, m in seated] + [walker]; meta.pop('walk', None)
+    with open(path, 'w') as f: json.dump(meta, f, indent=1)
+    cine.log('updated room.json people')
+    (x, y), q = ROUTE[0]
+    arm.location = (x, y, arm.location.z); arm.rotation_euler.z += math.pi   # he faces -y as imported: turn him to the refiner
+    people.pose_at(arm, acts['stand'], 40)
+    for c, a, m in seated: people.pose_at(a, c['acts']['work'], 200)
+    for which in str(args.get('cams', 'dylan,mark,irving,helly,milchick')).split(','):
+        preview(sc, cams, which, int(args.get('samples', 96)), os.path.join(OUT, f'people_{which}.png'), size=(900, 900))

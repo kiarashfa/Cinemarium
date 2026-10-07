@@ -2,17 +2,23 @@
 import Scene from '../layouts/Scene.astro';
 ---
 <Scene title="Cinemarium · The Tower" theme="dark" here="tower" loading="Lighting the tower…"
-  description="A glass tower standing in still water at dusk; each of its ten floors is a small living room for one of Kia's favourite series or films.">
+  description="A glass tower in a reading room; each of its ten floors is a small living room for a favourite series or film.">
   <section class="cap fade" id="cap" aria-live="polite">
     <div class="k" id="k"></div>
     <h1 id="nm"></h1>
     <div class="sc" id="sc"></div>
+    <div class="rt" id="rt"></div>
     <a id="open" href="#">Open the case →</a>
   </section>
   <div class="switch" role="group" aria-label="Which list">
     <button data-kind="series" aria-pressed="true">Series</button><button data-kind="film" aria-pressed="false">Films</button>
   </div>
+  <div class="order" role="group" aria-label="Order">
+    <span>Order</span><button data-sort="rank" aria-pressed="true">Mine</button><button data-sort="year" aria-pressed="false">Year</button><button data-sort="imdb" aria-pressed="false">IMDb</button>
+  </div>
   <div class="floors" id="floors" aria-label="Floors"></div>
+  <button class="view" id="view">Step in</button>
+  <div class="hint" id="hint">Click the tower to step in</div>
   <script>
     import { startTower } from '../scene/apps/tower';
     startTower(document.getElementById('gl') as HTMLCanvasElement).catch(err => {
@@ -23,7 +29,10 @@ import Scene from '../layouts/Scene.astro';
   <style>
     .switch{position:fixed;left:50%;transform:translateX(-50%);top:calc(70px + env(safe-area-inset-top,0px));z-index:3;display:flex;border:1px solid var(--hair);border-radius:22px;padding:3px;background:rgba(0,0,0,.25);backdrop-filter:blur(6px)}
     .switch button{background:none;border:0;color:var(--dim);font:11px var(--sans);letter-spacing:.22em;text-transform:uppercase;padding:9px 18px;border-radius:19px;cursor:pointer}
-    .switch button[aria-pressed=true]{background:var(--fg);color:#111}
+    .switch button[aria-pressed=true]{background:var(--fg);color:var(--on)}
+    .order{position:fixed;left:50%;transform:translateX(-50%);top:calc(120px + env(safe-area-inset-top,0px));z-index:3;display:flex;gap:14px;align-items:baseline;font:10.5px var(--sans);letter-spacing:.22em;text-transform:uppercase;color:var(--hair)}
+    .order button{background:none;border:0;color:var(--dim);font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;padding:2px 0;border-bottom:1px solid transparent}
+    .order button[aria-pressed=true]{color:var(--fg);border-bottom-color:var(--brass)}
     .floors{position:fixed;right:clamp(16px,3vw,44px);top:50%;transform:translateY(-50%);z-index:3;display:flex;flex-direction:column;gap:9px;align-items:flex-end}
     .floors :global(button){background:none;border:0;color:var(--dim);font:11px var(--sans);letter-spacing:.18em;text-transform:uppercase;cursor:pointer;display:flex;gap:12px;align-items:center;padding:3px 0}
     .floors :global(button .n){font-variant-numeric:tabular-nums;color:var(--hair);transition:color .4s}
@@ -32,8 +41,13 @@ import Scene from '../layouts/Scene.astro';
     .floors :global(button.on){color:var(--fg)}
     .floors :global(button.on .n){color:var(--brass)}
     .floors :global(button.on::after){width:38px;background:var(--brass)}
+    .view{position:fixed;right:clamp(16px,3vw,44px);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:3;border:1px solid var(--hair);background:var(--chip);color:var(--fg);border-radius:22px;padding:10px 18px;font:11px var(--sans);letter-spacing:.18em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(6px)}
+    .hint{position:fixed;right:clamp(16px,3vw,44px);bottom:calc(40px + env(safe-area-inset-bottom,0px));z-index:3;font-family:var(--italic);font-style:italic;font-size:16px;color:var(--dim)}
     @media (max-width:760px){
+      .hint{display:none}
+      .view{bottom:auto;top:calc(118px + env(safe-area-inset-top,0px));right:auto;left:clamp(16px,3vw,44px)}
       .switch{top:auto;bottom:calc(196px + env(safe-area-inset-bottom,0px))}
+      .order{top:auto;bottom:calc(166px + env(safe-area-inset-bottom,0px))}
       .floors{top:calc(118px + env(safe-area-inset-top,0px));transform:none;gap:4px}
       .floors :global(button .t){display:none}
     }

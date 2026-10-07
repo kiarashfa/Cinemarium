@@ -1,6 +1,6 @@
 ---
 // A full-screen 3D page: the canvas, a loading veil, the header and the caption.
-// `theme` is "dark" (the tower at dusk) or "light" (the case in the stone hall).
+// `theme` is "dark" (the tower in its gallery) or "light" (the case in the stone hall); the ambient may change it.
 interface Props { title: string; description: string; theme: 'dark' | 'light'; here: 'tower' | 'case'; loading: string }
 const { title, description, theme, here, loading } = Astro.props;
 const base = import.meta.env.BASE_URL;
@@ -40,8 +40,8 @@ const base = import.meta.env.BASE_URL;
     :root{
       --display:'Bodoni Moda',ui-serif,Didot,Georgia,serif; --italic:'Cormorant Garamond',ui-serif,Georgia,serif; --sans:'Manrope',ui-sans-serif,system-ui,sans-serif;
     }
-    [data-theme=dark]{ --bg:#070707; --fg:#EFE8DC; --dim:rgba(239,232,220,.56); --hair:rgba(239,232,220,.16); --brass:#D2AE6C; --veil:4,6,10; color-scheme:dark }
-    [data-theme=light]{ --bg:#e9dfd0; --fg:#2a2118; --dim:rgba(42,33,24,.62); --hair:rgba(42,33,24,.2); --brass:#8a6a32; --veil:233,223,208; color-scheme:light }
+    [data-theme=dark]{ --bg:#070707; --fg:#EFE8DC; --dim:rgba(239,232,220,.56); --hair:rgba(239,232,220,.16); --brass:#D2AE6C; --veil:4,6,10; --chip:rgba(0,0,0,.28); --on:#111; color-scheme:dark }
+    [data-theme=light]{ --bg:#e9dfd0; --fg:#2a2118; --dim:rgba(42,33,24,.62); --hair:rgba(42,33,24,.2); --brass:#8a6a32; --veil:233,223,208; --chip:rgba(255,250,240,.55); --on:#f3ebdd; color-scheme:light }
     *{box-sizing:border-box}
     html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);overflow:hidden;font-family:var(--sans)}
     canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
@@ -59,6 +59,8 @@ const base = import.meta.env.BASE_URL;
     .cap .k{font-size:10.5px;letter-spacing:.3em;text-transform:uppercase;color:var(--brass)}
     .cap h1{font-family:var(--display);font-weight:400;font-size:clamp(40px,4.4vw,64px);line-height:1.02;margin:10px 0 8px}
     .cap .sc{font-family:var(--italic);font-style:italic;font-size:20px;color:var(--dim)}
+    .cap .rt{margin-top:10px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);font-variant-numeric:tabular-nums}
+    .cap .rt b{font-weight:500;color:var(--fg)}
     .cap a{display:inline-block;margin-top:18px;color:var(--fg);text-decoration:none;font-size:12px;letter-spacing:.2em;text-transform:uppercase;border-bottom:1px solid var(--brass);padding-bottom:3px}
     .fade{transition:opacity .45s,transform .55s}
     .fade.out{opacity:0}

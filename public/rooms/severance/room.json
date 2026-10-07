@@ -112,50 +112,228 @@
   {
    "who": "dylan",
    "file": "dylan.glb",
-   "clip": "dylan_work"
+   "acts": [
+    {
+     "name": "work",
+     "loop": true,
+     "min": 10,
+     "max": 26
+    },
+    {
+     "name": "yawn",
+     "w": 1.0
+    },
+    {
+     "name": "scratch",
+     "w": 1.0
+    },
+    {
+     "name": "shrug",
+     "w": 0.7
+    },
+    {
+     "name": "look",
+     "w": 1.0
+    }
+   ]
   },
   {
    "who": "mark",
    "file": "mark.glb",
-   "clip": "mark_work"
+   "acts": [
+    {
+     "name": "work",
+     "loop": true,
+     "min": 18,
+     "max": 45
+    },
+    {
+     "name": "look",
+     "w": 1.2
+    },
+    {
+     "name": "roll",
+     "w": 0.8
+    },
+    {
+     "name": "face",
+     "w": 1.0
+    }
+   ]
   },
   {
    "who": "irving",
    "file": "irving.glb",
-   "clip": "irving_work"
+   "acts": [
+    {
+     "name": "work",
+     "loop": true,
+     "min": 22,
+     "max": 55
+    },
+    {
+     "name": "think",
+     "w": 1.0
+    },
+    {
+     "name": "dust",
+     "w": 1.0
+    },
+    {
+     "name": "look",
+     "w": 0.6
+    }
+   ]
   },
   {
    "who": "helly",
    "file": "helly.glb",
-   "clip": "helly_work"
+   "acts": [
+    {
+     "name": "work",
+     "loop": true,
+     "min": 9,
+     "max": 24
+    },
+    {
+     "name": "hair",
+     "w": 1.2
+    },
+    {
+     "name": "look",
+     "w": 1.0
+    },
+    {
+     "name": "stretch",
+     "w": 0.6
+    },
+    {
+     "name": "face",
+     "w": 0.8
+    }
+   ]
   },
   {
    "who": "milchick",
    "file": "milchick.glb",
-   "clip": "milchick_walk",
-   "walk": true
+   "walker": true,
+   "speed": 1.09,
+   "acts": [
+    {
+     "name": "walk",
+     "loop": true
+    },
+    {
+     "name": "stand",
+     "w": 1.0
+    },
+    {
+     "name": "look",
+     "w": 0.8
+    },
+    {
+     "name": "listen",
+     "w": 1.0
+    }
+   ],
+   "route": [
+    {
+     "at": [
+      1.0,
+      -1.95
+     ],
+     "stop": {
+      "face": [
+       0.98,
+       -0.48
+      ],
+      "dwell": [
+       7,
+       15
+      ]
+     }
+    },
+    {
+     "at": [
+      3.3,
+      -2.5
+     ],
+     "stop": null
+    },
+    {
+     "at": [
+      2.65,
+      1.38
+     ],
+     "stop": {
+      "face": [
+       1.18,
+       1.38
+      ],
+      "dwell": [
+       7,
+       15
+      ]
+     }
+    },
+    {
+     "at": [
+      3.0,
+      2.85
+     ],
+     "stop": null
+    },
+    {
+     "at": [
+      -0.68,
+      2.85
+     ],
+     "stop": {
+      "face": [
+       -0.68,
+       1.58
+      ],
+      "dwell": [
+       7,
+       15
+      ]
+     }
+    },
+    {
+     "at": [
+      -3.1,
+      2.8
+     ],
+     "stop": null
+    },
+    {
+     "at": [
+      -2.35,
+      -0.28
+     ],
+     "stop": {
+      "face": [
+       -0.88,
+       -0.28
+      ],
+      "dwell": [
+       7,
+       15
+      ]
+     }
+    },
+    {
+     "at": [
+      -3.1,
+      -2.5
+     ],
+     "stop": null
+    }
+   ]
   }
  ],
- "walk": [
-  [
-   -3.2,
-   2.9
-  ],
-  [
-   -3.2,
-   -2.6
-  ],
-  [
-   3.4,
-   -2.6
-  ],
-  [
-   3.4,
-   2.9
-  ]
- ],
  "lightmapScale": {
-  "arch": 1.1962890625,
-  "furn": 1.748046875
+  "arch": 1.1943359375,
+  "furn": 1.7470703125
  }
 }

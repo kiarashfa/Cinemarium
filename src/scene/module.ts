@@ -3,7 +3,7 @@
 // Every room, for every title, is built inside MODULE at real size (metres, people 1.75 m tall)
 // and shown at SCALE in every layout. The case and the tower floor are derived from these numbers
 // only, so every case and every floor is identical, and the glass always clears the tallest room.
-// Pick the numbers once; never scale a room on its own (that is what broke the GlassRoom mocks).
+// Pick the numbers once; never scale a room on its own (that is how cases and floors drift apart in size).
 import * as THREE from 'three/webgpu';
 
 /** The box every room is built in, in real metres. Origin at the centre of the floor; x right, y up, z toward the viewer. */

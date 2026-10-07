@@ -39,9 +39,9 @@ export function createPost(renderer: THREE.WebGPURenderer, scene: THREE.Scene, c
   }
   const resolved = high ? traa(beauty, preDepth, preVelocity, camera) : beauty;
 
-  const focus = { distance: uniform(3), range: uniform(0.35), bokeh: uniform(high ? 1.7 : 1.2) };
+  const focus = { distance: uniform(3), range: uniform(0.35), bokeh: uniform(high ? 0.95 : 0.7) };
   const Q = new URLSearchParams(location.search);   // ?nodof ?nobloom: switches for judging the finish
-  const focused = Q.has('nodof') ? resolved : dof(resolved, pre.getViewZNode(), focus.distance, focus.range, focus.bokeh);
+  const focused: any = Q.has('nodof') ? resolved : dof(resolved, pre.getViewZNode(), focus.distance, focus.range, focus.bokeh);
   const [bs, br, bt] = opts.bloom ?? [0.18, 0.4, 1.1];
   const lit = Q.has('nobloom') ? focused : focused.add(bloom(focused, bs, br, bt));
   // a light vignette and grain, as a lens and a sensor would leave them

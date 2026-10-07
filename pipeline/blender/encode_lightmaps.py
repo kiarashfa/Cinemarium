@@ -3,6 +3,7 @@
 # The web loads them as sRGB textures and sets lightMapIntensity = pi * scale.
 # Usage: blender -b --factory-startup -P pipeline/blender/encode_lightmaps.py -- <room>
 import bpy, sys, os, json
+sys.dont_write_bytecode = True   # no __pycache__ next to the scripts
 import numpy as np
 
 room = sys.argv[sys.argv.index('--') + 1]

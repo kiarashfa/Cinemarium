@@ -1,4 +1,4 @@
-// The tower: a basalt footing in still water, then ten identical floors under one skin of glass.
+// The tower: a basalt footing, then ten identical floors under one skin of glass.
 // A floor is a lacquer slab plus exactly CASE.h of room and air, so every storey is the same height
 // and the slab above always clears the tallest room.
 import * as THREE from 'three/webgpu';
@@ -6,7 +6,7 @@ import { CASE, FLOOR, GLASS } from './module';
 import { box, glassBox } from './case';
 import { lacquer, brass, glass } from './materials';
 
-// a facade, not a vitrine: ordinary architectural glass that mirrors the dusk sky
+// a facade, not a vitrine: ordinary architectural glass that mirrors the room around it
 const facade = glass.clone(); facade.specularIntensity = 1; facade.envMapIntensity = 0.5;
 // an unlit storey: dark matte back and side, so an empty floor reads as an office with the lights off
 const unlit = new THREE.MeshStandardMaterial({ color: 0x15140f, roughness: 0.92 });

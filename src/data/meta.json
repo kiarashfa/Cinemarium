@@ -1,0 +1,62 @@
+{
+  "asOf": "2026-10-06",
+  "titles": {
+    "severance": {
+      "imdb": {
+        "id": "tt11280740",
+        "rating": 8.6,
+        "votes": 385489
+      },
+      "tmdb": {
+        "id": 95396,
+        "rating": 8.4,
+        "votes": 3007
+      },
+      "year": 2022,
+      "genres": [
+        "Drama",
+        "Mystery",
+        "Sci-Fi"
+      ],
+      "seasons": 3
+    },
+    "lost": {
+      "imdb": {
+        "id": "tt0411008",
+        "rating": 8.3,
+        "votes": 683573
+      },
+      "tmdb": {
+        "id": 4607,
+        "rating": 8,
+        "votes": 5376
+      },
+      "year": 2004,
+      "runtime": "44 min",
+      "genres": [
+        "Adventure",
+        "Drama",
+        "Fantasy"
+      ],
+      "seasons": 6
+    },
+    "the-matrix": {
+      "imdb": {
+        "id": "tt0133093",
+        "rating": 8.7,
+        "votes": 2243093
+      },
+      "tmdb": {
+        "id": 603,
+        "rating": 8.3,
+        "votes": 28886
+      },
+      "year": 1999,
+      "runtime": "136 min",
+      "genres": [
+        "Action",
+        "Sci-Fi"
+      ]
+    }
+  }
+}

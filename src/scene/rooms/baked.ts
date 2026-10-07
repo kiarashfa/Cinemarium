@@ -1,12 +1,13 @@
 // A baked room: static geometry lit by Cycles light maps (direct and bounce light, baked in Blender), and the
 // living parts on top: motion-captured people lit by the room's own lights, screens, a clock, a walker.
-// Built by pipeline/blender (see docs/pipeline.md); files in public/rooms/<id>/.
+// Built by pipeline/blender; files in public/rooms/<id>/.
 import * as THREE from 'three/webgpu';
 import { lights, vec3 } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import type { Room } from './types';
 import { RENDERER } from '../stage';
+import { perform, type PersonMeta } from './performers';
 
 const gltf = new GLTFLoader(), exr = new EXRLoader(), image = new THREE.TextureLoader();
 
@@ -21,7 +22,7 @@ class ReflectionsOnly extends EnvironmentNode {
   }
 }
 class RoomMaterial extends THREE.MeshPhysicalNodeMaterial {
-  setupEnvironment(builder: any) {
+  setupEnvironment(builder: any): any {
     const env = super.setupEnvironment(builder) as any;
     return env ? new ReflectionsOnly(env.envNode) : null;
   }
@@ -50,8 +51,7 @@ const asset = (id: string, f: string) => `${import.meta.env.BASE_URL}rooms/${id}
 interface Meta {
   wallHeight: number; lightmaps: Record<string, string>; lightMapIntensity: number; lightmapScale?: Record<string, number>;
   troffers: { x: number; y: number; z: number; w: number; d: number; watts: number }[];
-  people: { who: string; file: string; clip: string; walk?: boolean }[];
-  walk: [number, number][];
+  people: PersonMeta[];
 }
 
 export async function bakedRoom(id: string, screen?: (q: number) => { canvas: HTMLCanvasElement; draw(t: number): void }): Promise<Room> {
@@ -70,7 +70,7 @@ export async function bakedRoom(id: string, screen?: (q: number) => { canvas: HT
 
   const group = new THREE.Group(); group.add(scene);
   const none = lights([]), cache = new Map<string, THREE.Material>(), screens: { mat: THREE.MeshBasicNodeMaterial; draw(t: number): void; tex: THREE.CanvasTexture }[] = [];
-  const hands: { pivot: THREE.Object3D; kind: string }[] = [];
+  const hands: { pivot: THREE.Mesh; kind: string }[] = [];
   let clockCentre: THREE.Vector3 | null = null;
   scene.traverse(o => {
     const m = o as THREE.Mesh; if (!m.isMesh) return;
@@ -112,9 +112,7 @@ export async function bakedRoom(id: string, screen?: (q: number) => { canvas: HT
   // the room's own light, captured once: the desks reflect it and the people are lit by it
   const env = captureRoom(group, meta);
   if (env) for (const m of cache.values()) { (m as RoomMaterial).envMap = env; }
-  const mixers: THREE.AnimationMixer[] = [];
-  let walker: { body: THREE.Object3D; mixer: THREE.AnimationMixer } | null = null;
-  await Promise.all(meta.people.map(async (p, i) => {
+  const bodies = await Promise.all(meta.people.map(async p => {
     const g = await gltf.loadAsync(asset(id, `people/${p.file}`));
     const body = g.scene;
     body.traverse(o => {
@@ -128,32 +126,18 @@ export async function bakedRoom(id: string, screen?: (q: number) => { canvas: HT
       if (src.map && (src.transparent || src.alphaTest > 0 || /opacity|hair/i.test(src.name))) { mat.alphaTest = 0.45; mat.transparent = false; mat.side = THREE.DoubleSide; }
       m.material = mat;
     });
-    const mixer = new THREE.AnimationMixer(body), clip = g.animations.find(a => a.name === p.clip) ?? g.animations[0];
-    if (clip) { const a = mixer.clipAction(clip); a.play(); a.time = (i * 2.3) % clip.duration; }
-    mixers.push(mixer); group.add(body);
-    if (p.walk) walker = { body, mixer };
+    group.add(body);
+    return { body, clips: g.animations, meta: p };
   }));
-
-  // Milchick's rounds: along the path at walking pace, turning smoothly into each leg
-  const path = meta.walk.map(([x, y]) => new THREE.Vector2(x, -y));
-  const legs = path.map((a, i) => a.distanceTo(path[(i + 1) % path.length])), loop = legs.reduce((s, l) => s + l, 0);
-  const pos = new THREE.Vector2();
-  function walk(t: number) {
-    if (!walker) return;
-    let s = (t * 1.0) % loop, i = 0; while (s > legs[i]) { s -= legs[i]; i++; }
-    const a = path[i], b = path[(i + 1) % path.length]; pos.lerpVectors(a, b, s / legs[i]);
-    const w = walker as { body: THREE.Object3D };
-    w.body.position.set(pos.x, 0, pos.y);
-    const want = Math.atan2(b.x - a.x, b.y - a.y); let d = want - w.body.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); w.body.rotation.y += d * 0.1;
-
-  }
+  // each person's acts, crossfaded at random by weight; Milchick on his rounds
+  const cast = perform(bodies);
+  if (new URLSearchParams(location.search).has('debug')) (window as any).__cast = cast;
 
   let last = -1;
   return {
     group,
     update(t, dt) {
-      for (const m of mixers) m.update(dt);
-      walk(t);
+      cast.update(t, dt);
       if (t - last > 0.12) { last = t; for (const s of screens) { s.draw(t); s.tex.needsUpdate = true; } }
       const now = new Date(), sec = now.getSeconds() + now.getMilliseconds() / 1000, min = now.getMinutes() + sec / 60, hr = (now.getHours() % 12) + min / 60;
       for (const h of clock) h.pivot.rotation.z = -((h.kind === 'h' ? hr / 12 : h.kind === 'm' ? min / 60 : Math.floor(sec) / 60) * Math.PI * 2 - h.rest);
