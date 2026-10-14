@@ -180,6 +180,157 @@ def lost(out):
     tint(ph('concrete_wall_008', 'Diffuse'), f'{out}/ceiling_color.jpg', (120, 112, 98), size=512, contrast=0.4)
 
 
+def _rect_uv_texture(w, h, draw, mode='RGB', bg=(0, 0, 0)):
+    """A canvas drawn with PIL (for textures mapped 0..1 across a face)."""
+    from PIL import ImageDraw
+    im = Image.new(mode, (w, h), bg); draw(im, ImageDraw.Draw(im)); return im
+
+
+def seinfeld(out):
+    """Jerry's apartment, 5A: honey oak strips underfoot, white walls under a mottled grey glaze, grey beadboard to the
+    dado, the blue-grey couch, black-and-white flecked rugs with red borders, white kitchen tiles, the pink bathroom."""
+    from PIL import ImageDraw, ImageFont
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    rng = np.random.default_rng(81)
+    S = 2048
+    # the floor: 57 mm oak strips running front to back, random lengths, each board its own tone, fine dark joints;
+    # the texture spans 1.824 m (32 strips), the laminate's grain laid along the boards
+    grain = _lum(ph('laminate_floor_02', 'Diffuse'), S).T; grain = (grain / grain.mean()) ** 0.8
+    n = 32; sw = S // n
+    col = np.zeros((S, S, 3), np.float32); h = np.ones((S, S), np.float32)
+    y = np.arange(S)
+    for i in range(n):
+        x0 = i * sw; cuts = [int(rng.uniform(0, 1) * S)]
+        while cuts[-1] < cuts[0] + S: cuts.append(cuts[-1] + int(rng.uniform(0.25, 0.65) * S))
+        tone = np.zeros(S, np.float32); joint = np.zeros(S, bool)
+        for a, b in zip(cuts, cuts[1:]):
+            idx = np.arange(a, b) % S; tone[idx] = rng.uniform(0.86, 1.12); joint[a % S] = joint[(a + 1) % S] = True
+        warm = rng.uniform(-0.05, 0.05)
+        c = lin((178 + 30 * warm, 126, 74 - 40 * warm))
+        col[:, x0:x0 + sw] = c[None, None] * (tone[:, None] * grain[:, x0:x0 + sw])[..., None]
+        col[:, x0:x0 + 1] *= 0.42; h[:, x0:x0 + 1] = 0.0
+        col[joint, x0:x0 + sw] *= 0.5; h[joint, x0:x0 + sw] = 0.2
+    _save(col, f'{out}/floor_color.jpg')
+    _normal_from_height(h, 1.2).resize((1024, 1024), Image.LANCZOS).save(f'{out}/floor_normal.jpg', quality=92)
+    # the walls: white paint under a mottled grey-beige glaze (the set's faux finish); the band above the picture rail a
+    # shade greyer; the phantom ceiling
+    pl = _lum(ph('painted_plaster_wall', 'Diffuse'), S); pl = (pl / pl.mean())
+    mott = 0.86 + 0.14 * _noise(S, 90, 5) + 0.06 * _noise(S, 22, 6)
+    rel = pl ** 0.7 * (0.93 + 0.07 * (mott - 0.86) / 0.2)
+    _save(lin((226, 222, 213))[None, None] * rel[..., None], f'{out}/wall_color.jpg')
+    _save(lin((190, 186, 180))[None, None] * rel[..., None], f'{out}/band_color.jpg')
+    copy(ph('painted_plaster_wall', 'nor_gl'), f'{out}/wall_normal.jpg', size=1024)
+    tint(ph('white_plaster_02', 'Diffuse'), f'{out}/ceiling_color.jpg', (210, 206, 198), size=512, contrast=0.4)
+    # beadboard: 76 mm boards with a bead and a V-groove at each joint, painted grey; the texture spans 8 boards
+    B = 1024; x = (np.arange(B) / B * 8) % 1.0
+    prof = np.clip(np.minimum(x, 1 - x) / 0.035, 0, 1) ** 0.7 - 0.25 * np.exp(-((x - 0.07) / 0.02) ** 2)
+    hb = np.tile(prof[None, :], (B, 1)).astype(np.float32)
+    _normal_from_height(hb, 3.0).save(f'{out}/beadboard_normal.jpg', quality=92)
+    paint = (0.93 + 0.07 * _noise(B, 40, 9)) * (0.82 + 0.18 * hb)
+    _save(lin((156, 153, 158))[None, None] * paint[..., None], f'{out}/beadboard_color.jpg')
+    _save(lin((158, 158, 162))[None, None] * paint[..., None], f'{out}/counter_board_color.jpg')
+    # the couch and the armchair: a blue-grey woven upholstery
+    tint(ph('cotton_jersey', 'Diffuse'), f'{out}/couch_color.jpg', (84, 108, 116), size=1024, contrast=1.4)
+    copy(ph('cotton_jersey', 'nor_gl'), f'{out}/couch_normal.jpg', size=1024)
+    # the rugs (0..1 across each): a black border, a black-and-white fleck, a fine red line, the coffee table's with a
+    # red field in the middle
+    for name, field in (('rug_coffee', True), ('rug_dining', False)):
+        R = 1024; yy, xx = np.mgrid[0:R, 0:R].astype(np.float32) / R
+        d = np.minimum(np.minimum(xx, 1 - xx), np.minimum(yy, 1 - yy))
+        fleck = (rng.random((R, R)) > 0.5).astype(np.float32); fleck = np.asarray(Image.fromarray((fleck * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.7)), np.float32) / 255
+        c = lin((210, 208, 202))[None, None] * fleck[..., None] + lin((22, 22, 24))[None, None] * (1 - fleck[..., None])
+        c = np.where((d < 0.06)[..., None], lin((18, 18, 20))[None, None], c)
+        c = np.where(((d > 0.135) & (d < 0.15))[..., None], lin((150, 30, 28))[None, None], c)
+        if field: c = np.where((d > 0.26)[..., None], lin((128, 30, 26))[None, None] * (0.9 + 0.1 * fleck[..., None]), c)
+        _save(c, f'{out}/{name}_color.jpg')
+    # tiles: the kitchen's white 108 mm squares (4 x 4 per texture), the bathroom's salmon pink
+    for name, base, grout in (('tile_kitchen', (226, 226, 222), (150, 150, 148)), ('tile_bath', (214, 162, 150), (190, 170, 160))):
+        T = 1024; t = T // 4; yy, xx = np.mgrid[0:T, 0:T]
+        g = np.minimum(np.minimum(xx % t, t - xx % t), np.minimum(yy % t, t - yy % t))
+        tone = 0.95 + 0.08 * rng.random((4, 4))[yy // t, xx // t]
+        grt = np.clip(1 - (g - 2.5) / 2, 0, 1)[..., None]
+        _save(lin(base)[None, None] * tone[..., None] * (1 - grt) + lin(grout)[None, None] * grt, f'{out}/{name}_color.jpg')
+        _normal_from_height(np.clip((g - 2) / 5, 0, 1).astype(np.float32), 1.5).save(f'{out}/{name}_normal.jpg', quality=92)
+    # the fridge doors (0..1 across the pair): almond enamel under magnets, snapshots, clippings, stickers and menus
+    F = _rect_uv_texture(1024, 2048, lambda im, dr: None, bg=(226, 216, 190))
+    dr = ImageDraw.Draw(F)
+    for k in range(140):
+        cx, cy = rng.uniform(0.04, 0.96) * 1024, rng.uniform(0.12, 0.8) * 2048
+        if 470 < cx < 560: continue                                   # the gap between the doors
+        kind = rng.random(); w, hh = (rng.uniform(40, 150), rng.uniform(50, 200)) if kind < 0.6 else (rng.uniform(25, 60),) * 2
+        colr = tuple(int(v) for v in ((rng.uniform(200, 250),) * 3 if kind < 0.35 else rng.uniform(30, 240, 3)))
+        dr.rectangle([cx - w / 2, cy - hh / 2, cx + w / 2, cy + hh / 2], fill=colr)
+        if kind < 0.35:
+            for j in range(int(hh // 14)): dr.line([cx - w / 2 + 6, cy - hh / 2 + 8 + j * 14, cx + w / 2 - 6, cy - hh / 2 + 8 + j * 14], fill=(120, 120, 125), width=2)
+    dr.rectangle([60, 900, 200, 1150], fill=(28, 28, 30))                # the ice and water dispenser in the left door
+    F.save(f'{out}/fridge_color.jpg', quality=92)
+    # cereal and the cupboards' contents (an atlas of 8 x 4 box fronts): bright colour fields, a band, a bowl shape
+    C = _rect_uv_texture(1024, 1024, lambda im, dr: None, bg=(240, 236, 228)); dr = ImageDraw.Draw(C)
+    pal = [(216, 40, 36), (250, 200, 30), (30, 90, 180), (240, 120, 30), (60, 150, 70), (245, 245, 240), (130, 60, 150), (200, 30, 90), (40, 170, 200), (230, 210, 160)]
+    for i in range(8):
+        for j in range(4):
+            x0, y0 = i * 128, j * 256; a, b = pal[rng.integers(10)], pal[rng.integers(10)]
+            dr.rectangle([x0, y0, x0 + 127, y0 + 255], fill=a)
+            dr.rectangle([x0 + 8, y0 + 18, x0 + 119, y0 + 70], fill=b)
+            dr.ellipse([x0 + 24, y0 + 120, x0 + 104, y0 + 200], fill=(245, 242, 235)); dr.ellipse([x0 + 34, y0 + 130, x0 + 94, y0 + 175], fill=pal[rng.integers(10)])
+    C.save(f'{out}/cereal_color.jpg', quality=92)
+    # spines (books, VHS boxes, board games): 64 vertical spines across, two rows
+    P = _rect_uv_texture(2048, 1024, lambda im, dr: None, bg=(20, 20, 22)); dr = ImageDraw.Draw(P)
+    for r in range(2):
+        for i in range(64):
+            x0 = i * 32; vhs = r == 1
+            c = (18, 18, 20) if vhs and rng.random() < 0.7 else tuple(int(v) for v in rng.uniform(40, 230, 3))
+            dr.rectangle([x0 + 1, r * 512, x0 + 30, r * 512 + 511], fill=c)
+            band = (235, 235, 230) if vhs else tuple(int(v) for v in rng.uniform(160, 250, 3))
+            dr.rectangle([x0 + 4, r * 512 + 140, x0 + 27, r * 512 + 330], fill=band)
+    P.save(f'{out}/spines_color.jpg', quality=92)
+    # pictures on the walls (originals in the manner of the set's): a silver racer on a mountain road under a dark title
+    # band; a pop city of coloured blocks; framed photographs in black and white
+    W_, H_ = 1024, 1300
+    p1 = _rect_uv_texture(W_, H_, lambda im, dr: None, bg=(236, 232, 222)); dr = ImageDraw.Draw(p1)
+    dr.rectangle([90, 90, W_ - 90, 1000], fill=(150, 160, 170))
+    dr.polygon([(90, 560), (300, 300), (520, 470), (760, 260), (W_ - 90, 520), (W_ - 90, 1000), (90, 1000)], fill=(110, 92, 70))
+    dr.polygon([(90, 1000), (420, 640), (600, 640), (W_ - 90, 1000)], fill=(150, 120, 90))
+    dr.ellipse([300, 690, 700, 900], fill=(205, 208, 212)); dr.ellipse([330, 700, 660, 800], fill=(225, 228, 232))
+    for cx in (390, 620): dr.ellipse([cx - 45, 820, cx + 45, 910], fill=(28, 28, 30))
+    dr.ellipse([720, 700, 900, 820], fill=(178, 34, 30))
+    dr.rectangle([90, 1040, W_ - 90, 1180], fill=(26, 26, 30))
+    p1.save(f'{out}/poster_racer.jpg', quality=92)
+    p2 = _rect_uv_texture(1024, 1300, lambda im, dr: None, bg=(250, 246, 236)); dr = ImageDraw.Draw(p2)
+    for k in range(60):
+        x0, w = rng.uniform(60, 900), rng.uniform(60, 180); y1 = rng.uniform(500, 1200); hh = rng.uniform(150, 600)
+        dr.rectangle([x0, y1 - hh, x0 + w, y1], fill=pal[rng.integers(10)], outline=(20, 20, 20), width=6)
+        for j in range(int(hh // 50)): dr.rectangle([x0 + 15, y1 - hh + 20 + j * 50, x0 + 35, y1 - hh + 40 + j * 50], fill=(250, 240, 120))
+    dr.rectangle([0, 1200, 1024, 1300], fill=(60, 140, 60))
+    p2.save(f'{out}/poster_city.jpg', quality=92)
+    for k in range(3):
+        g = (_noise(512, 18 + 10 * k, 60 + k) * 0.7 + 0.15 + 0.15 * _noise(512, 3, 70 + k)) * 255
+        Image.fromarray(np.dstack([g * 0.98, g * 0.98, g * 0.95]).astype(np.uint8)).save(f'{out}/photo{k}.jpg', quality=90)
+    # magazines on the coffee table (an atlas of 4 x 2 covers): a photograph, a masthead band, a few lines
+    G = _rect_uv_texture(1024, 1024, lambda im, dr: None, bg=(236, 232, 224)); dr = ImageDraw.Draw(G)
+    for i in range(4):
+        for j in range(2):
+            x0, y0 = i * 256, j * 512; c = pal[rng.integers(10)]
+            dr.rectangle([x0 + 10, y0 + 90, x0 + 245, y0 + 430], fill=tuple(int(v * 0.7 + 60) for v in c))
+            dr.ellipse([x0 + 60, y0 + 160, x0 + 190, y0 + 330], fill=tuple(int(v) for v in rng.uniform(120, 230, 3)))
+            dr.rectangle([x0 + 10, y0 + 18, x0 + 245, y0 + 78], fill=(200, 30, 30) if j else (20, 20, 24))
+            for k in range(3): dr.rectangle([x0 + 20, y0 + 445 + k * 18, x0 + 200 - 30 * k, y0 + 455 + k * 18], fill=(60, 60, 64))
+    G.save(f'{out}/magazine_color.jpg', quality=92)
+    # the door's number, and the bathroom's window view (a sunlit brick building across the way, soft)
+    f = ImageFont.truetype('C:/Windows/Fonts/arialbd.ttf', 300) if os.path.exists('C:/Windows/Fonts/arialbd.ttf') else ImageFont.load_default()
+    num = Image.new('RGB', (512, 320), (236, 230, 214)); ImageDraw.Draw(num).text((256, 160), '5A', fill=(30, 28, 26), font=f, anchor='mm')
+    num.save(f'{out}/door_5a.jpg', quality=92)
+    num = Image.new('RGB', (512, 320), (236, 230, 214)); ImageDraw.Draw(num).text((256, 160), '5B', fill=(30, 28, 26), font=f, anchor='mm')
+    num.save(f'{out}/door_5b.jpg', quality=92)
+    V = 1024; yy, xx = np.mgrid[0:V, 0:V].astype(np.float32) / V
+    brick = ((yy * 40) % 1 > 0.1) & (((xx * 14 + 0.5 * np.floor(yy * 40)) % 1) > 0.06)
+    v = np.where(brick[..., None], lin((170, 96, 70)), lin((200, 188, 170))) * (0.85 + 0.3 * _noise(V, 30, 77))[..., None]
+    win = (((xx * 4) % 1 > 0.25) & ((xx * 4) % 1 < 0.75) & ((yy * 3) % 1 > 0.2) & ((yy * 3) % 1 < 0.8))
+    v = np.where(win[..., None], lin((70, 80, 92)), v)
+    _save(v * 1.4, f'{out}/view_color.jpg')
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

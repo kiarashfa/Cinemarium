@@ -37,6 +37,11 @@ class RoomMaterial extends THREE.MeshPhysicalNodeMaterial {
     const t = texture(this.lightMap, uv(1)).rgb;
     return new (THREE as any).IrradianceNode(t.mul(t).mul(this.lightMapIntensity));
   }
+  // the node above holds its atlas and intensity, while three shares a compiled program between materials that differ
+  // only in their textures: without the atlas in the key, a wall can end up drawn with the furniture's light map
+  customProgramCacheKey() {
+    return super.customProgramCacheKey() + (this.lightMapSquared && this.lightMap ? `:${this.lightMap.uuid}:${this.lightMapIntensity}` : '');
+  }
   // the light map already carries its occlusion; screen-space AO would darken the same corners twice
   setupMaterialLightings(builder: any) {
     const all = super.setupMaterialLightings(builder) as any[];

@@ -4,7 +4,7 @@
 
 ## What's inside
 
-- **Ten series and ten films**, one room each, chosen from a personal list, with five honourable mentions for each. The first rooms are Lumon's Macrodata Refinement floor from *Severance*, the rain-lashed hotel room of the red pill from *The Matrix* and the Swan station from *LOST*; more are under construction, and the collection is still growing.
+- **Ten series and ten films**, one room each, chosen from a personal list, with five honourable mentions for each. The first rooms are Lumon's Macrodata Refinement floor from *Severance*, the rain-lashed hotel room of the red pill from *The Matrix*, the Swan station from *LOST* and Jerry's apartment from *Seinfeld*; more are under construction, and the collection is still growing.
 - **The club.** A round video club, its walls lined floor to ceiling with films under a crown of light. Every visit begins at the door.
 - **The case.** One room at a time on a lacquer plinth. Drag to walk around it and lean in close; switch between series and films, order them by personal rank, by year or by IMDb rating, and watch the room sink into the plinth as the next one rises. Every title has its own address.
 - **Rooms that are alive.** Path-traced light baked from real fixtures, real materials, and motion-captured people who work, pause, talk and do their rounds. The terminals run, the clock on the wall keeps your time, rain runs down the windows while lightning flickers in, and down in the hatch the counter runs down from 108 minutes until someone enters the numbers.

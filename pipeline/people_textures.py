@@ -544,5 +544,178 @@ def lost():
     for k, v in made.items(): print(k, [os.path.basename(p) for p in v])
 
 
+def _weave(B, base, fleck, rng, scale=1.0):
+    """A woollen cloth's colour, made on the body: base with a fine fleck of light and dark threads and a soft slub."""
+    n1 = noise(B.x.shape, 0.6 * scale, int(rng.integers(1000))); n2 = noise(B.x.shape, 2.5 * scale, int(rng.integers(1000)))
+    c = np.array(base, np.float32)[None, None] / 255 * (0.82 + 0.3 * n2[..., None])
+    f = np.clip((n1 - 0.62) * 4, 0, 1)[..., None]; d = np.clip((0.3 - n1) * 4, 0, 1)[..., None]
+    return c * (1 - f - d * 0.6) + np.array(fleck, np.float32)[None, None] / 255 * f + c * 0.35 * d * 0.6
+
+
+def _checks(B, size, a, b, line=None, lw=0.0):
+    """A check on the body (x across, z up): squares `size` metres of colours a and b, or a plaid of `line` stripes."""
+    x, z = np.nan_to_num(B.x), np.nan_to_num(B.z)
+    if line is None:
+        m = ((np.floor(x / size) + np.floor(z / size)) % 2).astype(np.float32)[..., None]
+        return np.array(a, np.float32) / 255 * (1 - m) + np.array(b, np.float32) / 255 * m
+    u, v = (x / size) % 1, (z / size) % 1
+    s = ((np.abs(u - 0.5) < lw) | (np.abs(v - 0.5) < lw)).astype(np.float32)[..., None]
+    s2 = ((np.abs(u - 0.1) < lw * 0.5) | (np.abs(v - 0.1) < lw * 0.5)).astype(np.float32)[..., None] * 0.6
+    c = np.array(a, np.float32)[None, None] / 255
+    return c * (1 - s - s2) + np.array(line, np.float32)[None, None] / 255 * s + np.array(b, np.float32)[None, None] / 255 * s2
+
+
+def _paint(a, mask, colour_img, shade=None, k=0.6, flatten=0.0):
+    """Within mask: an image of colour, carrying the cloth's own light and dark (its folds) by `k`; `flatten` blurs that
+    first (px), so a knit's pattern (an argyle) does not show through the new cloth."""
+    l = lum(blur(a, flatten) if flatten else a); m = mask > 0.5
+    rel = np.clip(l / max(l[m].mean() if m.any() else 1, 1e-4), 0.4, 1.8) ** k if shade is None else shade
+    return a * (1 - mask[..., None]) + colour_img * rel[..., None] * mask[..., None]
+
+
+def _hairline(Hd, front=0.05, side=0.004, nape=-0.088):
+    """The hairline on a head (front, sides, nape), as heights relative to the eyebrows."""
+    brow = Hd.J['Bip01 MMiddleEyebrow'][2]; ax = np.abs(Hd.x)
+    line = brow + front - 0.03 * smooth(0.03, 0.062, ax)
+    line = line + (brow + side - line) * smooth(-0.075, -0.035, Hd.y)
+    line = line + (brow + nape - line) * smooth(-0.005, 0.05, Hd.y)
+    ear = (ax > 0.066) & (Hd.z < brow + 0.008) & (Hd.z > brow - 0.07) & (np.abs(Hd.y) < 0.04)
+    return brow, line, ear
+
+
+def seinfeld():
+    """Jerry's apartment in season seven, as in "The Wink" (costumes after Charmaine Simmons): Jerry in a denim-blue
+    button-down, black jeans and a black belt, white sneakers; George in a brown tweed jacket over a navy-and-mustard
+    plaid shirt; Kramer in a grey flecked bouclé jacket over a black-and-white checkerboard shirt, black trousers and
+    his black boots; Elaine in a red blazer over a cream blouse, a cream skirt with small red flowers, black tights
+    and boots."""
+    rng = np.random.default_rng(29)
+    made = {}
+
+    # Jerry (Male_Adult_08): dark brown full hair; the shirt a deeper blue, the jeans black, a black belt, white sneakers
+    h = load('Male_Adult_08', 'm014_head_color.tga'); Hd = Body('m014_head_color.tga')
+    brow, line, ear = _hairline(Hd, front=0.052)
+    hm = soft(Hd.grow(Hd.where((Hd.z > line - 0.004) & ~ear).astype(np.float32), 3), 1.4) * smooth(0.8, 0.6, hsv(h)[2])
+    h = recolour(h, hm, (40, 29, 22), contrast=1.2)
+    made['jerry'] = [save(h, 'jerry', 'm014_head_color.tga')]
+    o = load('Male_Adult_08', 'm014_opacity_color.tga'); oV = hsv(o)[2]
+    made['jerry'].append(save(recolour(o, soft((oV > 0.03).astype(np.float32), 1), (38, 27, 21), contrast=1.2), 'jerry', 'm014_opacity_color.tga',
+                              load_alpha('Male_Adult_08', 'm014_opacity_color.tga')))
+    b = load('Male_Adult_08', 'm014_body_color.tga'); B = Body('m014_body_color.tga'); H, S, V = hsv(b)
+    shirt = B.where((H > 180) & (H < 240) & (S > 0.12) & (V > 0.35) & ~B.part('Hand', 'Finger'))
+    b = recolour(b, B.grow(shirt.astype(np.float32), 24), (64, 94, 150), contrast=0.85, flatten=1.2)
+    belt = B.J['Bip01 Pelvis'][2] + 0.085
+    legs = B.where(B.part('Thigh', 'Calf', 'Pelvis', 'Foot') & (B.z < belt) & (B.z > 0.075) & ~B.part('Hand', 'Finger'))
+    b = recolour(b, B.grow(legs.astype(np.float32), 24), (30, 30, 34), contrast=0.85)
+    bl = B.where(B.part('Pelvis', 'Spine', 'Thigh') & (B.z > belt - 0.035) & (B.z < belt + 0.004))
+    b = recolour(b, B.grow(bl.astype(np.float32), 1), (18, 17, 18), contrast=0.6)
+    b = recolour(b, soft(B.where(bl & (np.abs(B.x) < 0.013) & (B.y < 0)).astype(np.float32), 0.6), (150, 146, 136), contrast=0.4)   # the buckle
+    feet = B.where(B.part('Foot', 'Toe', 'Calf') & (B.z <= 0.075))
+    b = recolour(b, B.grow(feet.astype(np.float32), 6), (226, 226, 222), contrast=0.45, flatten=1.5)
+    sole = B.where(feet & (B.z < 0.03))
+    b = recolour(b, soft(sole.astype(np.float32), 0.6), (200, 196, 186), contrast=0.3)
+    made['jerry'].append(save(b, 'jerry', 'm014_body_color.tga'))
+
+    # George (Male_Adult_13, made broad, short): bald crown, a short dark fringe round the sides and back; a brown tweed
+    # jacket, open over a navy plaid shirt with a mustard line, buttoned to the collar; dark slacks, brown shoes
+    h = load('Male_Adult_13', 'm010_head_color.tga'); Hd = Body('m010_head_color.tga')
+    h = _bald(h, Hd, shine=0.22)
+    brow = Hd.J['Bip01 MMiddleEyebrow'][2]; ax = np.abs(Hd.x)
+    behind = smooth(-0.07, -0.045, Hd.y)                                     # behind the temples, round the back
+    top = brow + 0.035 + 0.022 * smooth(0.0, 0.07, Hd.y)                       # its upper edge, a little higher at the back
+    low = brow - 0.045 - 0.045 * smooth(-0.01, 0.06, Hd.y)                     # its lower edge: sideburns, then the nape
+    ears = ((ax > 0.066) & (Hd.z < brow + 0.008) & (Hd.z > brow - 0.07) & (np.abs(Hd.y) < 0.04)).astype(np.float32)
+    ears = ears * smooth(brow + 0.012, brow - 0.006, Hd.z)                    # only the ear itself, not the hair above it
+    rm = np.where(Hd.ok, behind * smooth(top + 0.022, top - 0.016, Hd.z) * smooth(low - 0.015, low + 0.012, Hd.z) * (1 - ears), 0).astype(np.float32)
+    rm = blur(Hd.grow(rm, 4), 6.0)
+    h = h * (1 - 0.5 * rm[..., None]) + np.array([40, 31, 26], np.float32) / 255 * 0.5 * rm[..., None]
+    h = _hair_on(h, rm, rng, (30, 24, 20), 0.9)
+    made['george'] = [save(h, 'george', 'm010_head_color.tga')]
+    b = load('Male_Adult_13', 'm010_body_color.tga'); B = Body('m010_body_color.tga'); H, S, V = hsv(b)
+    J = B.J; neck, pel = J['Bip01 Neck'][2], J['Bip01 Pelvis'][2]
+    hands = B.part('Hand', 'Finger') & (S > 0.15) & (H < 45)
+    upper = B.where(~hands & B.part('Spine', 'Clavicle', 'Neck', 'UpperArm', 'Forearm', 'Pelvis') & (B.z > pel - 0.13) & ~(B.part('Neck') & (B.z > neck + 0.02)))
+    depth = np.clip((neck - B.z) / 0.5, 0, 1)
+    front = B.where(upper & (B.y < -0.02) & (np.abs(B.x) < 0.04 + 0.03 * (1 - depth)) & (B.z > pel + 0.12))   # the shirt between the lapels
+    collar = B.where(B.part('Neck', 'Spine2', 'Clavicle') & (B.z > neck - 0.05) & (B.z < neck + 0.03) & (np.abs(B.x) < 0.07))
+    shirt = front | collar
+    jacket = upper & ~shirt
+    tweed = _weave(B, (104, 80, 60), (170, 150, 120), rng)
+    b = _paint(b, B.grow(jacket.astype(np.float32), 32), tweed, k=0.22, flatten=16)
+    plaid = _checks(B, 0.035, (30, 36, 64), (70, 80, 110), line=(176, 146, 62), lw=0.05)
+    b = _paint(b, soft(shirt.astype(np.float32), 0.8), plaid, k=0.4, flatten=10)
+    legs = B.where(B.part('Thigh', 'Calf', 'Pelvis') & (B.z <= pel - 0.13) & (B.z > 0.12))
+    b = recolour(b, B.grow(legs.astype(np.float32), 6), (62, 56, 50), contrast=0.6, flatten=1.5)
+    feet = B.where(B.part('Foot', 'Toe') | (B.part('Calf') & (B.z <= 0.12)))
+    b = recolour(b, B.grow(feet.astype(np.float32), 6), (58, 40, 28), contrast=0.8)
+    b = leftover_black(b, (40, 34, 30))
+    made['george'].append(save(b, 'george', 'm010_body_color.tga'))
+    made['george'].append(_flat_normals('Male_Adult_13', 'm010_body_normal.tga', 'george', B.grow(upper.astype(np.float32), 3) * 0.8))
+
+    # Kramer (Male_Adult_06, made lean, tall): the big dark curls; a grey flecked bouclé jacket, open over a black and
+    # white checkerboard shirt; black trousers, black boots
+    h = load('Male_Adult_06', 'm011_head_color.tga'); Hd = Body('m011_head_color.tga'); H, S, V = hsv(h)
+    brow, line, ear = _hairline(Hd, front=0.06)
+    hm = soft(Hd.grow(Hd.where((Hd.z > line - 0.01) & ~ear).astype(np.float32), 3), 1.4) * smooth(0.75, 0.55, V)
+    h = recolour(h, hm, (50, 34, 25), contrast=1.25)
+    made['kramer'] = [save(h, 'kramer', 'm011_head_color.tga')]
+    o = load('Male_Adult_06', 'm011_opacity_color.tga'); oV = hsv(o)[2]
+    made['kramer'].append(save(recolour(o, soft((oV > 0.03).astype(np.float32), 1), (52, 36, 26), contrast=1.3), 'kramer', 'm011_opacity_color.tga',
+                               load_alpha('Male_Adult_06', 'm011_opacity_color.tga')))
+    b = load('Male_Adult_06', 'm011_body_color.tga'); B = Body('m011_body_color.tga'); H, S, V = hsv(b)
+    J = B.J; neck, pel = J['Bip01 Neck'][2], J['Bip01 Pelvis'][2]
+    hands = B.part('Hand', 'Finger') & (S > 0.15) & (H < 45) & ~(((H < 15) | (H > 340)) & (S > 0.5))
+    upper = B.where(~hands & B.part('Spine', 'Clavicle', 'Neck', 'UpperArm', 'Forearm', 'Pelvis', 'Hand', 'Thigh') & (B.z > pel - 0.11) & ~(B.part('Neck') & (B.z > neck + 0.03)))   # the coat to the hips
+    depth = np.clip((neck - B.z) / 0.5, 0, 1)
+    front = B.where(upper & (B.y < -0.02) & (np.abs(B.x) < 0.045 + 0.04 * (1 - depth)) & (B.z > pel + 0.1))
+    collar = B.where(B.part('Neck', 'Spine2', 'Clavicle') & (B.z > neck - 0.06) & (B.z < neck + 0.04) & (np.abs(B.x) < 0.075))
+    shirt = front | collar
+    jacket = upper & ~shirt
+    boucle = _weave(B, (112, 110, 106), (214, 212, 206), rng, scale=0.7)
+    b = _paint(b, B.grow(jacket.astype(np.float32), 32), boucle, k=0.4, flatten=3)
+    b = _paint(b, soft(shirt.astype(np.float32), 0.6), _checks(B, 0.032, (236, 234, 228), (18, 18, 20)), k=0.25)
+    legs = B.where(B.part('Thigh', 'Calf', 'Pelvis') & (B.z <= pel - 0.11) & (B.z > 0.12))
+    b = recolour(b, B.grow(legs.astype(np.float32), 24), (26, 26, 29), contrast=0.8)
+    H, S, V = hsv(b); red = B.grow(B.where(((H < 15) | (H > 340)) & (S > 0.45) & ~hands).astype(np.float32), 4)   # the henley's red, wherever it is left
+    b = _paint(b, soft(red, 0.8), boucle, k=0.3)
+    feet = B.where(B.part('Foot', 'Toe') | (B.part('Calf') & (B.z <= 0.12)))
+    b = recolour(b, B.grow(feet.astype(np.float32), 6), (20, 19, 20), contrast=0.9, flatten=1.0)
+    made['kramer'].append(save(b, 'kramer', 'm011_body_color.tga'))
+    made['kramer'].append(_flat_normals('Male_Adult_06', 'm011_body_normal.tga', 'kramer', B.grow(upper.astype(np.float32), 3) * 0.7))
+
+    # Elaine (Business_Female_03): her big dark curls; the blazer red over a cream blouse, the cream skirt with small red
+    # flowers, black tights and boots
+    o = load('Business_Female_03', 'f016_opacity_color.tga'); oV = hsv(o)[2]
+    made['elaine'] = [save(recolour(o, soft((oV > 0.02).astype(np.float32), 1), (40, 28, 21), contrast=1.3), 'elaine', 'f016_opacity_color.tga',
+                           load_alpha('Business_Female_03', 'f016_opacity_color.tga'))]
+    h = load('Business_Female_03', 'f016_head_color.tga'); Hd = Body('f016_head_color.tga'); H, S, V = hsv(h)
+    brow, line, ear = _hairline(Hd, front=0.045)
+    hm = soft(Hd.grow(Hd.where((Hd.z > line) & ~ear).astype(np.float32), 3), 1.4) * smooth(0.5, 0.35, V)
+    h = recolour(h, hm, (40, 28, 21), contrast=1.2)
+    made['elaine'].append(save(h, 'elaine', 'f016_head_color.tga'))
+    b = load('Business_Female_03', 'f016_body_color.tga'); B = Body('f016_body_color.tga'); H, S, V = hsv(b)
+    J = B.J; neck, pel = J['Bip01 Neck'][2], J['Bip01 Pelvis'][2]; knee = J['Bip01 L Calf'][2]
+    hem = pel - 0.1                                                           # the blazer's hem, over the hips
+    hands = B.part('Hand', 'Finger') & (S > 0.15) & (H < 40) & (V > 0.42)    # skin is lighter than the blazer's brown cuffs
+    upper = B.where(~hands & B.part('Spine', 'Clavicle', 'Neck', 'UpperArm', 'Forearm', 'Pelvis', 'Hand', 'Thigh') & (B.z > hem) & ~(B.part('Neck') & (B.z > neck - 0.03)))
+    depth = np.clip((neck - B.z) / 0.3, 0, 1)
+    blouse = B.where(upper & (B.y < -0.02) & (np.abs(B.x) < 0.012 + 0.04 * (1 - depth)) & (B.z > neck - 0.26))
+    b = _paint(b, B.grow((upper & ~blouse).astype(np.float32), 32), np.array([176, 36, 34], np.float32)[None, None] / 255 * np.ones(b.shape, np.float32), k=0.55, flatten=6)
+    b = recolour(b, soft(blouse.astype(np.float32), 0.7), (232, 224, 208), contrast=0.3, flatten=2.0)
+    skirt = B.where(B.part('Pelvis', 'Thigh', 'Calf', 'Spine') & (B.z <= hem) & (B.z > knee - 0.04))
+    cream = np.array([222, 208, 182], np.float32)[None, None] / 255 * np.ones(b.shape, np.float32)
+    flowers = np.clip((noise(b.shape, 1.2, 33) - 0.78) * 6, 0, 1) * (noise(b.shape, 8, 34) > 0.35)
+    leaves = np.clip((noise(b.shape, 1.0, 35) - 0.8) * 6, 0, 1) * 0.7
+    cream = cream * (1 - flowers[..., None] - leaves[..., None]) + np.array([180, 50, 56], np.float32) / 255 * flowers[..., None] + np.array([96, 120, 80], np.float32) / 255 * leaves[..., None]
+    b = _paint(b, B.grow(skirt.astype(np.float32), 24), cream, k=0.35)
+    tights = B.where(B.part('Calf', 'Thigh') & (B.z <= knee - 0.04) & (B.z > 0.13))   # black tights below the skirt
+    b = recolour(b, B.grow(tights.astype(np.float32), 12), (22, 20, 22), contrast=0.6, flatten=1.0)
+    boots = B.where(B.part('Foot', 'Toe', 'Calf') & (B.z <= 0.13))
+    b = recolour(b, B.grow(boots.astype(np.float32), 6), (24, 21, 21), contrast=0.8)
+    made['elaine'].append(save(b, 'elaine', 'f016_body_color.tga'))
+    made['elaine'].append(_flat_normals('Business_Female_03', 'f016_body_normal.tga', 'elaine', B.grow(skirt.astype(np.float32), 3) * 0.7))
+    for k, v in made.items(): print(k, [os.path.basename(p) for p in v])
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()

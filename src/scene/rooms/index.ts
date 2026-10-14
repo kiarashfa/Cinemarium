@@ -18,6 +18,7 @@ export const ROOMS: Record<string, RoomLoader> = {
   'severance': baked('severance', () => import('./mdr-screen').then(m => m.mdrScreen)),
   'the-matrix': baked('the-matrix'),
   'lost': baked('lost', () => import('./swan-screen').then(m => m.swanScreen)),
+  'seinfeld': baked('seinfeld'),
 };
 
 const cache = new Map<string, Promise<Room>>();

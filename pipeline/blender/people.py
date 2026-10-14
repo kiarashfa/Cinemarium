@@ -71,11 +71,11 @@ def _radial(P, a, b, scale):
     return r * (scale(np.clip(t / L, 0, 1)) - 1)[:, None]
 
 
-def reshape(arm, mesh, shape):
+def reshape(arm, mesh, shape, k=1.0):
     """Change a body's build by moving its rest-pose vertices: radial scaling about the spine and limb axes,
     weighted by the skin weights so the joints blend. The skeleton is untouched, so every clip still fits.
     shape: 'heavy' (an obese build), 'athletic' (broad shoulders, big arms, a narrow waist), 'broad' (big and heavy-set:
-    chest, arms, some belly, a thick neck), 'lean' (a longer face)."""
+    chest, arms, some belly, a thick neck), 'lean' (a longer face; `k` how much)."""
     me = mesh.data
     if me.shape_keys: raise RuntimeError('reshape expects a mesh without shape keys')
     J = _joints(arm); M = mesh.matrix_world; Mi = M.inverted()
@@ -154,8 +154,8 @@ def reshape(arm, mesh, shape):
     elif shape == 'lean':
         hd = j('Head'); brow = j('MMiddleEyebrow').z; lip = j('MUpperLip').z
         face = w('Head', 'MJaw', 'Mouth', 'Lip', 'Cheek', 'Masseter', 'Caninus') * _smooth(brow, brow - 0.06, P[:, 2]) * _smooth(0.03, -0.02, P[:, 1] - hd.y)
-        D[:, 0] -= face * (P[:, 0] - hd.x) * 0.07
-        D[:, 2] -= face * _smooth(lip + 0.02, lip - 0.05, P[:, 2]) * 0.007
+        D[:, 0] -= face * (P[:, 0] - hd.x) * 0.07 * k
+        D[:, 2] -= face * _smooth(lip + 0.02, lip - 0.05, P[:, 2]) * 0.007 * k
     else:
         raise ValueError(shape)
     for i, v in enumerate(me.vertices):
@@ -184,6 +184,85 @@ def hair_volume(arm, mesh, lift=0.016, curl=0.005, seed=3):
         nrm = (N3 @ v.normal).normalized()
         v.co = Mi @ (p + nrm * k * (lift + curl * lump)); moved += 1
     _fresh_normals(mesh); cine.log('hair volume', mesh.get('person', mesh.name), moved, 'vertices')
+
+
+def hair_cards(arm, mesh, scale=(1.0, 1.0, 1.0), lift=0.0, key='opacity'):
+    """Bigger hair: scale the hair cards (the faces of the `key` material) about the middle of the skull, by `scale`
+    (across, front to back, up), and raise the crown by `lift` metres (upright curls). The face's own fringe, below
+    the brows in front, moves less."""
+    J = _joints(arm); M = mesh.matrix_world; Mi = M.inverted(); me = mesh.data
+    k = [i for i, s in enumerate(mesh.material_slots) if s.material and key in s.material.name]
+    if not k: raise RuntimeError(f"{mesh.get('person', mesh.name)}: no '{key}' material")
+    vs = {v for p in me.polygons if p.material_index in k for v in p.vertices}
+    eye = (J['Bip01 LEye'] + J['Bip01 REye']) / 2; brow = J['Bip01 MMiddleEyebrow'].z
+    c = Vector((eye.x, eye.y + 0.05, eye.z + 0.01))                  # the skull's middle (the avatar faces -y)
+    for i in vs:
+        p = M @ me.vertices[i].co; d = p - c
+        face = float(_smooth(brow + 0.01, brow - 0.03, p.z) * _smooth(-0.02, -0.06, d.y))   # in front, below the brows
+        s = [1 + (sc - 1) * (1 - 0.8 * face) for sc in scale]
+        q = c + Vector((d.x * s[0], d.y * s[1], d.z * s[2] if d.z > 0 else d.z))
+        q.z += lift * float(_smooth(0.0, 0.1, d.z)) * (1 - face)
+        me.vertices[i].co = Mi @ q
+    _fresh_normals(mesh); cine.log('hair cards', mesh.get('person', mesh.name), len(vs), 'vertices')
+
+
+def hair_mass(arm, mesh, depth, n=300, size=0.018, colours=((0.03, 0.018, 0.012), (0.05, 0.032, 0.022)), fall=None, front=0.05,
+              squash=(1.0, 1.0, 1.0), seed=5):
+    """Curly hair as a mass of small lumps over the scalp, skinned to the head and joined into the body: Kramer's
+    upright curls, Elaine's big dark curls. depth(p, d) gives the hair's thickness (m) at scalp point p (d = p minus the
+    skull's middle, the avatar facing -y); `fall` (z) lets it hang below the hairline at the back and sides, to that
+    height (shoulder-length hair). Lumps sit at random depths, larger toward the outside."""
+    import bmesh
+    rng = np.random.default_rng(seed)
+    J = _joints(arm); M = mesh.matrix_world; me = mesh.data
+    eye = (J['Bip01 LEye'] + J['Bip01 REye']) / 2; brow = J['Bip01 MMiddleEyebrow'].z
+    c = Vector((eye.x, eye.y + 0.05, eye.z + 0.01))
+    head = {i for i, g in enumerate(mesh.vertex_groups) if g.name == 'Bip01 Head'}
+    hk = [i for i, s in enumerate(mesh.material_slots) if s.material and 'head' in s.material.name]
+    on_head = {v for p in me.polygons if p.material_index in hk for v in p.vertices}
+    scalp = []
+    for v in me.vertices:
+        if v.index not in on_head or not any(g.group in head and g.weight > 0.5 for g in v.groups): continue
+        p = M @ v.co; ax = abs(p.x)
+        line = brow + front - 0.03 * float(_smooth(0.03, 0.062, ax))
+        line += (brow + 0.004 - line) * float(_smooth(-0.075, -0.035, p.y))
+        line += (brow - 0.088 - line) * float(_smooth(-0.005, 0.05, p.y))
+        if ax > 0.066 and brow - 0.07 < p.z < brow + 0.008 and abs(p.y) < 0.04: continue      # the ears
+        if p.z < line: continue
+        scalp.append((p, (M.to_3x3() @ v.normal).normalized()))
+    if not scalp: raise RuntimeError('no scalp found')
+    bm = bmesh.new(); mat_of = []
+    def lump(at, r):
+        m = Matrix.Translation(at) @ Quaternion(Vector(rng.normal(size=3)).normalized(), rng.uniform(0, math.pi)).to_matrix().to_4x4() @ Matrix.Diagonal((r * squash[0], r * squash[1], r * squash[2], 1))
+        res = bmesh.ops.create_icosphere(bm, subdivisions=1, radius=1.0, matrix=m)
+        k = int(rng.random() < 0.45)
+        for f in {f for v in res['verts'] for f in v.link_faces}: f.material_index = k
+    for _ in range(n):
+        p, nrm = scalp[rng.integers(len(scalp))]
+        t = depth(p, p - c)
+        if t <= 0.002: continue
+        u = rng.random() ** 0.7
+        lump(p + nrm * (t * u), size * (0.7 + 0.6 * u) * rng.uniform(0.8, 1.2))
+    if fall is not None:   # hanging from the back and sides of the scalp down to `fall`, close round the neck
+        low = [s for s in scalp if s[0].z < brow + 0.01 and (s[0].y - c.y) > -0.045 and abs(s[0].x - c.x) < 0.075]
+        for _ in range(int(n * 0.6)):
+            p, nrm = low[rng.integers(len(low))]
+            out = Vector((p.x - c.x, p.y - c.y, 0)).normalized()
+            z = rng.uniform(fall, p.z); t = depth(p, p - c) * rng.uniform(0.4, 1.0)
+            at = Vector((p.x, p.y, z)) + out * (t + 0.01 * (p.z - z) / max(p.z - fall, 1e-3))
+            lump(at, size * rng.uniform(0.8, 1.25))
+    for f in bm.faces: f.smooth = True
+    hm = bpy.data.meshes.new('curls'); bm.to_mesh(hm); bm.free()
+    ob = bpy.data.objects.new('curls', hm); [col.objects.link(ob) for col in mesh.users_collection]
+    for k, cl in enumerate(colours):
+        m = bpy.data.materials.new(f"curls_{mesh.get('person', 'x')}_{k}"); p_ = m.node_tree.nodes['Principled BSDF']
+        p_.inputs['Base Color'].default_value = (*cl, 1); p_.inputs['Roughness'].default_value = 0.6; p_.inputs['Specular IOR Level'].default_value = 0.35
+        hm.materials.append(m)
+    ob.matrix_world = mesh.matrix_world.copy(); hm.transform(mesh.matrix_world.inverted()); ob.matrix_world = mesh.matrix_world
+    vg = ob.vertex_groups.new(name='Bip01 Head'); vg.add(list(range(len(hm.vertices))), 1.0, 'REPLACE')
+    bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); mesh.select_set(True); bpy.context.view_layer.objects.active = mesh
+    bpy.ops.object.join()
+    cine.log('hair mass', mesh.get('person', mesh.name), len(hm.vertices), 'vertices')
 
 
 def _fresh_normals(mesh):

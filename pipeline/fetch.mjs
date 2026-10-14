@@ -103,6 +103,21 @@ const ROOMS = {
     for (const t of ['worn_tile_floor', 'brushed_concrete', 'concrete_wall_008', 'leather_red_02', 'wood_table_worn', 'smooth_concrete_floor']) await polyhaven(t, '2k', 'tex');
     await polyhaven('desk_lamp_arm_01', '1k', 'gltf');
   },
+  async seinfeld() {
+    // Jerry (Male_Adult_08, cached for LOST), George, Kramer, Elaine
+    for (const a of ['Adults/Male_Adult_08', 'Adults/Male_Adult_13', 'Adults/Male_Adult_06', 'Professions/Business_Female_03']) await avatar(a);
+    const S = 'all_animations_max_motextr_static';
+    // Jerry mid-room, George behind the counter, Kramer in the doorway: standing idles, talk and listen
+    for (const c of ['m_idle_breathe_01', 'm_idle_breathe_02', 'm_idle_neutral_01', 'm_idle_neutral_02', 'm_idle_look_around_01', 'm_gestic_listen_neutral_01',
+      'm_gestic_talk_neutral_01', 'm_gestic_talk_neutral_02', 'm_gestic_talk_relaxed_01', 'm_gestic_shrug_01', 'm_gestic_shrug_02', 'm_gestic_talk_nervous_01',
+      'm_gestic_talk_excited_01', 'm_gestic_listen_excited_01', 'm_idle_shake_arms_01', 'm_gestic_laugh_loud', 'm_gestic_laugh_low', 'm_idle_nervous_01',
+      'm_gestic_listen_accept_01', 'm_gestic_listen_deny_01', 'm_idle_neutral_04']) await clip(S, c);
+    // Elaine perched on the couch's arm: the seated-chair set, and standing talk to layer over it
+    for (const c of ['breathe_01', 'idle_neutral_01', 'gestic_shrug_01', 'idle_touch_hair', 'gestic_thoughtful', 'idle_look_around', 'idle_waiting_01']) await clip(S, `f_sit_chair_${c}`);
+    for (const c of ['f_gestic_talk_excited_01', 'f_gestic_talk_neutral_01', 'f_gestic_listen_neutral_01', 'f_gestic_laugh_low', 'f_gestic_talk_self-assured_01']) await clip(S, c);
+    for (const t of ['laminate_floor_02', 'cotton_jersey', 'painted_plaster_wall', 'white_plaster_02']) await polyhaven(t, '2k', 'tex');
+    for (const m of ['bananas', 'food_apple_01', 'food_pears_asian_01', 'wooden_cutting_board', 'potted_plant_02', 'desk_lamp_arm_01', 'mantel_clock_01']) await polyhaven(m, '1k', 'gltf');
+  },
 };
 
 const room = process.argv[2];
