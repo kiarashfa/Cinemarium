@@ -98,7 +98,7 @@ def export_people(seated, web_dir, meta_of):
     out = os.path.join(web_dir, 'people'); os.makedirs(out, exist_ok=True)
     metas = []
     for c, arm, mesh in seated:
-        people.export_person(arm, mesh, c['acts'], os.path.join(out, f"{c['who']}.glb"))
+        people.export_person(arm, mesh, c['acts'], os.path.join(out, f"{c['who']}.glb"), roam=c.get('roam', ()))
         metas.append(meta_of(c))
     return metas
 

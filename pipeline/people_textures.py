@@ -717,5 +717,118 @@ def seinfeld():
     for k, v in made.items(): print(k, [os.path.basename(p) for p in v])
 
 
+def _wrist_band(b, B, side, colour, w0, w1, k=0.5):
+    """A metal band round a wrist (a watch, a bracelet): texels of the forearm and hand between w0 and w1 metres up the
+    arm from the hand joint (the arms lie along x in the rest pose: the left at +x)."""
+    hx = B.J[f'Bip01 {side} Hand'][0]; s = (hx - B.x) if side == 'L' else (B.x - hx)
+    m = B.where(B.part(f'{side} Forearm', f'{side} Hand') & (s > w0) & (s < w1))
+    shine = 0.75 + 0.5 * noise(b.shape, 0.8, 71 if side == 'L' else 72)
+    return b * (1 - soft(m.astype(np.float32), 0.5)[..., None]) + np.array(colour, np.float32) / 255 * shine[..., None] * soft(m.astype(np.float32), 0.5)[..., None] * k / 0.5
+
+
+def the_sopranos():
+    """Dr. Melfi's office in "Denial, Anger, Acceptance" (season one, costumes after Juliet Polcsa): Tony in a black
+    short-sleeve knit shirt with a tonal pattern, black trousers and belt, black shoes, his gold watch and bracelet;
+    Melfi in an oatmeal tweed skirt suit over a black top, a long brown patterned scarf, sheer tights, black pumps,
+    her rimless glasses, her bob gone auburn."""
+    rng = np.random.default_rng(31)
+    made = {}
+
+    # Tony (Male_Adult_14: the same photographed face as Medical_Male_03, without the moustache): the receding hair
+    # near black, the skin olive, a five o'clock shadow, darker brows, brown eyes
+    h = load('Male_Adult_14', 'm012_head_color.tga'); Hd = Body('m012_head_color.tga'); H, S, V = hsv(h)
+    brow, line, ear = _hairline(Hd, front=0.05)
+    eyeballs = np.isin(Hd.bone, [i for i, g in enumerate(Hd.groups) if g in ('Bip01 LEye', 'Bip01 REye')]) & Hd.ok   # not the brows ('Eyebrow')
+    h = skin_tone(h, Hd.grow(Hd.ok.astype(np.float32)) * (1 - eyeballs), (0.93, 0.85, 0.74))
+    hair = Hd.where(((Hd.z > brow - 0.075) & ~ear & ~((Hd.y < -0.05) & (Hd.z < brow + 0.03) & (np.abs(Hd.x) < 0.06))) | (Hd.z > line - 0.004))
+    hm = soft(Hd.grow(hair.astype(np.float32), 3), 1.2) * smooth(0.62, 0.4, V)                # the hair is darker than the scalp
+    h = recolour(h, hm, (34, 26, 22), contrast=1.25)
+    h = _hair_on(h, _beard_mask(Hd, cheeks=0.55), rng, (40, 33, 28), 0.26)                    # shaved that morning, dark beard
+    H, S, V = hsv(h)
+    iris = (eyeballs & ~((V > 0.7) & (S < 0.2))).astype(np.float32)
+    h = recolour(h, soft(iris, 0.5), (66, 44, 30), contrast=1.0)
+    made['tony'] = [save(h, 'tony', 'm012_head_color.tga')]
+    b = load('Male_Adult_14', 'm012_body_color.tga'); B = Body('m012_body_color.tga'); H, S, V = hsv(b)
+    J = B.J; pel = J['Bip01 Pelvis'][2]; belt = pel + 0.09
+    hands = B.part('Hand', 'Finger') & (S > 0.15) & (H < 45)
+    cuffs = B.where(B.part('Hand', 'Forearm') & ~hands & (np.abs(B.x) > J['Bip01 L Hand'][0] - 0.07))   # the long sleeves' cuffs: bare wrists now
+    shirt = B.where(~hands & ~cuffs & B.part('Spine', 'Clavicle', 'Neck', 'UpperArm', 'Forearm', 'Pelvis') & (B.z > belt) & (S < 0.2))
+    knit = 0.82 + 0.3 * (np.sin(np.nan_to_num(B.z) * 260 + 8 * np.abs(np.sin(np.nan_to_num(B.x) * 90))) > 0.6)   # a tonal zigzag rib
+    knit = knit * (0.9 + 0.2 * noise(b.shape, 0.7, 73))
+    b = _paint(b, B.grow(shirt.astype(np.float32), 8), np.array([30, 30, 33], np.float32)[None, None] / 255 * knit[..., None], k=0.45, flatten=6)
+    bare = _sleeves(B, 0.4) | cuffs
+    b = _skin_paint(b, B, bare, rng, warm=(0.95, 0.86, 0.76))
+    hair_arm = np.clip((noise(b.shape, 0.5, 74) - 0.55) * 3, 0, 1) * soft(B.grow(bare.astype(np.float32), 2), 1.0)
+    b = b * (1 - 0.35 * hair_arm[..., None]) + np.array([40, 30, 24], np.float32) / 255 * 0.35 * hair_arm[..., None]
+    b = skin_tone(b, B.grow(hands.astype(np.float32), 3), (0.93, 0.85, 0.74))
+    made['tony'].append(_flat_normals('Male_Adult_14', 'm012_body_normal.tga', 'tony', np.maximum(B.grow(bare.astype(np.float32), 3), B.grow(shirt.astype(np.float32)) * 0.7)))
+    khaki = (H > 22) & (H < 55) & (S > 0.18) & (V > 0.2)
+    legs = B.where(B.part('Thigh', 'Calf', 'Pelvis', 'Spine') & ((B.z <= belt) | khaki) & (B.z > 0.1) & ~hands & ~shirt)
+    b = recolour(b, B.grow(legs.astype(np.float32), 8), (26, 26, 29), contrast=0.75, flatten=1.0)
+    bl = B.where(B.part('Pelvis', 'Spine', 'Thigh') & (B.z > belt - 0.035) & (B.z < belt + 0.004))
+    bl |= B.where(B.part('Pelvis', 'Spine', 'Thigh') & (np.abs(B.z - belt) < 0.07) & (H < 40) & (S > 0.25) & (V < 0.42))   # his own brown belt
+    b = recolour(b, B.grow(bl.astype(np.float32), 1), (16, 15, 16), contrast=0.6)
+    b = recolour(b, soft(B.where(bl & (np.abs(B.x) < 0.016) & (B.y < 0)).astype(np.float32), 0.6), (176, 174, 168), contrast=0.4)   # the buckle
+    feet = B.where(B.part('Foot', 'Toe') | (B.part('Calf') & (B.z <= 0.1)))
+    b = recolour(b, B.grow(feet.astype(np.float32), 6), (17, 16, 17), contrast=0.9, flatten=0.8)
+    b = _wrist_band(b, B, 'L', (196, 156, 74), 0.012, 0.034)                                 # the gold watch
+    b = _wrist_band(b, B, 'R', (206, 166, 82), 0.014, 0.022)                                 # the gold bracelet
+    b = leftover_black(b, (26, 26, 29))
+    made['tony'].append(save(b, 'tony', 'm012_body_color.tga'))
+
+    # Melfi (Business_Female_02, made lean in the face): the bob auburn, the lipstick muted; the burgundy jacket becomes
+    # oatmeal tweed, the striped top black with the scarf over it, the trousers a tweed skirt to the knee and sheer
+    # tights below (the legs are slimmed in the mesh), black pumps
+    auburn = (72, 42, 29)
+    h = load('Business_Female_02', 'f015_head_color.tga'); Hd = Body('f015_head_color.tga'); H, S, V = hsv(h)
+    brow = Hd.J['Bip01 MMiddleEyebrow'][2]
+    # in the layout (as Helly's): the face and throat, the eye and mouth islands keep their colour; the rest that is
+    # blond is hair (the scalp, the locks along the sides and the cards' islands below)
+    protect = np.maximum.reduce([ellipse(h.shape, 0.5, 0.37, 0.215, 0.235), region(h.shape, 0.0, 0.5, 1.0, 0.72), region(h.shape, 0.0, 0.58, 0.14, 1.0),
+                                 region(h.shape, 0.1, 0.84, 0.36, 1.0)])
+    blond = (H > 16) & (H < 60) & (S > 0.14) & (V > 0.1)
+    hair = (blond & (protect < 0.5)) | Hd.where((Hd.z > brow + 0.07) & (Hd.y > -0.02))
+    h = recolour(h, soft(hair.astype(np.float32), 0.8), auburn, contrast=1.15)
+    lips = (ellipse(h.shape, 0.5, 0.405, 0.075, 0.035) > 0.5) & ((H < 20) | (H > 325)) & (S > 0.3)
+    lm = soft(lips.astype(np.float32), 1.0)[..., None]; L = lum(h)[..., None]
+    h = h * (1 - lm) + (L + (h - L) * 0.6) * 0.95 * lm                                          # the lipstick muted, not red
+    made['melfi'] = [save(h, 'melfi', 'f015_head_color.tga')]
+    o = load('Business_Female_02', 'f015_opacity_color.tga'); oV = hsv(o)[2]
+    made['melfi'].append(save(recolour(o, soft((oV > 0.03).astype(np.float32), 1), auburn, contrast=1.2), 'melfi', 'f015_opacity_color.tga',
+                              load_alpha('Business_Female_02', 'f015_opacity_color.tga')))
+    b = load('Business_Female_02', 'f015_body_color.tga'); B = Body('f015_body_color.tga'); H, S, V = hsv(b)
+    J = B.J; neck, pel = J['Bip01 Neck'][2], J['Bip01 Pelvis'][2]; knee = J['Bip01 L Calf'][2]
+    hands = B.part('Hand', 'Finger') & (S > 0.15) & (H < 40) & (V > 0.4)
+    trousers = B.part('Pelvis', 'Thigh', 'Calf', 'Spine') & (V < 0.3) & (S < 0.45) & (B.z < pel + 0.03)   # dark, under the jacket's hem
+    upper = B.where(~hands & B.part('Spine', 'Clavicle', 'Neck', 'UpperArm', 'Forearm', 'Pelvis', 'Hand') & (B.z > pel - 0.12) & ~trousers)
+    depth = np.clip((neck - B.z) / 0.3, 0, 1)
+    front = B.where((B.y < -0.02) & (np.abs(B.x) < 0.014 + 0.05 * (1 - depth)) & (B.z > neck - 0.27) & B.part('Spine', 'Clavicle', 'Neck'))
+    collar = B.where((B.z > neck - 0.012) & ~B.part('Hand', 'UpperArm', 'Forearm'))            # the turtleneck's collar, all round
+    top = (front | collar) & ~B.part('Hand', 'UpperArm', 'Forearm')                           # the striped top: black now, the scarf over it
+    jacket = upper & ~top
+    tweed = _weave(B, (150, 132, 108), (206, 194, 170), rng, scale=0.8)
+    b = _paint(b, B.grow(jacket.astype(np.float32), 24), tweed, k=0.35, flatten=8)
+    scarf = B.where(top & (B.y < -0.02) & (np.abs(np.abs(B.x) - (0.03 + 0.022 * depth)) < 0.02))   # its two ends, down either side
+    scarf |= B.where(collar & (B.z < neck + 0.005))                                          # and round the neck
+    paisley = np.array([70, 48, 36], np.float32)[None, None] / 255 * (0.6 + 0.8 * noise(b.shape, 1.6, 75)[..., None])
+    b = recolour(b, soft(top.astype(np.float32), 0.6), (18, 17, 18), contrast=0.3, flatten=4)
+    b = _paint(b, soft(scarf.astype(np.float32), 0.8), paisley, k=0.4)
+    skirt = B.where(B.part('Pelvis', 'Thigh', 'Spine') & (B.z <= pel - 0.12 + 0.002) & (B.z > knee + 0.02)) | B.where(trousers & (B.z > knee + 0.02))
+    b = _paint(b, B.grow(skirt.astype(np.float32), 16), tweed, k=0.3, flatten=8)
+    H, S, V = hsv(b)                                                                          # the burgundy, wherever it is left
+    red = B.where(((H < 20) | (H > 320)) & (S > 0.3) & (V < 0.55) & ~B.part('Hand', 'Finger', 'Head', 'Foot', 'Toe') & (B.z > knee))
+    b = _paint(b, soft(B.grow(red.astype(np.float32), 2), 0.8), tweed, k=0.3)
+    hem = B.where(B.part('Thigh', 'Calf') & (np.abs(B.z - (knee + 0.025)) < 0.006))
+    b = b * (1 - 0.35 * soft(hem.astype(np.float32), 0.6)[..., None])                       # the hem's shadow
+    tone = np.median(b[B.where(hands)], 0) * 255 if hands.any() else np.array([214, 168, 146])
+    legs = B.where(B.part('Calf', 'Thigh', 'Foot') & (B.z <= knee + 0.02) & (B.z > 0.085))
+    b = recolour(b, B.grow(legs.astype(np.float32), 12), tuple(tone * np.array([0.86, 0.8, 0.76])), contrast=0.35, flatten=2.0)   # sheer tights
+    shoes = B.where(B.part('Foot', 'Toe', 'Calf') & (B.z <= 0.085))
+    b = recolour(b, B.grow(shoes.astype(np.float32), 6), (16, 15, 16), contrast=0.8)
+    made['melfi'].append(save(b, 'melfi', 'f015_body_color.tga'))
+    made['melfi'].append(_flat_normals('Business_Female_02', 'f015_body_normal.tga', 'melfi', np.maximum(B.grow(legs.astype(np.float32), 4), B.grow(skirt.astype(np.float32), 4) * 0.8)))
+    for k, v in made.items(): print(k, [os.path.basename(p) for p in v])
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()

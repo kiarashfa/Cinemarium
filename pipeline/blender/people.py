@@ -36,6 +36,8 @@ def load_avatar(name, textures=None, collection=None):
             if n.type != 'TEX_IMAGE' or not n.image: continue
             base = os.path.basename(n.image.filepath.replace('\\', '/'))
             src = textures.get(base) or os.path.join(tex_dir, base)
+            if base.endswith('_specular.tga') and not os.path.exists(src):   # some avatars name a specular map they lack
+                nt.nodes.remove(n); continue
             n.image = bpy.data.images.load(src, check_existing=True)
             if base.endswith('_specular.tga'):
                 # Unity-style specular: drop it, use a plain roughness instead
@@ -151,6 +153,24 @@ def reshape(arm, mesh, shape, k=1.0):
             D += w(f'{s} Thigh')[:, None] * _radial(P, j(f'{s} Thigh'), j(f'{s} Calf'), limb(0, 0, 1.18, 1.08))
             D += w(f'{s} Calf')[:, None] * _radial(P, j(f'{s} Calf'), j(f'{s} Foot'), limb(0, 0, 1.08, 1.03))
         D += w('Neck')[:, None] * _radial(P, j('Neck'), j('Head'), lambda t: 1.26 - 0.1 * t)
+    elif shape == 'slim_legs':
+        # trouser legs made into legs (a skirt and tights are painted on): each cross-section of a thigh or a calf is
+        # scaled about its bone to a leg's mean radius there; the hips stay as they are
+        for s in 'LR':
+            for bone, nxt, prof in (('Thigh', 'Calf', ((0.0, 0.088), (0.15, 0.084), (0.5, 0.071), (0.85, 0.058), (1.0, 0.054))),
+                                    ('Calf', 'Foot', ((0.0, 0.052), (0.3, 0.053), (0.7, 0.041), (0.92, 0.033), (1.0, 0.032)))):
+                a, b = np.array(j(f'{s} {bone}')[:]), np.array(j(f'{s} {nxt}')[:]); u = b - a; L = np.linalg.norm(u); u /= L
+                wb = w(f'{s} {bone}'); q = P - a; t = (q @ u) / L; r = np.linalg.norm(q - np.outer(q @ u, u), axis=1)
+                sel = (wb > 0.5) & (t > -0.05) & (t < 1.05)
+                bins = np.linspace(0, 1, 11); cur = []
+                for t0, t1 in zip(bins, bins[1:]):
+                    m = sel & (t >= t0) & (t < t1); cur.append(np.mean(r[m]) if m.sum() > 3 else np.nan)
+                cur = np.array(cur); ok = np.isfinite(cur); mid = (bins[:-1] + bins[1:]) / 2
+                want = np.interp(mid, [p[0] for p in prof], [p[1] for p in prof])
+                ratio = np.clip(want[ok] / cur[ok], 0.35, 1.2)
+                hip = (lambda x: _smooth(0.04, 0.22, x)) if bone == 'Thigh' else (lambda x: np.ones_like(x))
+                sc_ = lambda x, m=mid[ok], rt=ratio, hip=hip: 1 + (np.interp(x, m, rt) - 1) * hip(x)
+                D += wb[:, None] * _radial(P, j(f'{s} {bone}'), j(f'{s} {nxt}'), sc_)
     elif shape == 'lean':
         hd = j('Head'); brow = j('MMiddleEyebrow').z; lip = j('MUpperLip').z
         face = w('Head', 'MJaw', 'Mouth', 'Lip', 'Cheek', 'Masseter', 'Caninus') * _smooth(brow, brow - 0.06, P[:, 2]) * _smooth(0.03, -0.02, P[:, 1] - hd.y)
@@ -389,6 +409,103 @@ def ik2(arm, side, target, pole):
     _aim(arm, fo, W1, S + axis * d)
 
 
+def ik_leg(arm, side, target, pole, keep_foot=True):
+    """Two-bone IK on a leg (thigh, calf): the ankle on `target`, the knee bent toward `pole`. The foot keeps the
+    world orientation it had (flat on the floor stays flat), unless keep_foot is False."""
+    th, ca, ft = (arm.pose.bones[f'Bip01 {side} {b}'] for b in ('Thigh', 'Calf', 'Foot'))
+    F = _world(arm, ft).to_3x3().copy()
+    S = _world(arm, th).translation.copy(); E = _world(arm, ca).translation.copy(); A = _world(arm, ft).translation.copy()
+    a, b = (E - S).length, (A - E).length
+    d = min(max((target - S).length, abs(a - b) + 1e-4), a + b - 1e-4)
+    axis = (target - S).normalized()
+    x = (a * a - b * b + d * d) / (2 * d); r = math.sqrt(max(a * a - x * x, 0.0))
+    pv = (pole - S); pv = (pv - axis * pv.dot(axis)).normalized()
+    _aim(arm, th, E, S + axis * x + pv * r)
+    _aim(arm, ca, _world(arm, ft).translation.copy(), S + axis * d)
+    if keep_foot:
+        p = _world(arm, ft).translation.copy()
+        _set_world(arm, ft, Matrix.Translation(p) @ F.to_4x4())
+
+
+def shift_root(arm, d):
+    """Move the whole body by the world vector d (the root bone; everything rides on it): a person lowered into a
+    lounge chair lower than the clip's."""
+    root = next(pb for pb in arm.pose.bones if pb.parent is None)
+    M = _world(arm, root); pb_M = Matrix.Translation(Vector(d)) @ M
+    root.matrix = arm.matrix_world.inverted() @ pb_M
+    bpy.context.view_layer.update()
+
+
+def _pose(arm):
+    """The pose now: every bone's local rotation, and the root's armature-space matrix."""
+    root = next(pb for pb in arm.pose.bones if pb.parent is None)
+    return {pb.name: pb.rotation_quaternion.copy() for pb in arm.pose.bones}, root.matrix.copy()
+
+
+def _mix(p, q, w):
+    """Blend two poses (from _pose) by w (0 = p, 1 = q): rotations slerped, the root's matrix too."""
+    rot = {k: p[0][k].slerp(q[0][k], w) for k in p[0]}
+    (ta, ra, sa), (tb, rb, sb) = p[1].decompose(), q[1].decompose()
+    root = Matrix.LocRotScale(ta.lerp(tb, w), ra.slerp(rb, w), sa.lerp(sb, w))
+    return rot, root
+
+
+def sequence(arm, base, name, segments, overlay=None, blend=0.6):
+    """One long act from several clips played in turn, each carried to where the last left off. A segment is a dict:
+    src (action), f0 (its first frame), dur (seconds), rate (1), at (Matrix, world: where its root goes, or a
+    function of t, the segment's own seconds, returning one: a walk carried along a path), blend (seconds of crossfade
+    into it). overlay(t, seg_index, local_t) may adjust the pose before it is keyed (IK, a look, a pointing arm).
+    Returns the act (frames from base's first frame)."""
+    sc = bpy.context.scene; A = arm.matrix_world.copy(); Ai = A.inverted()
+    root = next(pb for pb in arm.pose.bones if pb.parent is None)
+    t0s, t = [], 0.0
+    for s in segments: t0s.append(t); t += s['dur']
+    total = t; f0 = int(base.frame_range[0]); n = int(round(total * FPS))
+
+    def at(k, lt):
+        s = segments[k]; pose_at(arm, s['src'], s['f0'] + min(lt, s['dur'] + s.get('hold', 0.0)) * FPS * s.get('rate', 1.0))
+        rot, M = _pose(arm)
+        W = s['at'](lt) if callable(s['at']) else s['at']
+        return rot, Ai @ W @ A @ M
+    act = base.copy(); act.name = name; act.use_fake_user = True
+    for f in range(n + 1):
+        t = f / FPS
+        k = max(i for i, t0 in enumerate(t0s) if t0 <= t + 1e-9) if t < total else len(segments) - 1
+        lt = t - t0s[k]; pose = at(k, lt)
+        bl = segments[k].get('blend', blend)
+        if k > 0 and lt < bl:                                   # crossfade from where the last segment would be now
+            w = lt / bl; w = w * w * (3 - 2 * w)
+            pose = _mix(at(k - 1, t - t0s[k - 1]), pose, w)
+        arm.animation_data.action = act
+        if act.slots and arm.animation_data.action_slot is None: arm.animation_data.action_slot = act.slots[0]
+        sc.frame_set(f0 + f)
+        for b, q in pose[0].items(): arm.pose.bones[b].rotation_quaternion = q
+        root.matrix = pose[1]
+        bpy.context.view_layer.update()
+        if overlay: overlay(t, k, lt)
+        root.keyframe_insert('location', frame=f0 + f)
+        for pb in arm.pose.bones: pb.keyframe_insert('rotation_quaternion', frame=f0 + f)
+    for _, fc in _fcurves(act):
+        for kp in [kp for kp in fc.keyframe_points if not f0 <= kp.co[0] <= f0 + n][::-1]: fc.keyframe_points.remove(kp)
+        fc.update()
+    act.frame_range = (f0, f0 + n)
+    cine.log('sequence', name, f'{total:.1f} s', len(segments), 'segments')
+    return act
+
+
+def heading(arm, action, frame):
+    """Where the body faces at a frame of an action (world, horizontal), and the pelvis there."""
+    pose_at(arm, action, frame)
+    return forward(arm), _world(arm, arm.pose.bones['Bip01 Pelvis']).translation.copy()
+
+
+def carry(p_from, h_from, p_to, h_to):
+    """The world matrix that moves a body at p_from facing h_from to p_to facing h_to (turning about the vertical)."""
+    a = math.atan2(h_to.y, h_to.x) - math.atan2(h_from.y, h_from.x)
+    p_from = Vector((p_from.x, p_from.y, 0)); p_to = Vector((p_to.x, p_to.y, 0))
+    return Matrix.Translation(p_to) @ Matrix.Rotation(a, 4, 'Z') @ Matrix.Translation(-p_from)
+
+
 def desk_work(arm, base, left, right, frames, seed=1, name=None, facing=None):
     """MDR refining over the seated clip `base`: the left hand taps the keys in bursts, the right hand rolls the
     trackball (busier while the keys rest), the head drifts between screen and keys. Every motion has a whole
@@ -486,7 +603,9 @@ def custom_act(arm, base, frames, name, step, bones):
     for f in range(frames[0], frames[1] + 1):
         sc.frame_set(f); bpy.context.view_layer.update()
         step(f, (f - frames[0]) / FPS)
-        for b in bones: arm.pose.bones[b].keyframe_insert('rotation_quaternion', frame=f)
+        for b in bones:
+            pb = arm.pose.bones[b]; pb.keyframe_insert('rotation_quaternion', frame=f)
+            if pb.parent is None: pb.keyframe_insert('location', frame=f)   # the root carries the body (a seat's drop)
     # the act is only its own frames: the rest of the base would make a one-shot run on (and its props linger)
     for _, fc in _fcurves(act):
         for k in [k for k in fc.keyframe_points if not frames[0] <= k.co[0] <= frames[1]][::-1]: fc.keyframe_points.remove(k)
@@ -585,10 +704,11 @@ def anchor(arm, act, ref):
     return act
 
 
-def check_acts(arm, acts, spot=0.05, turn=15.0, drift=0.3):
+def check_acts(arm, acts, spot=0.05, turn=15.0, drift=0.3, roam=()):
     """Every act must begin where the first act begins (the same spot within `spot` m, the same heading within `turn`
     degrees) and stay near there (`drift` m): the web crossfades acts in place, so an act baked in another frame
-    makes the person jump. Raises with the culprits."""
+    makes the person jump. An act named in `roam` may wander (a walk out of the room and back), but must end where it
+    began. Raises with the culprits."""
     pelvis = arm.pose.bones['Bip01 Pelvis']
     def at(action, f):
         pose_at(arm, action, f); M = arm.matrix_world @ pelvis.matrix; return M.translation.copy(), M.to_quaternion()
@@ -600,16 +720,17 @@ def check_acts(arm, acts, spot=0.05, turn=15.0, drift=0.3):
         p, q = at(a, f0)
         ang = math.degrees(q0.rotation_difference(q).angle); ang = min(ang, 360 - ang)
         far = max(flat(at(a, f)[0] - p) for f in range(f0, f1 + 1, 5))
+        if name in roam: far = flat(at(a, f1)[0] - p)          # it may go where it likes, but comes back
         if flat(p - p0) > spot or ang > turn or far > drift:
-            bad.append(f"{name}: starts {flat(p - p0) * 100:.0f} cm and {ang:.0f}° from '{ref_name}', wanders {far * 100:.0f} cm")
+            bad.append(f"{name}: starts {flat(p - p0) * 100:.0f} cm and {ang:.0f}° from '{ref_name}', {'ends' if name in roam else 'wanders'} {far * 100:.0f} cm")
     if bad: raise RuntimeError(f"{arm.get('person', arm.name)}: acts out of place: " + '; '.join(bad))
     cine.log('acts in place', arm.get('person', arm.name), ', '.join(acts))
 
 
-def export_person(arm, mesh, acts, path, image_size=1024):
+def export_person(arm, mesh, acts, path, image_size=1024, roam=()):
     """One glTF per person: body, rig and every act as its own animation (NLA tracks, each named after its act).
     The acts are checked first (check_acts): a person whose acts do not share one spot is never exported."""
-    check_acts(arm, acts)
+    check_acts(arm, acts, roam=roam)
     for slot in mesh.material_slots:
         for nd in slot.material.node_tree.nodes:
             if nd.type == 'TEX_IMAGE' and nd.image and nd.image.size[0] > image_size: nd.image.scale(image_size, image_size)

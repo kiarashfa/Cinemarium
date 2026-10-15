@@ -153,8 +153,8 @@ export async function bakedRoom(id: string, screen?: Screen): Promise<Room> {
         if (/partition/.test(src.name)) { mat.sheen = 0; mat.color.setRGB(0.8, 0.95, 0.84); }
         // an old mirror is tarnished: a dim reflection (a bright one turns the bulbs in the capture into a white glow)
         if (/mirror/.test(src.name)) mat.envMapIntensity = 0.14;
-        // the walking people's contact shadows come from screen-space AO on the carpet (live depth, so every step)
-        if (/carpet/.test(src.name)) mat.keepAO = true;
+        // the walking people's contact shadows come from screen-space AO on the floors they walk (live depth, so every step)
+        if (/carpet|terrazzo/.test(src.name)) mat.keepAO = true;
         // lightning: its own light map, added as light reflected by the surface's colour, as strong as the strike
         const fl = flashAtlas[ud.lm];
         if (fl && storm) {

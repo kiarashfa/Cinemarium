@@ -331,6 +331,120 @@ def seinfeld(out):
     _save(v * 1.4, f'{out}/view_color.jpg')
 
 
+def the_sopranos(out):
+    """Dr. Melfi's office: sapele veneer gone warm red-brown, a grey-green loop carpet, the big rug's beige basketweave
+    with its key border, olive chenille, celadon wool, the chaise's dark leather, the rosewood desk; the waiting room's
+    speckled floor; the summer trees behind the blinds; diplomas, a botanical print, books."""
+    import math
+    from PIL import ImageDraw
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    acg = lambda i, m: os.path.join(CACHE, 'ambientcg', i, f'{i}_2K-JPG_{m}.jpg')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    rng = np.random.default_rng(99)
+    S = 2048
+    # the veneer: sapele's straight grain, warmed and darkened to the set's red-brown, a little figure across it
+    v = _lum(ph('sapele_veneer', 'Diffuse'), S); v = (v / v.mean()) ** 1.25
+    fig = 0.94 + 0.12 * _noise(S, 70, 3)
+    _save(lin((118, 72, 46))[None, None] * (v * fig)[..., None], f'{out}/veneer_color.jpg')
+    copy(ph('sapele_veneer', 'nor_gl'), f'{out}/veneer_normal.jpg', size=1024)
+    copy(ph('sapele_veneer', 'Rough'), f'{out}/veneer_rough.jpg', size=1024, mode='L')
+    # the door and the shelves' faces: the same veneer, a shade lighter (honey, as the door reads)
+    _save(lin((140, 92, 58))[None, None] * (v * fig)[..., None], f'{out}/veneer_light_color.jpg')
+    # the desk and the credenza: dark figured rosewood
+    tint(ph('rosewood_veneer1', 'Diffuse'), f'{out}/rosewood_color.jpg', (66, 32, 22), size=1024, contrast=1.15)
+    # the floor: a grey-green loop carpet, wall to wall
+    tint(acg('Carpet012', 'Color'), f'{out}/carpet_color.jpg', (104, 106, 90), contrast=0.7)
+    copy(acg('Carpet012', 'NormalGL'), f'{out}/carpet_normal.jpg', size=1024)
+    # Tony's chair: olive chenille (the velour's nap); Melfi's: celadon-grey wool
+    tint(ph('velour_velvet', 'Diffuse'), f'{out}/chenille_color.jpg', (92, 90, 62), size=1024, contrast=1.3)
+    copy(ph('velour_velvet', 'nor_gl'), f'{out}/chenille_normal.jpg', size=1024)
+    tint(ph('poly_wool_herringbone', 'Diffuse'), f'{out}/celadon_color.jpg', (148, 156, 140), size=1024, contrast=0.9)
+    copy(ph('poly_wool_herringbone', 'nor_gl'), f'{out}/celadon_normal.jpg', size=1024)
+    # the chaise: dark olive-brown leather
+    tint(ph('brown_leather', 'Diffuse'), f'{out}/leather_color.jpg', (52, 46, 36), size=1024, contrast=1.2)
+    copy(ph('brown_leather', 'nor_gl'), f'{out}/leather_normal.jpg', size=1024)
+    # the waiting room's armchair: an oatmeal boucle (the waffle's weave)
+    tint(ph('waffle_pique_cotton', 'Diffuse'), f'{out}/boucle_color.jpg', (176, 168, 150), size=1024, contrast=1.6)
+    copy(ph('waffle_pique_cotton', 'nor_gl'), f'{out}/boucle_normal.jpg', size=1024)
+    # the big rug (0..1 across it, 3.6 x 2.7 m): a beige basketweave field, a taupe key border between two fine lines
+    R = 2048; yy, xx = np.mgrid[0:R, 0:R].astype(np.float32) / R
+    weave = _lum(ph('waffle_pique_cotton', 'Diffuse'), 512); weave = np.tile((weave / weave.mean()) ** 1.4, (4, 4))
+    field = lin((188, 172, 142))[None, None] * weave[..., None] * (0.95 + 0.08 * _noise(R, 120, 11))[..., None]
+    du, dv = np.minimum(xx, 1 - xx) * 3.6, np.minimum(yy, 1 - yy) * 2.7          # metres to the nearest edge
+    d = np.minimum(du, dv)
+    band = (d > 0.1) & (d < 0.3)
+    # the key: a meander along the band (s along the edge, t across it), 0.2 m per repeat
+    s = np.where(du < dv, yy * 2.7, xx * 3.6); t = (d - 0.1) / 0.2
+    f = (s / 0.2) % 1
+    key = ((t < 0.18) | (t > 0.82) | ((f < 0.16) & (t < 0.82)) | ((f > 0.16) & (f < 0.66) & (t > 0.64) & (t < 0.82)) |
+           ((f > 0.5) & (f < 0.66) & (t > 0.34) & (t < 0.82)) | ((f > 0.32) & (f < 0.66) & (t > 0.34) & (t < 0.5)))
+    border = np.where((band & key)[..., None], lin((118, 100, 80))[None, None] * weave[..., None], field)
+    lines = (np.abs(d - 0.06) < 0.008) | (np.abs(d - 0.34) < 0.006)
+    border = np.where(lines[..., None], lin((118, 100, 80))[None, None], border)
+    _save(np.where((d < 0.035)[..., None], lin((150, 134, 108))[None, None] * weave[..., None], border), f'{out}/rug_color.jpg')
+    # the waiting room's floor: a grey speckled terrazzo-like vinyl
+    sp = rng.random((S, S)).astype(np.float32)
+    speck = (sp > 0.985).astype(np.float32) * 0.55 + (sp < 0.02).astype(np.float32) * -0.4
+    speck = np.asarray(Image.fromarray(((speck + 0.5) * 255).clip(0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.8)), np.float32) / 255 - 0.5
+    _save(lin((150, 148, 140))[None, None] * (1 + 1.2 * speck + 0.05 * _noise(S, 80, 12))[..., None], f'{out}/terrazzo_color.jpg')
+    # the view: summer woods close behind the building, out of focus (trunks, green, bright gaps)
+    V = 1024; yy, xx = np.mgrid[0:V, 0:V].astype(np.float32) / V
+    leaf = 0.4 * _noise(V, 10, 21) + 0.35 * _noise(V, 30, 22) + 0.25 * _noise(V, 4, 23)
+    view = lin((96, 140, 70))[None, None] * (0.55 + 0.9 * leaf)[..., None]
+    gaps = np.clip((leaf - 0.6) * 4, 0, 1)
+    view = view * (1 - gaps[..., None]) + lin((222, 230, 214))[None, None] * gaps[..., None]
+    for k in range(9):
+        x0 = rng.uniform(0.02, 0.98); w = rng.uniform(0.012, 0.035)
+        trunk = np.exp(-((xx - x0 - 0.02 * np.sin(yy * 6 + k)) / w) ** 4) * np.clip((yy - rng.uniform(0.0, 0.4)) * 4, 0, 1)
+        view = view * (1 - trunk[..., None]) + lin((58, 50, 40))[None, None] * trunk[..., None]
+    view = np.asarray(Image.fromarray((lin_to_srgb(view) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(5)), np.float32) / 255
+    Image.fromarray((view * 255).clip(0, 255).astype(np.uint8)).save(f'{out}/view_color.jpg', quality=92)
+    # diplomas (0..1 across each): cream paper, a black-letter heading, lines, a gold seal, in a thin black frame
+    for k in range(2):
+        D_ = _rect_uv_texture(1024, 800, lambda im, dr: None, bg=(232, 224, 204)); dr = ImageDraw.Draw(D_)
+        dr.rectangle([10, 10, 1013, 789], outline=(20, 18, 16), width=22)
+        dr.rectangle([70, 70, 953, 729], outline=(150, 130, 90), width=3)
+        dr.rectangle([220, 130, 804, 190], fill=(40, 34, 30))
+        for j in range(7): dr.rectangle([180 + 20 * (j % 2), 250 + j * 46, 844 - 20 * (j % 2), 262 + j * 46], fill=(90, 84, 78))
+        dr.ellipse([440, 590, 580, 730] if k else [130, 590, 270, 730], fill=(190, 150, 60), outline=(120, 90, 30), width=6)
+        D_.save(f'{out}/diploma{k}.jpg', quality=92)
+    # the botanical print: a white mat, a faint sepia drawing of a leafy stem
+    P = _rect_uv_texture(900, 1100, lambda im, dr: None, bg=(236, 232, 222)); dr = ImageDraw.Draw(P)
+    dr.rectangle([150, 160, 750, 940], fill=(228, 220, 200))
+    pts = [(450 + 30 * math.sin(i / 9), 900 - i * 6) for i in range(120)]
+    dr.line(pts, fill=(120, 96, 70), width=5)
+    for i in range(8, 120, 13):
+        x, y = pts[i]; sd = 1 if (i // 13) % 2 else -1
+        dr.ellipse([x + (10 if sd > 0 else -150), y - 40, x + (150 if sd > 0 else -10), y + 10], outline=(130, 104, 76), width=4)
+    P.save(f'{out}/botanical.jpg', quality=92)
+    # books: 64 spines across in two rows (medical and analytic texts: dark cloth, gilt bands, white paperbacks)
+    B = _rect_uv_texture(2048, 1024, lambda im, dr: None, bg=(20, 18, 16)); dr = ImageDraw.Draw(B)
+    pal = [(70, 22, 22), (24, 40, 30), (24, 30, 56), (120, 96, 60), (210, 204, 190), (40, 36, 34), (150, 40, 30), (90, 70, 50), (200, 170, 110), (60, 80, 90)]
+    for r in range(2):
+        for i in range(64):
+            x0 = i * 32; c = pal[rng.integers(len(pal))]; c = tuple(int(np.clip(v * rng.uniform(0.85, 1.15), 0, 255)) for v in c)
+            dr.rectangle([x0 + 1, r * 512, x0 + 30, r * 512 + 511], fill=c)
+            g = (200, 170, 90) if sum(c) < 300 else (40, 36, 34)
+            for zb in (60, 440): dr.rectangle([x0 + 3, r * 512 + zb, x0 + 28, r * 512 + zb + 8], fill=g)
+            dr.rectangle([x0 + 9, r * 512 + 120, x0 + 22, r * 512 + 300], fill=g)
+    B.save(f'{out}/spines_color.jpg', quality=92)
+    # magazines in the waiting room (an atlas of 4 x 2 covers)
+    G = _rect_uv_texture(1024, 1024, lambda im, dr: None, bg=(236, 232, 224)); dr = ImageDraw.Draw(G)
+    for i in range(4):
+        for j in range(2):
+            x0, y0 = i * 256, j * 512; c = pal[rng.integers(len(pal))]
+            dr.rectangle([x0 + 10, y0 + 90, x0 + 245, y0 + 430], fill=tuple(int(v * 0.6 + 80) for v in c))
+            dr.ellipse([x0 + 60, y0 + 160, x0 + 190, y0 + 330], fill=tuple(int(v) for v in rng.uniform(120, 230, 3)))
+            dr.rectangle([x0 + 10, y0 + 18, x0 + 245, y0 + 78], fill=(190, 30, 30) if (i + j) % 2 else (20, 20, 24))
+    G.save(f'{out}/magazine_color.jpg', quality=92)
+    # the statue's bronze: a green patina, darker in the hollows (a noise the lightmap does not carry)
+    pat = 0.7 + 0.5 * _noise(1024, 16, 31) + 0.2 * _noise(1024, 3, 32)
+    _save(lin((62, 96, 84))[None, None] * pat[..., None], f'{out}/patina_color.jpg')
+    # linen for the drum shades; the phantom ceiling
+    tint(ph('rough_linen', 'Diffuse'), f'{out}/linen_color.jpg', (226, 214, 188), size=512, contrast=0.8)
+    tint(ph('white_plaster_02', 'Diffuse'), f'{out}/ceiling_color.jpg', (214, 210, 200), size=512, contrast=0.4)
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

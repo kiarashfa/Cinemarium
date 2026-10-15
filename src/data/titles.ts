@@ -33,7 +33,7 @@ const LIST: Title[] = [
   { slug: 'the-americans', kind: 'series', rank: 5, title: 'The Americans', year: 2013, imdb: { id: 'tt2149175' } },
   { slug: 'mr-robot', kind: 'series', rank: 6, title: 'Mr. Robot', year: 2015, imdb: { id: 'tt4158110' } },
   { slug: 'lost', kind: 'series', rank: 7, title: 'LOST', year: 2004, imdb: { id: 'tt0411008' }, scene: 'The Swan station', room: 'lost' },
-  { slug: 'the-sopranos', kind: 'series', rank: 8, title: 'The Sopranos', year: 1999, imdb: { id: 'tt0141842' } },
+  { slug: 'the-sopranos', kind: 'series', rank: 8, title: 'The Sopranos', year: 1999, imdb: { id: 'tt0141842' }, scene: "Dr. Melfi's office", room: 'the-sopranos' },
   { slug: 'succession', kind: 'series', rank: 9, title: 'Succession', year: 2018, imdb: { id: 'tt7660850' } },
   { slug: 'severance', kind: 'series', rank: 10, title: 'Severance', year: 2022, imdb: { id: 'tt11280740' }, scene: 'Macrodata Refinement, Lumon', room: 'severance' },
   { slug: 'game-of-thrones', kind: 'series', rank: 11, title: 'Game of Thrones', year: 2011, imdb: { id: 'tt0944947' } },

@@ -118,6 +118,25 @@ const ROOMS = {
     for (const t of ['laminate_floor_02', 'cotton_jersey', 'painted_plaster_wall', 'white_plaster_02']) await polyhaven(t, '2k', 'tex');
     for (const m of ['bananas', 'food_apple_01', 'food_pears_asian_01', 'wooden_cutting_board', 'potted_plant_02', 'desk_lamp_arm_01', 'mantel_clock_01']) await polyhaven(m, '1k', 'gltf');
   },
+  async 'the-sopranos'() {
+    // Tony (Male_Adult_14, cached for LOST), Melfi
+    for (const a of ['Adults/Male_Adult_14', 'Professions/Business_Female_02']) await avatar(a);
+    const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+    // in the two armchairs: breathing bases, idles, talk to layer over them
+    for (const c of ['breathe_01', 'idle_neutral_01', 'idle_relaxed_01', 'gestic_thoughtful', 'gestic_shrug_01', 'idle_touch_face', 'idle_scratch_head',
+      'idle_look_around', 'idle_nervous_01', 'idle_waiting_01']) await clip(S, `m_sit_chair_${c}`);
+    for (const c of ['breathe_01', 'idle_neutral_01', 'idle_neutral_02', 'gestic_thoughtful', 'idle_touch_hair', 'idle_touch_face', 'idle_look_around',
+      'idle_relaxed_01']) await clip(S, `f_sit_chair_${c}`);
+    for (const c of ['m_gestic_talk_relaxed_01', 'm_gestic_talk_neutral_01', 'm_gestic_talk_nervous_01', 'm_gestic_talk_excited_01', 'm_idle_angry_01',
+      'm_idle_angry_02', 'm_idle_breathe_01', 'm_idle_look_around_01', 'f_gestic_talk_neutral_01', 'f_gestic_listen_neutral_01']) await clip(S, c);
+    // the walk-out: up from the chair, the outburst, out of the door and back, down into the chair again
+    for (const c of ['m_sit_stand_up_chair_01', 'm_sit_down_chair_01', 'm_gestic_talk_angry_01', 'm_gestic_talk_angry_02']) await clip(XYZ, c);
+    for (const c of ['m_walk_fast_01', 'm_walk_neutral_02', 'm_walk_slow_01']) await clip(XY, c);
+    for (const t of ['sapele_veneer', 'rosewood_veneer1', 'velour_velvet', 'brown_leather', 'waffle_pique_cotton', 'poly_wool_herringbone',
+      'rough_linen', 'white_plaster_02']) await polyhaven(t, '2k', 'tex');
+    for (const m of ['hanging_picture_frame_01', 'desk_lamp_arm_01', 'office_notepads', 'binder_notebook']) await polyhaven(m, '1k', 'gltf');
+    for (const t of ['Carpet012', 'Carpet013']) await ambientcg(t);
+  },
 };
 
 const room = process.argv[2];

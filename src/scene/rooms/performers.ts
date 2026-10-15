@@ -1,11 +1,16 @@
 // People who keep living: each person's file holds several acts (motion-capture clips baked in Blender, each a
 // seamless loop). A seated refiner mostly works and now and then breaks off into an idle; the walker does his
 // rounds and stops to watch. The next act is picked at random, by weight, and the change is a crossfade, so
-// nothing restarts and nothing repeats on a fixed beat.
+// nothing restarts and nothing repeats on a fixed beat. An act may cue another person's (a man storming out of the
+// room, the woman he leaves watching him go): the two then play together.
 import * as THREE from 'three/webgpu';
 import { rng } from '../materials';
 
-export interface Act { name: string; loop?: boolean; w?: number; min?: number; max?: number }
+export interface Act {
+  name: string; loop?: boolean; w?: number; min?: number; max?: number;
+  /** played as the first break from the looping act */ first?: boolean;
+  /** other people's acts that start with this one: { who: act } */ cue?: Record<string, string>;
+}
 export interface Stop { face: [number, number]; dwell: [number, number] }
 export interface PersonMeta {
   who: string; file: string; acts: Act[];
@@ -42,10 +47,11 @@ function pick(acts: Act[], r: () => number) {
   return acts[acts.length - 1];
 }
 
-/** Work, then an idle, then work again for a while: never the same idle twice in a row. */
-function seated(p: Performer, acts: Act[], r: () => number) {
-  const work = acts.find(a => a.loop) ?? acts[0], idles = acts.filter(a => a !== work && p.has(a.name));
-  let until = -1, onWork = false, last = '';
+/** Work, then an idle, then work again for a while: never the same idle twice in a row. An act with no weight is
+ * only ever played when another person's act cues it. */
+function seated(p: Performer, acts: Act[], r: () => number, cue: (a: Act) => void) {
+  const work = acts.find(a => a.loop) ?? acts[0], idles = acts.filter(a => a !== work && p.has(a.name) && a.w !== 0);
+  let until = -1, onWork = false, last = '', first = idles.find(a => a.first);
   return (t: number) => {
     if (t < until) return;
     if (!onWork || !idles.length) {
@@ -54,8 +60,8 @@ function seated(p: Performer, acts: Act[], r: () => number) {
       const lo = work.min ?? 15, hi = work.max ?? 40;   // the first stretch is short, so the room comes alive soon
       onWork = true; until = t + (first ? lo * 0.3 + r() * (hi - lo) * 0.35 : lo + r() * (hi - lo));
     } else {
-      const a = pick(idles.filter(i => i.name !== last), r);
-      p.play(a.name, false); last = a.name; onWork = false;
+      const a = first ?? pick(idles.filter(i => i.name !== last), r); first = undefined;
+      p.play(a.name, false); last = a.name; onWork = false; cue(a);
       until = t + Math.max(1.5, p.duration(a.name) - FADE);
     }
   };
@@ -107,12 +113,18 @@ export interface Cast {
 }
 
 export function perform(people: { body: THREE.Object3D; clips: THREE.AnimationClip[]; meta: PersonMeta }[]): Cast {
+  let now = 0;
+  const cue = (a: Act) => {   // the cued people drop what they are doing (crossfading) and play theirs to its end
+    for (const [who, act] of Object.entries(a.cue ?? {})) {
+      const k = people.findIndex(x => x.meta.who === who); if (k < 0 || !runs[k].p.has(act)) continue;
+      runs[k].p.play(act, false); runs[k].hold = now + runs[k].p.duration(act) - FADE;
+    }
+  };
   const runs = people.map(({ body, clips, meta }, k) => {
     const p = new Performer(body, clips), r = rng(17 + k * 101);
-    const step = meta.walker ? rounds(p, body, meta, r) : seated(p, meta.acts, r);
+    const step = meta.walker ? rounds(p, body, meta, r) : seated(p, meta.acts, r, cue);
     return { p, step, hold: -1 };
   });
-  let now = 0;
   return {
     update(t, dt) {
       now = t;
@@ -122,6 +134,7 @@ export function perform(people: { body: THREE.Object3D; clips: THREE.AnimationCl
     play(who, act) {   // held for its whole length: the scheduler waits, then carries on from there
       const k = people.findIndex(x => x.meta.who === who); if (k < 0 || !runs[k].p.has(act)) return;
       runs[k].p.play(act, true, 0, 0); runs[k].hold = now + runs[k].p.duration(act);
+      const a = people[k].meta.acts.find(x => x.name === act); if (a) cue(a);   // and whoever it cues
     },
     current(who) { const k = people.findIndex(x => x.meta.who === who); return k >= 0 ? runs[k].p.current : null; },
   };
