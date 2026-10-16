@@ -76,7 +76,7 @@ def _radial(P, a, b, scale):
 def reshape(arm, mesh, shape, k=1.0):
     """Change a body's build by moving its rest-pose vertices: radial scaling about the spine and limb axes,
     weighted by the skin weights so the joints blend. The skeleton is untouched, so every clip still fits.
-    shape: 'heavy' (an obese build), 'athletic' (broad shoulders, big arms, a narrow waist), 'broad' (big and heavy-set:
+    shape: 'heavy' (an obese build; `k` how much), 'athletic' (broad shoulders, big arms, a narrow waist), 'broad' (big and heavy-set:
     chest, arms, some belly, a thick neck), 'lean' (a longer face; `k` how much)."""
     me = mesh.data
     if me.shape_keys: raise RuntimeError('reshape expects a mesh without shape keys')
@@ -98,7 +98,7 @@ def reshape(arm, mesh, shape, k=1.0):
     front = _smooth(-0.02, 0.03, -ry)                      # the avatar faces -y
     belly, chest, hip, seat = _gauss(h, 0.28, 0.2), _gauss(h, 0.76, 0.14), _gauss(h, -0.04, 0.14), _gauss(h, -0.12, 0.11)
     limb = lambda a, b, s0, s1: (lambda t: s0 + (s1 - s0) * t)
-    if shape == 'heavy':
+    if shape == 'heavy':                                   # k > 1: heavier still (Huell); every displacement scales by it
         sf = 1 + 0.85 * belly + 0.28 * chest + 0.12 * hip
         sx = 1 + 0.32 * belly + 0.2 * chest + 0.24 * hip
         sb = 1 + 0.16 * belly + 0.1 * chest + 0.3 * seat
@@ -119,6 +119,7 @@ def reshape(arm, mesh, shape, k=1.0):
         D[:, 0] += under * (P[:, 0] - hd.x) * 0.26; D[:, 1] += under * np.minimum(P[:, 1] - hd.y, 0) * 0.1
         chin = face * _gauss(P[:, 2], lip - 0.075, 0.025)
         D[:, 1] -= chin * 0.012; D[:, 2] -= chin * 0.008
+        D *= k
     elif shape == 'athletic':
         sf = 1 + 0.15 * chest - 0.05 * belly
         sx = 1 + 0.13 * chest + 0.07 * _gauss(h, 0.56, 0.14) - 0.03 * belly
@@ -493,6 +494,41 @@ def sequence(arm, base, name, segments, overlay=None, blend=0.6):
     return act
 
 
+def path(pts):
+    """A smooth path over the floor through points (Catmull-Rom): returns (at, length), at(s) giving the point s metres
+    along it and the tangent there. A walk is an in-place clip carried along one (see `walk_along`)."""
+    P = [Vector((p[0], p[1], 0)) for p in pts]; P = [P[0]] + P + [P[-1]]
+    samples = []
+    for i in range(1, len(P) - 2):
+        p0, p1, p2, p3 = P[i - 1], P[i], P[i + 1], P[i + 2]
+        for k in range(24):
+            t = k / 24; t2, t3 = t * t, t * t * t
+            samples.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3))
+    samples.append(P[-2])
+    acc = [0.0]
+    for a, b in zip(samples, samples[1:]): acc.append(acc[-1] + (b - a).length)
+    L = acc[-1]
+    def at(s):
+        s = min(max(s, 0.0), L)
+        i = next((i for i in range(1, len(acc)) if acc[i] >= s), len(acc) - 1)
+        w = (s - acc[i - 1]) / max(acc[i] - acc[i - 1], 1e-6)
+        p = samples[i - 1].lerp(samples[i], w)
+        j0, j1 = max(i - 3, 0), min(i + 2, len(samples) - 1)
+        tng = (samples[j1] - samples[j0]); tng = tng.normalized() if tng.length > 1e-6 else Vector((1, 0, 0))
+        return p, tng
+    return at, L
+
+
+def walk_along(arm, walk, f0, speed, route):
+    """A sequence segment's carrier for an in-place walk clip following `route` (from `path`): a function of the
+    segment's own seconds returning the world matrix that sets the walker on the path, facing along it."""
+    hw, pw = heading(arm, walk, f0); at, L = route
+    def M(lt):
+        p, t = at(lt * speed)
+        return carry(pw, hw, p, t)
+    return M
+
+
 def heading(arm, action, frame):
     """Where the body faces at a frame of an action (world, horizontal), and the pelvis there."""
     pose_at(arm, action, frame)
@@ -662,6 +698,153 @@ def add_glasses(arm, mesh, lens_r=0.017, mat=None):
     bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); mesh.select_set(True); bpy.context.view_layer.objects.active = mesh
     bpy.ops.object.join()
     cine.log('glasses on', mesh.get('person', mesh.name))
+
+
+def _join_to_head(mesh, bm, name, mats):
+    """A rest-pose bmesh (world space) made an object skinned wholly to the head and joined into the body mesh."""
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    ob = bpy.data.objects.new(name, me); [c.objects.link(ob) for c in mesh.users_collection]
+    for m in mats: me.materials.append(m)
+    ob.matrix_world = mesh.matrix_world.copy(); me.transform(mesh.matrix_world.inverted()); ob.matrix_world = mesh.matrix_world
+    vg = ob.vertex_groups.new(name='Bip01 Head'); vg.add(list(range(len(me.vertices))), 1.0, 'REPLACE')
+    bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); mesh.select_set(True); bpy.context.view_layer.objects.active = mesh
+    bpy.ops.object.join()
+
+
+def _wire(bm, pts, r, closed=False, seg=6):
+    """A thin round wire along points (a glasses' rim, a temple)."""
+    pts = [Vector(p) for p in pts]; n = len(pts); rings = []
+    for i, p in enumerate(pts):
+        a = pts[(i - 1) % n] if closed or i > 0 else p; b = pts[(i + 1) % n] if closed or i < n - 1 else p
+        t = (b - a).normalized(); u = t.orthogonal().normalized(); v = t.cross(u)
+        rings.append([bm.verts.new(p + (u * math.cos(2 * math.pi * k / seg) + v * math.sin(2 * math.pi * k / seg)) * r) for k in range(seg)])
+    for i in range(n if closed else n - 1):
+        a, b = rings[i], rings[(i + 1) % n]
+        for k in range(seg): bm.faces.new((a[k], a[(k + 1) % seg], b[(k + 1) % seg], b[k]))
+
+
+def add_frames(arm, mesh, mat, w=0.05, h=0.033, r=0.0012, corner=0.008, tilt=4.0):
+    """Wire-rimmed rectangular glasses (Walt's): two rounded-rectangle rims `w` x `h` before the eyes, a bridge, and the
+    temples back over the ears; skinned to the head and joined into the body mesh (rest pose)."""
+    import bmesh
+    J = _joints(arm); L, R = J['Bip01 LEye'], J['Bip01 REye']; mid = (L + R) / 2
+    fwd = J['Bip01 MNose'] - mid; fwd.z = 0; fwd.normalize(); side = (L - R).normalized(); up = Vector((0, 0, 1))
+    up = (Matrix.Rotation(math.radians(tilt), 3, side) @ up).normalized()          # the rims lean back a little at the top
+    bm = bmesh.new(); off = fwd * 0.03
+    def rim(c):
+        pts = []
+        for qx, qy, a0 in ((1, 1, 0), (-1, 1, 90), (-1, -1, 180), (1, -1, 270)):
+            cc = c + side * qx * (w / 2 - corner) + up * qy * (h / 2 - corner)
+            for k in range(5):
+                a = math.radians(a0 + 90 * k / 4); pts.append(cc + (side * math.cos(a) + up * math.sin(a)) * corner)
+        _wire(bm, pts, r, closed=True)
+    cl, cr = L + off + side * 0.003, R + off - side * 0.003
+    rim(cl); rim(cr)
+    a, b = cr + side * (w / 2), cl - side * (w / 2)
+    _wire(bm, [a + up * 0.006, (a + b) / 2 + up * 0.009 + fwd * 0.002, b + up * 0.006], r)   # the bridge
+    for c, s in ((cl, 1), (cr, -1)):                                                         # the temples, to the ears
+        e = c + side * s * (w / 2) + up * (h / 2 - 0.006)
+        ear = Vector((mid.x, mid.y, mid.z)) + side * s * 0.074 - fwd * 0.08 + up * 0.0
+        _wire(bm, [e, e - fwd * 0.012 + side * s * 0.004, ear, ear - fwd * 0.012 - up * 0.014], r * 1.1)
+    _join_to_head(mesh, bm, 'frames', [mat])
+    cine.log('frames on', mesh.get('person', mesh.name))
+
+
+def beanie(arm, mesh, knit, rim=None, axis_tilt=22.0, brim=98.0, t=0.009, cuff=16.0, stripe=3.5, res=(48, 24)):
+    """A close-fitting knit cap over the skull (Jesse's), skinned to the head: a dome of rings about an axis leaning
+    back by `axis_tilt` degrees, its brim the cone `brim` degrees from that axis (low over the forehead, lower behind,
+    at the tops of the ears); every point cast down onto the head and set `t` out; the cuff (the last `cuff` degrees)
+    thicker, a `stripe` of `rim` colour at its edge."""
+    import bmesh
+    from mathutils.bvhtree import BVHTree
+    J = _joints(arm); eye = (J['Bip01 LEye'] + J['Bip01 REye']) / 2
+    c = Vector((eye.x, eye.y + 0.05, eye.z + 0.01))                       # the skull's middle (the avatar faces -y)
+    n = Vector((0, math.sin(math.radians(axis_tilt)), math.cos(math.radians(axis_tilt))))
+    side = Vector((1, 0, 0)); back = n.cross(side).normalized()
+    deps = bpy.context.evaluated_depsgraph_get()
+    bvh = BVHTree.FromObject(mesh, deps)                                    # in the mesh's own space
+    Mi = mesh.matrix_world.inverted(); M = mesh.matrix_world
+    nu, nv = res; bm = bmesh.new(); rings = []
+    for j in range(nv + 1):
+        v = math.radians(brim) * (1 - j / nv); row = []
+        for i in range(nu):
+            u = 2 * math.pi * i / nu
+            d = (n * math.cos(v) + (side * math.cos(u) + back * math.sin(u)) * math.sin(v)).normalized()
+            o = Mi @ (c + d * 0.3); dl = Mi.to_3x3() @ -d                   # the mesh's own units (imported at 0.01)
+            hit = bvh.ray_cast(o, dl.normalized(), dl.length * 0.4)
+            p = (M @ hit[0]) if hit[0] is not None else c + d * 0.1
+            deg = math.degrees(v); tt = t + 0.004 * min(max((deg - (brim - cuff)) / 4.0, 0.0), 1.0)   # the cuff, turned up
+            row.append(bm.verts.new(p + d * tt))
+        rings.append(row)
+    top = bm.verts.new(c + n * max((r.co - c).length for r in rings[-1]))
+    faces = []
+    for j in range(nv):
+        a, b = rings[j], rings[j + 1]
+        for i in range(nu): faces.append((bm.faces.new((a[i], a[(i + 1) % nu], b[(i + 1) % nu], b[i])), j))
+    for i in range(nu): faces.append((bm.faces.new((rings[-1][i], rings[-1][(i + 1) % nu], top)), nv))
+    inner = [bm.verts.new(c + (v.co - c) * 0.96) for v in rings[0]]          # the brim's turned edge, in toward the head
+    for i in range(nu): faces.append((bm.faces.new((inner[i], inner[(i + 1) % nu], rings[0][(i + 1) % nu], rings[0][i])), -1))
+    for f, j in faces:
+        f.smooth = True
+        deg = brim * (1 - max(j, 0) / nv)
+        f.material_index = 1 if rim is not None and (j < 0 or deg > brim - stripe) else 0
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    _join_to_head(mesh, bm, 'beanie', [knit] + ([rim] if rim is not None else []))
+    cine.log('beanie on', mesh.get('person', mesh.name))
+
+
+# ---------------------------------------------------------------- hands
+FINGERS = {'thumb': '0', 'index': '1', 'middle': '2', 'ring': '3', 'pinky': '4'}
+SHAPES = {   # curl per finger (degrees for each of its three joints): a fist, a pointing hand, a finger gun
+    'fist': {'thumb': (20, 30, 30), 'index': (70, 90, 60), 'middle': (75, 95, 60), 'ring': (75, 95, 60), 'pinky': (75, 90, 60)},
+    'point': {'thumb': (25, 35, 30), 'index': (0, 4, 4), 'middle': (75, 95, 60), 'ring': (78, 95, 60), 'pinky': (80, 90, 60)},
+    'gun': {'thumb': (-18, -6, 0), 'index': (0, 0, 0), 'middle': (72, 95, 60), 'ring': (76, 95, 60), 'pinky': (78, 90, 60)},
+}
+
+
+def _palm(arm, side):
+    """The palm's normal (world): the side the fingers close toward. The plane of the wrist and the index and little
+    finger's knuckles; of its two sides, the one the thumb's tip lies on (it rests in front of the palm)."""
+    P = lambda b: _world(arm, arm.pose.bones[f'Bip01 {side} {b}']).translation.copy()
+    H = P('Hand'); n = (P('Finger1') - H).cross(P('Finger4') - H).normalized()
+    return n if (P('Finger02') - H).dot(n) >= 0 else -n
+
+
+def hand_shape(arm, side, shape, w=1.0):
+    """Close a hand's fingers into `shape` (SHAPES) by the fraction w: each joint turns about the axis across the
+    finger, toward the palm (Biped finger bones do not bend about one local axis: the axis is taken in the world)."""
+    if w <= 0: return
+    palm = _palm(arm, side)
+    for finger, angles in SHAPES[shape].items():
+        f = FINGERS[finger]; chain = [f'Bip01 {side} Finger{f}{s}' for s in ('', '1', '2')]
+        for k, (b, ang) in enumerate(zip(chain, angles)):
+            if not ang or b not in arm.pose.bones: continue
+            pb = arm.pose.bones[b]; base = _world(arm, pb).translation.copy()
+            nxt = _world(arm, arm.pose.bones[chain[k + 1]]).translation.copy() if k < 2 else base + (base - _world(arm, pb.parent).translation)
+            d = (nxt - base).normalized()
+            ax = d.cross(palm)                                              # turning about it carries d toward the palm
+            if ax.length < 1e-6: continue
+            bend(arm, b, ax.normalized(), math.radians(ang) * w)
+
+
+def point_at(arm, side, target, w=1.0, reach=0.42, jab=0.0, shape='point', drop=0.25, out=0.22):
+    """An arm thrown out toward `target` (world) by the fraction w, the elbow kept bent (`reach` metres from the
+    shoulder to the wrist, plus `jab`), the hand turned so its index finger runs at the target, the fingers in `shape`
+    ('point', or 'gun' for a finger gun: the thumb cocked up)."""
+    if w <= 0: return
+    sh = _world(arm, arm.pose.bones[f'Bip01 {side} UpperArm']).translation.copy()
+    H0 = _world(arm, arm.pose.bones[f'Bip01 {side} Hand']).translation.copy()
+    lat = sh - _world(arm, arm.pose.bones['Bip01 Neck']).translation; lat.z = 0; lat.normalize()   # the shoulder's outward side
+    d = (Vector(target) - sh).normalized()
+    tgt = H0.lerp(sh + d * (reach + jab), w)
+    ik2(arm, side, tgt, tgt - Vector((0, 0, drop)) + lat * out)                 # the elbow down and out
+    hand = arm.pose.bones[f'Bip01 {side} Hand']; H = _world(arm, hand).translation.copy()
+    hand_shape(arm, side, shape, w)
+    tip = _world(arm, arm.pose.bones[f'Bip01 {side} Finger12']).translation.copy()
+    q = (tip - H).normalized().rotation_difference((Vector(target) - H).normalized())
+    M = _world(arm, hand)
+    _set_world(arm, hand, Matrix.Translation(H) @ Quaternion().slerp(q, w).to_matrix().to_4x4() @ Matrix.Translation(-H) @ M)
+    if shape == 'gun': palm_to(arm, side, -lat, 0.8 * w)                     # the palm turned in, the thumb up
 
 
 def palm_to(arm, side, want, w=1.0):

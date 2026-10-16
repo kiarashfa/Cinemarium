@@ -53,6 +53,14 @@ async function ambientcg(id, res = '2K-JPG') {
   note(`ambientcg/${id}`, `https://ambientcg.com/view?id=${id}`, 'CC0', res);
 }
 
+// ---------- Wikimedia Commons (public-domain scans) ----------
+async function commons(file, width, out) {
+  const api = `https://commons.wikimedia.org/w/api.php?action=query&titles=File:${encodeURIComponent(file)}&prop=imageinfo&iiprop=url&iiurlwidth=${width}&format=json`;
+  const page = Object.values((await (await fetch(api, { headers: { 'User-Agent': 'Cinemarium/1.0' } })).json()).query.pages)[0];
+  const info = page.imageinfo[0]; await get(info.thumburl, join(CACHE, 'commons', out));
+  note(`commons/${out}`, info.descriptionurl, 'Public domain', 1);
+}
+
 const ROOMS = {
   async severance() {
     mkdirSync(join(CACHE, 'rocketbox'), { recursive: true });
@@ -136,6 +144,26 @@ const ROOMS = {
       'rough_linen', 'white_plaster_02']) await polyhaven(t, '2k', 'tex');
     for (const m of ['hanging_picture_frame_01', 'desk_lamp_arm_01', 'office_notepads', 'binder_notebook']) await polyhaven(m, '1k', 'gltf');
     for (const t of ['Carpet012', 'Carpet013']) await ambientcg(t);
+  },
+  async 'breaking-bad'() {
+    // Walt, Jesse, Saul, Huell (Male_Adult_12, cached for The Matrix)
+    for (const a of ['Professions/Business_Male_04', 'Adults/Male_Adult_20', 'Professions/Business_Male_03', 'Adults/Male_Adult_12']) await avatar(a);
+    const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+    // in the client chairs and behind the desk: breathing bases, idles, talk to layer over them
+    for (const c of ['breathe_01', 'idle_neutral_01', 'idle_neutral_02', 'idle_relaxed_01', 'gestic_thoughtful', 'gestic_shrug_01', 'idle_touch_face',
+      'idle_scratch_head', 'idle_look_around', 'idle_nervous_01', 'idle_waiting_01', 'idle_roll_head']) await clip(S, `m_sit_chair_${c}`);
+    for (const c of ['m_gestic_talk_relaxed_01', 'm_gestic_talk_neutral_01', 'm_gestic_talk_nervous_01', 'm_gestic_talk_excited_01', 'm_gestic_talk_cool',
+      'm_gestic_listen_neutral_01', 'm_idle_angry_01', 'm_idle_angry_02', 'm_idle_breathe_01', 'm_idle_breathe_02', 'm_idle_neutral_01', 'm_idle_neutral_02',
+      'm_idle_look_around_01', 'm_idle_waiting_01', 'm_idle_nervous_01']) await clip(S, c);
+    // up from a chair and down again (Walt, Saul, Jesse), the outburst, the walks (Jesse in and out of the office)
+    for (const c of ['m_sit_stand_up_chair_01', 'm_sit_down_chair_01', 'm_gestic_talk_angry_01', 'm_gestic_talk_angry_02']) await clip(XYZ, c);
+    for (const c of ['m_walk_cool_01', 'm_walk_neutral_01', 'm_walk_neutral_02', 'm_walk_slow_01']) await clip(XY, c);
+    for (const t of ['sapele_veneer', 'rosewood_veneer1', 'brown_leather', 'leather_red_02', 'leather_red_03', 'floral_jacquard', 'velour_velvet',
+      'painted_plaster_wall', 'white_plaster_02', 'large_floor_tiles_02', 'rough_linen', 'cotton_jersey']) await polyhaven(t, '2k', 'tex');
+    for (const m of ['potted_plant_02', 'desk_lamp_arm_01', 'office_notepads', 'binder_notebook', 'stationery_supplies']) await polyhaven(m, '1k', 'gltf');
+    for (const t of ['Carpet012', 'Carpet013']) await ambientcg(t);
+    // the wallpaper behind the desk: the Constitution's first page (National Archives scan)
+    await commons('Constitution_of_the_United_States,_page_1.jpg', 2400, 'constitution_page1.jpg');
   },
 };
 

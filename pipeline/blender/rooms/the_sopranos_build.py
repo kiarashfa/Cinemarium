@@ -291,7 +291,7 @@ def _seat(c, arm, base, frames):
 def cast(col, args):
     """Load, dress, shape and seat the two, and bake their acts (cached: retargets and IK take minutes)."""
     full = bool(args.get('full'))
-    spec = {'cast': CAST, 'chairs': R.CHAIRS, 'seat': R.SEAT, 'door': R.DOOR, 'statue': list(R.STATUE), 'phi': R.PHI, 'full': full, 'v': 2}
+    spec = {'cast': CAST, 'chairs': R.CHAIRS, 'seat': R.SEAT, 'door': R.DOOR, 'statue': list(R.STATUE), 'phi': R.PHI, 'full': full, 'v': 3}
     seated = stages.cast_cache(OUT, CAST, spec, lambda: _make_cast(col, full), col)
     for c, arm, mesh in seated: people.pose_at(arm, c['acts'][c['work'][0]], 30)
     return seated
@@ -351,7 +351,8 @@ def _make_cast(col, full):
         mc, marm, mmesh, mbase, mframes, mdrop = made['melfi']
         mc['acts']['watch'] = _watch(marm, mc, mdrop, tarm, tc['acts']['walkout'])
     for c, arm, mesh in seated:
-        for a in c['acts'].values(): people.freeze(a)
+        for k, a in c['acts'].items():
+            if k != 'walkout': people.freeze(a)                      # the walk-out shapes his pointing hand
         base = made[c['who']][3]
         if base not in c['acts'].values(): bpy.data.actions.remove(base)
         people.pose_at(arm, c['acts'][c['work'][0]], 30)
@@ -359,30 +360,6 @@ def _make_cast(col, full):
 
 
 # ---------------------------------------------------------------- the walk-out
-def _path(pts):
-    """A smooth path through points (Catmull-Rom): returns (point at s metres, tangent at s, length)."""
-    P = [Vector((p[0], p[1], 0)) for p in pts]; P = [P[0]] + P + [P[-1]]
-    samples = []
-    for i in range(1, len(P) - 2):
-        p0, p1, p2, p3 = P[i - 1], P[i], P[i + 1], P[i + 2]
-        for k in range(24):
-            t = k / 24; t2, t3 = t * t, t * t * t
-            samples.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3))
-    samples.append(P[-2])
-    acc = [0.0]
-    for a, b in zip(samples, samples[1:]): acc.append(acc[-1] + (b - a).length)
-    L = acc[-1]
-    def at(s):
-        s = min(max(s, 0.0), L)
-        i = next((i for i in range(1, len(acc)) if acc[i] >= s), len(acc) - 1)
-        w = (s - acc[i - 1]) / max(acc[i] - acc[i - 1], 1e-6)
-        p = samples[i - 1].lerp(samples[i], w)
-        j0, j1 = max(i - 3, 0), min(i + 2, len(samples) - 1)
-        tng = (samples[j1] - samples[j0]); tng = tng.normalized() if tng.length > 1e-6 else Vector((1, 0, 0))
-        return p, tng
-    return at, L
-
-
 def _walkout(arm, base, talk, drop):
     """Tony's walk-out, about 40 seconds: heated in the chair; he springs up and shouts at her, jabbing a finger; turns
     and strides out past his chair, through the door into the waiting room, where he stands fuming before the statue;
@@ -420,21 +397,15 @@ def _walkout(arm, base, talk, drop):
     chair, f = R.chair_at('tony'); side = Vector((-f.y, f.x, 0))   # the chair's left, seen from the chair: toward the door
     out = [pr1, pr1 - f * 0.25 + side * 0.45, chair + side * 0.75 - f * 0.1, door_in, door, door_out, stop]
     back = [stop, door_out, door, door_in, chair + side * 0.8 - f * 0.3, pd0]
-    path_out, L_out = _path(out); path_back, L_back = _path(back)
-    hw, pw = people.heading(arm, walk, walkf[0])
-    def along(path, L):
-        def M(lt):
-            p, t = path(lt * speed)
-            return people.carry(pw, hw, p, t)
-        return M
+    r_out, r_back = people.path(out), people.path(back); L_out, L_back = r_out[1], r_back[1]
     hf, pf = people.heading(arm, fume, fumef[0])
     M_fume = people.carry(pf, hf, stop, (statue - stop).normalized())
     segs = [dict(src=talk, f0=t0f, dur=3.2, at=Matrix.Identity(4)),
             dict(src=up, f0=upf[0], dur=(upf[1] - upf[0]) / FPS, at=M_up, blend=0.7),
             dict(src=rage, f0=ragef[0], dur=rage_dur, at=M_rage, blend=0.6),
-            dict(src=walk, f0=walkf[0], dur=L_out / speed, at=along(path_out, L_out), blend=0.8),
+            dict(src=walk, f0=walkf[0], dur=L_out / speed, at=people.walk_along(arm, walk, walkf[0], speed, r_out), blend=0.8),
             dict(src=fume, f0=fumef[0], dur=7.0, at=M_fume, blend=0.8),
-            dict(src=walk, f0=walkf[0] + 15, dur=L_back / speed, at=along(path_back, L_back), blend=0.9),
+            dict(src=walk, f0=walkf[0] + 15, dur=L_back / speed, at=people.walk_along(arm, walk, walkf[0], speed, r_back), blend=0.9),
             dict(src=down, f0=downf[0], dur=(downf[1] - downf[0]) / FPS, at=M_down, blend=0.9),
             dict(src=talk, f0=t0f, dur=2.8, at=Matrix.Identity(4), blend=1.2)]
     t_rage = segs[0]['dur'] + segs[1]['dur']
@@ -446,10 +417,8 @@ def _walkout(arm, base, talk, drop):
         elif k == 7: _look(arm, melfi, 0.3 * _smooth((lt - 0.5) / 1.5))
         elif k == 2:                                                                  # the finger jabbed at her
             T = segs[2]['dur']; e = people.envelope(lt, T, 0.8, 1.2)
-            sh = people._world(arm, arm.pose.bones['Bip01 R UpperArm']).translation.copy()
-            d = (melfi - sh).normalized(); jab = 0.06 * max(0.0, math.sin(2 * math.pi * 1.4 * lt)) ** 2
-            tgt = people._world(arm, arm.pose.bones['Bip01 R Hand']).translation.lerp(sh + d * (0.5 + jab), e)
-            people.ik2(arm, 'R', tgt, tgt - Vector((0, 0, 0.4)) + d.cross(Vector((0, 0, 1))) * 0.2)
+            jab = 0.09 * max(0.0, math.sin(2 * math.pi * 1.4 * lt)) ** 2
+            people.point_at(arm, 'R', melfi, e, reach=0.4, jab=jab, shape='point')
             _look(arm, melfi, 0.8 * e)
         elif k == 3: _look(arm, door_out + Vector((0, 0, 1.6)), 0.3)
         elif k == 4:

@@ -26,7 +26,7 @@ export interface Title {
 export const TOP = 10;
 
 const LIST: Title[] = [
-  { slug: 'breaking-bad', kind: 'series', rank: 1, title: 'Breaking Bad', year: 2008, imdb: { id: 'tt0903747' } },
+  { slug: 'breaking-bad', kind: 'series', rank: 1, title: 'Breaking Bad', year: 2008, imdb: { id: 'tt0903747' }, scene: "Saul Goodman's office", room: 'breaking-bad' },
   { slug: 'the-leftovers', kind: 'series', rank: 2, title: 'The Leftovers', year: 2014, imdb: { id: 'tt2699128' } },
   { slug: 'seinfeld', kind: 'series', rank: 3, title: 'Seinfeld', year: 1989, imdb: { id: 'tt0098904' }, scene: "Jerry's apartment, 5A", room: 'seinfeld' },
   { slug: 'house-md', kind: 'series', rank: 4, title: 'House M.D.', year: 2004, imdb: { id: 'tt0412142' } },

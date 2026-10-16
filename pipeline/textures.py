@@ -445,6 +445,143 @@ def the_sopranos(out):
     tint(ph('white_plaster_02', 'Diffuse'), f'{out}/ceiling_color.jpg', (214, 210, 200), size=512, contrast=0.4)
 
 
+def breaking_bad(out):
+    """Saul Goodman's office: a royal blue carpet, pale sage walls over an olive dado, the Constitution's first page as
+    the bay's wallpaper (amber parchment), honey oak, oxblood and khaki and coral leathers, the gold damask sofa, red
+    law books; the waiting room's beige tile and yellow walls, the parking lot behind the blinds seen through the
+    lettered glass; framed photographs, the diploma, magazines."""
+    import math
+    from PIL import ImageDraw, ImageFont
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    acg = lambda i, m: os.path.join(CACHE, 'ambientcg', i, f'{i}_2K-JPG_{m}.jpg')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    rng = np.random.default_rng(57)
+    S = 2048
+    font = lambda name, size: ImageFont.truetype(f'C:/Windows/Fonts/{name}', size) if os.path.exists(f'C:/Windows/Fonts/{name}') else ImageFont.load_default()
+    # the carpet: a dense royal blue loop pile, wall to wall
+    tint(acg('Carpet012', 'Color'), f'{out}/carpet_color.jpg', (30, 46, 116), size=1024, contrast=0.75)
+    copy(acg('Carpet012', 'NormalGL'), f'{out}/carpet_normal.jpg', size=1024)
+    # the office's walls: flat paint over plaster, pale sage above, a dark olive dado below; the waiting room's warm yellow
+    pl = _lum(ph('painted_plaster_wall', 'Diffuse'), 1024); pl = (pl / pl.mean()) ** 0.3
+    mott = 0.95 + 0.05 * _noise(1024, 60, 5)
+    for name, c in (('wall', (164, 166, 124)), ('dado', (86, 82, 50)), ('wait_wall', (210, 184, 128)), ('booth_wall', (196, 186, 160))):
+        _save(lin(c)[None, None] * (pl * mott)[..., None], f'{out}/{name}_color.jpg')
+    copy(ph('painted_plaster_wall', 'nor_gl'), f'{out}/wall_normal.jpg', size=1024)
+    tint(ph('white_plaster_02', 'Diffuse'), f'{out}/ceiling_color.jpg', (220, 218, 210), size=512, contrast=0.4)
+    # the Constitution: the National Archives' scan of page one, its parchment warmed to the set's amber; the margins trimmed
+    C = Image.open(os.path.join(CACHE, 'commons', 'constitution_page1.jpg')).convert('RGB')
+    w, h = C.size; C = C.crop((int(w * 0.035), int(h * 0.02), int(w * 0.975), int(h * 0.985))).resize((2048, 2560), Image.LANCZOS)
+    c = srgb_to_lin(np.asarray(C, np.float32) / 255); l = c @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    paper = np.clip(l / np.percentile(l, 70), 0, 1.15)
+    ink = np.clip(1 - paper, 0, 1) ** 0.8
+    age = 0.88 + 0.16 * _noise(2048, 90, 41); age = np.vstack([age, age[:512]])     # the page is taller than square
+    parch = lin((232, 192, 118))[None, None] * (paper ** 0.5 * age)[..., None]
+    con = parch * (1 - ink[..., None]) + lin((70, 42, 22))[None, None] * ink[..., None]
+    _save(con, f'{out}/constitution_color.jpg')
+    # the desk and the second desk: honey oak, open-grained; the door and casings: dark stained walnut
+    tint(ph('rosewood_veneer1', 'Diffuse'), f'{out}/oak_color.jpg', (128, 82, 44), size=1024, contrast=1.25)
+    tint(ph('sapele_veneer', 'Diffuse'), f'{out}/walnut_color.jpg', (58, 34, 22), size=1024, contrast=1.15)
+    copy(ph('sapele_veneer', 'nor_gl'), f'{out}/wood_normal.jpg', size=1024)
+    # leathers: Saul's oxblood chair, the khaki-olive client chairs, the coral tub chairs
+    tint(ph('leather_red_03', 'Diffuse'), f'{out}/oxblood_color.jpg', (78, 20, 18), size=1024, contrast=1.15)
+    copy(ph('leather_red_03', 'nor_gl'), f'{out}/oxblood_normal.jpg', size=1024)
+    tint(ph('brown_leather', 'Diffuse'), f'{out}/khaki_color.jpg', (124, 112, 76), size=1024, contrast=1.1)
+    copy(ph('brown_leather', 'nor_gl'), f'{out}/khaki_normal.jpg', size=1024)
+    tint(ph('leather_red_02', 'Diffuse'), f'{out}/coral_color.jpg', (190, 84, 70), size=1024, contrast=0.9)
+    copy(ph('leather_red_02', 'nor_gl'), f'{out}/coral_normal.jpg', size=1024)
+    # the sofa: a gold-brown damask (the jacquard's flowers, warmed, their contrast raised)
+    tint(ph('floral_jacquard', 'Diffuse'), f'{out}/damask_color.jpg', (162, 120, 62), size=1024, contrast=1.6)
+    copy(ph('floral_jacquard', 'nor_gl'), f'{out}/damask_normal.jpg', size=1024)
+    # the waiting room: beige ceramic tile; its chairs' burgundy vinyl
+    tint(ph('large_floor_tiles_02', 'Diffuse'), f'{out}/tile_color.jpg', (196, 178, 150), size=1024, contrast=0.8)
+    copy(ph('large_floor_tiles_02', 'nor_gl'), f'{out}/tile_normal.jpg', size=1024)
+    tint(ph('velour_velvet', 'Diffuse'), f'{out}/vinyl_color.jpg', (96, 26, 30), size=512, contrast=0.5)
+    # law books: 64 spines across in two rows, red and oxblood buckram with black labels and gilt bands, some green,
+    # some tan calf (the reporters), a few white binders
+    B = _rect_uv_texture(2048, 1024, lambda im, dr: None, bg=(20, 16, 14)); dr = ImageDraw.Draw(B)
+    pal = [(150, 26, 22), (128, 20, 20), (170, 40, 30), (110, 18, 16), (24, 64, 40), (176, 132, 80), (150, 26, 22), (128, 20, 20), (220, 214, 200), (60, 24, 20)]
+    for r in range(2):
+        for i in range(64):
+            x0 = i * 32; c = pal[rng.integers(len(pal))]; c = tuple(int(np.clip(v * rng.uniform(0.85, 1.12), 0, 255)) for v in c)
+            dr.rectangle([x0 + 1, r * 512, x0 + 30, r * 512 + 511], fill=c)
+            if sum(c) > 500: continue
+            g = (206, 172, 92)
+            for zb in (50, 70, 430, 450): dr.rectangle([x0 + 3, r * 512 + zb, x0 + 28, r * 512 + zb + 6], fill=g)
+            dr.rectangle([x0 + 6, r * 512 + 130, x0 + 25, r * 512 + 200], fill=(18, 16, 14)); dr.rectangle([x0 + 6, r * 512 + 260, x0 + 25, r * 512 + 300], fill=(18, 16, 14))
+            dr.rectangle([x0 + 9, r * 512 + 145, x0 + 22, r * 512 + 150], fill=g); dr.rectangle([x0 + 9, r * 512 + 160, x0 + 22, r * 512 + 164], fill=g)
+    B.save(f'{out}/lawbooks_color.jpg', quality=92)
+    # the file boxes' fronts (white, a hand hole, a label); the diploma (University of American Samoa, in a gilt frame)
+    F = _rect_uv_texture(512, 320, lambda im, dr: None, bg=(232, 230, 222)); dr = ImageDraw.Draw(F)
+    dr.rounded_rectangle([196, 40, 316, 80], 18, fill=(60, 58, 54)); dr.rectangle([120, 140, 392, 230], outline=(140, 136, 130), width=4)
+    for j in range(3): dr.rectangle([140, 160 + j * 22, 360 - 40 * j, 168 + j * 22], fill=(70, 70, 76))
+    F.save(f'{out}/filebox_color.jpg', quality=92)
+    D_ = _rect_uv_texture(1024, 800, lambda im, dr: None, bg=(236, 228, 206)); dr = ImageDraw.Draw(D_)
+    dr.rectangle([60, 60, 963, 739], outline=(150, 120, 60), width=4)
+    dr.text((512, 170), 'University of American Samoa', fill=(30, 26, 22), font=font('timesbd.ttf', 58), anchor='mm')
+    dr.text((512, 270), 'Saul Goodman', fill=(30, 26, 22), font=font('timesi.ttf', 64), anchor='mm')
+    dr.text((512, 350), 'Juris Doctor', fill=(40, 36, 30), font=font('times.ttf', 44), anchor='mm')
+    for j in range(4): dr.rectangle([220 + 30 * (j % 2), 420 + j * 34, 804 - 30 * (j % 2), 428 + j * 34], fill=(110, 100, 88))
+    dr.ellipse([440, 580, 584, 724], fill=(196, 40, 36), outline=(150, 20, 20), width=6)
+    D_.save(f'{out}/diploma.jpg', quality=92)
+    # photographs of Saul with people (soft, warm colour snapshots); the landscape over the sofa (a desert mesa at dusk)
+    for k in range(4):
+        P = np.zeros((512, 640, 3), np.float32); yy, xx = np.mgrid[0:512, 0:640].astype(np.float32)
+        P[:] = lin(tuple(int(v) for v in rng.uniform(60, 160, 3)))[None, None] * (0.8 + 0.4 * _noise(640, 60, 80 + k)[:512, :640])[..., None]
+        for j, cx in enumerate((230, 410)):
+            body = (((xx - cx) / 90) ** 2 + ((yy - 470) / 220) ** 2) < 1; head = (((xx - cx) / 42) ** 2 + ((yy - 200) / 52) ** 2) < 1
+            P[body] = lin((36, 34, 40) if j else tuple(int(v) for v in rng.uniform(40, 200, 3)))
+            P[head] = lin((214, 168, 140)) * (0.9 + 0.2 * j)
+        P = np.asarray(Image.fromarray((lin_to_srgb(P) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(4)))
+        Image.fromarray(P).save(f'{out}/photo{k}.jpg', quality=90)
+    V = 1024; yy, xx = np.mgrid[0:V, 0:V].astype(np.float32) / V
+    land = np.where((yy < 0.55)[..., None], lin((230, 150, 90)) * (1 - 0.6 * yy[..., None]), lin((120, 70, 40)) * (0.8 + 0.3 * _noise(V, 30, 51)[..., None]))
+    mesa = (yy > 0.4 - 0.12 * ((xx > 0.25) & (xx < 0.7))) & (yy < 0.56)
+    land = np.where(mesa[..., None], lin((96, 48, 36)), land)
+    _save(land, f'{out}/landscape.jpg')
+    # the storefront seen from inside: the parking lot in hard Albuquerque sun beyond the glass, the Sandias on the
+    # horizon, out of focus; on the glass, the red lettering read backwards (SAUL GOODMAN / ATTORNEY AT LAW)
+    W_, H_ = 2048, 1024; yy, xx = np.mgrid[0:H_, 0:W_].astype(np.float32); yy /= H_; xx /= W_
+    sky = lin((150, 186, 226)) * (1 - 0.4 * yy[..., None]) + lin((230, 236, 240)) * 0.4 * yy[..., None]
+    mtn = yy > 0.34 - 0.06 * np.sin(xx * 5.3 + 1) - 0.03 * np.sin(xx * 13)
+    view = np.where(mtn[..., None], lin((120, 116, 128)), sky)
+    lot = yy > 0.5
+    view = np.where(lot[..., None], lin((118, 112, 104)) * (0.9 + 0.2 * _noise(W_, 20, 61)[:H_, :W_])[..., None], view)
+    for k in range(9):   # parked cars, bright bodies and dark glass
+        x0 = rng.uniform(0.0, 0.92); cw = rng.uniform(0.07, 0.1)
+        car = (xx > x0) & (xx < x0 + cw) & (yy > 0.56) & (yy < 0.7)
+        view = np.where(car[..., None], lin(tuple(int(v) for v in rng.uniform(60, 240, 3))), view)
+        view = np.where((car & (yy < 0.62) & (xx > x0 + cw * 0.15) & (xx < x0 + cw * 0.85))[..., None], lin((40, 46, 52)), view)
+    view = np.asarray(Image.fromarray((lin_to_srgb(view) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(10)))
+    I = Image.fromarray(view); dr = ImageDraw.Draw(I)
+    txt = Image.new('RGBA', (W_, H_), (0, 0, 0, 0)); dt = ImageDraw.Draw(txt)
+    dt.text((W_ / 2, H_ * 0.47), 'SAUL GOODMAN', fill=(200, 28, 26, 255), font=font('arialbd.ttf', 230), anchor='mm', stroke_width=8, stroke_fill=(250, 250, 246, 255))
+    dt.text((W_ / 2, H_ * 0.68), 'ATTORNEY AT LAW', fill=(250, 250, 246, 255), font=font('arialbd.ttf', 120), anchor='mm', stroke_width=5, stroke_fill=(200, 28, 26, 255))
+    dt.text((W_ / 2, H_ * 0.82), '(505) 165-CALL', fill=(200, 28, 26, 255), font=font('arialbd.ttf', 80), anchor='mm')
+    txt = txt.transpose(Image.FLIP_LEFT_RIGHT)                       # read from inside, backwards
+    I.paste(txt, (0, 0), txt); I.save(f'{out}/storefront_view.jpg', quality=92)
+    # the brass plaque by the door; Francesca's monitor; magazines
+    Pq = _rect_uv_texture(512, 256, lambda im, dr: None, bg=(176, 140, 64)); dr = ImageDraw.Draw(Pq)
+    dr.rectangle([10, 10, 501, 245], outline=(110, 84, 30), width=8)
+    dr.text((256, 100), 'SAUL GOODMAN', fill=(40, 30, 14), font=font('timesbd.ttf', 56), anchor='mm')
+    dr.text((256, 170), '& ASSOCIATES', fill=(40, 30, 14), font=font('timesbd.ttf', 40), anchor='mm')
+    Pq.save(f'{out}/plaque.jpg', quality=92)
+    Mn = _rect_uv_texture(512, 384, lambda im, dr: None, bg=(30, 70, 150)); dr = ImageDraw.Draw(Mn)
+    dr.rectangle([0, 360, 512, 384], fill=(200, 200, 204)); dr.rectangle([40, 60, 300, 300], fill=(236, 236, 240))
+    for j in range(8): dr.rectangle([60, 80 + j * 26, 280 - 20 * (j % 3), 92 + j * 26], fill=(80, 80, 90))
+    Mn.save(f'{out}/monitor.jpg', quality=92)
+    G = _rect_uv_texture(1024, 1024, lambda im, dr: None, bg=(236, 232, 224)); dr = ImageDraw.Draw(G)
+    mp = [(190, 40, 40), (30, 60, 140), (240, 200, 60), (40, 120, 70), (20, 20, 24), (220, 110, 40)]
+    for i in range(4):
+        for j in range(2):
+            x0, y0 = i * 256, j * 512; c = mp[rng.integers(len(mp))]
+            dr.rectangle([x0 + 10, y0 + 90, x0 + 245, y0 + 430], fill=tuple(int(v * 0.6 + 80) for v in c))
+            dr.ellipse([x0 + 60, y0 + 160, x0 + 190, y0 + 330], fill=tuple(int(v) for v in rng.uniform(120, 230, 3)))
+            dr.rectangle([x0 + 10, y0 + 18, x0 + 245, y0 + 78], fill=mp[rng.integers(len(mp))])
+    G.save(f'{out}/magazine_color.jpg', quality=92)
+    # the bronze (Lady Justice, the scales, the lamps' brass) carries no texture; linen for the lamp shades
+    tint(ph('rough_linen', 'Diffuse'), f'{out}/linen_color.jpg', (232, 220, 192), size=512, contrast=0.8)
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

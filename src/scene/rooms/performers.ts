@@ -9,6 +9,7 @@ import { rng } from '../materials';
 export interface Act {
   name: string; loop?: boolean; w?: number; min?: number; max?: number;
   /** played as the first break from the looping act */ first?: boolean;
+  /** with `first`: the room opens on this act already playing, this many seconds in (and on the acts it cues) */ at?: number;
   /** other people's acts that start with this one: { who: act } */ cue?: Record<string, string>;
 }
 export interface Stop { face: [number, number]; dwell: [number, number] }
@@ -49,11 +50,17 @@ function pick(acts: Act[], r: () => number) {
 
 /** Work, then an idle, then work again for a while: never the same idle twice in a row. An act with no weight is
  * only ever played when another person's act cues it. */
-function seated(p: Performer, acts: Act[], r: () => number, cue: (a: Act) => void) {
+function seated(p: Performer, acts: Act[], r: () => number, cue: (a: Act, offset?: number) => void) {
   const work = acts.find(a => a.loop) ?? acts[0], idles = acts.filter(a => a !== work && p.has(a.name) && a.w !== 0);
   let until = -1, onWork = false, last = '', first = idles.find(a => a.first);
   return (t: number) => {
     if (t < until) return;
+    if (until < 0 && first?.at != null) {   // the room opens in the middle of it (a man walking back in)
+      const a = first; first = undefined;
+      p.play(a.name, false, a.at!, 0); last = a.name; onWork = false; cue(a, a.at);
+      until = t + Math.max(1.5, p.duration(a.name) - a.at! - FADE);
+      return;
+    }
     if (!onWork || !idles.length) {
       const first = until < 0;
       p.play(work.name, true, r() * p.duration(work.name), first ? 0 : FADE);
@@ -114,10 +121,15 @@ export interface Cast {
 
 export function perform(people: { body: THREE.Object3D; clips: THREE.AnimationClip[]; meta: PersonMeta }[]): Cast {
   let now = 0;
-  const cue = (a: Act) => {   // the cued people drop what they are doing (crossfading) and play theirs to its end
+  // the cued people drop what they are doing (crossfading) and play theirs to its end, from `offset` seconds in; but
+  // not someone in the middle of a big act of their own (one that cues others: he is up, or out of the room)
+  const cue = (a: Act, offset = 0) => {
     for (const [who, act] of Object.entries(a.cue ?? {})) {
       const k = people.findIndex(x => x.meta.who === who); if (k < 0 || !runs[k].p.has(act)) continue;
-      runs[k].p.play(act, false); runs[k].hold = now + runs[k].p.duration(act) - FADE;
+      const cur = runs[k].p.current, mine = cur && people[k].meta.acts.find(x => x.name === cur.getClip().name);
+      if (cur && mine?.cue && cur.loop === THREE.LoopOnce && cur.time < cur.getClip().duration - FADE) continue;
+      runs[k].p.play(act, false, Math.min(offset, runs[k].p.duration(act) - 0.1), offset ? 0 : FADE);
+      runs[k].hold = now + runs[k].p.duration(act) - offset - FADE;
     }
   };
   const runs = people.map(({ body, clips, meta }, k) => {
