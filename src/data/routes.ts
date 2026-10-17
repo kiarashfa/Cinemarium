@@ -26,7 +26,7 @@ export function path(r: Route) {
   return BASE + (r.view === 'home' ? '' : r.view === 'case' ? `${r.slug}/` : `${r.view}/`);
 }
 
-const SITE = 'Cinemarium';
+import { SITE } from './site';
 const caseHead = (t: Title) => ({ title: `${label(t)} · ${SITE}`, description: t.scene ? `${label(t)}: ${t.scene}, a small living room under glass in a circular video club.` : `${label(t)}: its room is being built, in a circular video club.` });
 
 /** The page's title and description. */

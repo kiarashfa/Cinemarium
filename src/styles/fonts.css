@@ -1,0 +1,6 @@
+/* The site's three typefaces, self-hosted; the browser fetches only the subsets a page uses.
+   Bodoni Moda and Manrope are variable, Bodoni Moda's file with its optical-size axis. */
+@import '@fontsource-variable/bodoni-moda/opsz.css';
+@import '@fontsource-variable/manrope/wght.css';
+@import '@fontsource/cormorant-garamond/latin-300-italic.css';
+@import '@fontsource/cormorant-garamond/latin-400-italic.css';

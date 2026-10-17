@@ -1,8 +1,12 @@
 ---
 // The club: one full-screen 3D page for every address. It carries the panels of all four places (home, the case, the
 // board, About); the body's data-view shows the one in use, so each address reads right before the scene starts.
-import { CLUB, sorted, honourable, label, subtitle, KIND_NAME } from '../data/titles';
+import { CLUB, TOP, sorted, honourable, label, subtitle, KIND_NAME } from '../data/titles';
 import { head, path, titleOf, type Route } from '../data/routes';
+import { COPYRIGHT, SOURCE, SUPPORT } from '../data/site';
+import Head from './Head.astro';
+import PayPal from '../assets/paypal.svg';
+import Coffee from '../assets/buy-me-a-coffee.svg';
 interface Props { route: Route }
 const { route } = Astro.props;
 const { title, description } = head(route);
@@ -10,20 +14,11 @@ const base = import.meta.env.BASE_URL;
 const t = route.view === 'case' ? titleOf(route.slug) : undefined;
 const first = sorted('series').find(x => x.room) ?? sorted('series')[0] ?? CLUB[0];
 const list = sorted('series');
-const BOARD_SLOTS = 10;
 ---
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>{title}</title>
-  <meta name="description" content={description}>
-  <meta name="color-scheme" content="dark">
-  <link rel="icon" href={`${base}favicon.svg`} type="image/svg+xml">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..600;1,6..96,400&family=Cormorant+Garamond:ital,wght@1,300;1,400&family=Manrope:wght@400;500&display=swap" rel="stylesheet">
+  <Head title={title} description={description} />
 </head>
 <body data-view={route.view}>
   <div class="loading" id="loading">Opening the club…</div>
@@ -78,8 +73,8 @@ const BOARD_SLOTS = 10;
       <div class="order" role="group" aria-label="Order"><span>Order</span><button data-sort="rank" aria-pressed="true">Mine</button><button data-sort="year" aria-pressed="false">Year</button><button data-sort="imdb" aria-pressed="false">IMDb</button></div>
     </div>
     <ol class="list" id="list">
-      {Array.from({ length: BOARD_SLOTS }, (_, i) => list[i]).map((x, i) => x
-        ? <li><span class="n">{String(i + 1).padStart(2, '0')}</span><a href={path({ view: 'case', slug: x.slug })}>{x.title} <em>{x.year}</em></a></li>
+      {Array.from({ length: TOP }, (_, i) => list[i]).map((x, i) => x
+        ? <li class={x.room ? undefined : 'unbuilt'}><span class="n">{String(i + 1).padStart(2, '0')}</span><a href={path({ view: 'case', slug: x.slug })}>{x.title} <em>{x.year}</em></a></li>
         : <li class="empty"><span class="n">{String(i + 1).padStart(2, '0')}</span><span>To come</span></li>)}
     </ol>
     <p class="also" id="also">Honourable mentions: {honourable('series').map(x => x.title).join(' · ')}</p>
@@ -90,12 +85,18 @@ const BOARD_SLOTS = 10;
     <h1 class="brand">Cinem<i>arium</i></h1>
     <p>A small museum of favourite series and films. Each title becomes a real room from one early, iconic scene, built to scale and kept under glass, with its people still going about their day.</p>
     <p>Ten series and ten films from a personal list. The first rooms are open; the rest are being built.</p>
+    <p>Cinemarium is free and open source, with no ads, no accounts and nothing to join. If a room made you smile, you can help build the next one.</p>
+    <div class="give">
+      <a href={SUPPORT.paypal} target="_blank" rel="noopener"><PayPal /><span>Donate · PayPal</span></a>
+      <a href={SUPPORT.coffee} target="_blank" rel="noopener"><Coffee /><span>Buy Me a Coffee</span></a>
+    </div>
     <p class="fine">Ratings from <a href="https://www.imdb.com" rel="noopener">IMDb</a> via the <a href="https://www.omdbapi.com" rel="noopener">OMDb API</a>, title details from <a href="https://www.themoviedb.org" rel="noopener">TMDB</a>. This product uses the TMDB API but is not endorsed or certified by TMDB. People built on the Microsoft Rocketbox library (MIT); textures and props from Poly Haven and ambientCG (CC0).</p>
-    <p class="fine">A personal, non-commercial fan project, not affiliated with any studio, network or rights holder. Titles, characters and the scenes they recall belong to their owners.</p>
+    <p class="fine">A personal, non-commercial fan project, not affiliated with any studio, network or rights holder. Titles, characters and the scenes they recall belong to their owners. Visits are counted with Google Analytics.</p>
     <div class="go">
       <a href={base}>Back into the club</a>
-      <a href="https://github.com/kiarashfa/Cinemarium" rel="noopener">The source</a>
+      <a href={SOURCE} rel="noopener">The source</a>
     </div>
+    <p class="fine copy">{COPYRIGHT}</p>
   </section>
 
   <div class="hint" id="hint" data-for="home case board"></div>
@@ -111,11 +112,6 @@ const BOARD_SLOTS = 10;
     });
   </script>
   <style is:global>
-    :root{
-      --display:'Bodoni Moda',ui-serif,Didot,Georgia,serif; --italic:'Cormorant Garamond',ui-serif,Georgia,serif; --sans:'Manrope',ui-sans-serif,system-ui,sans-serif;
-      --bg:#070707; --fg:#EFE8DC; --dim:rgba(239,232,220,.56); --hair:rgba(239,232,220,.16); --brass:#D2AE6C; --veil:4,6,10; --chip:rgba(0,0,0,.28); --on:#111;
-      --gut:clamp(16px,3vw,44px); color-scheme:dark;
-    }
     *{box-sizing:border-box}
     html,body{height:100%;margin:0;background:var(--bg);color:var(--fg);overflow:hidden;font-family:var(--sans)}
     canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
@@ -156,13 +152,14 @@ const BOARD_SLOTS = 10;
     .order button{background:none;border:0;color:var(--dim);font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer;padding:2px 0;border-bottom:1px solid transparent}
     .order button[aria-pressed=true]{color:var(--fg);border-bottom-color:var(--brass)}
 
-    .deck{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(30px + env(safe-area-inset-bottom,0px));z-index:3;display:flex;flex-direction:column;gap:12px;align-items:center;max-width:calc(100vw - 32px)}
+    .deck{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(30px + env(safe-area-inset-bottom,0px));z-index:3;display:flex;flex-direction:column;gap:12px;align-items:center;width:max-content;max-width:calc(100vw - 32px)}
+    .deck .row{flex-wrap:nowrap}
     .pills{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;max-width:min(720px,calc(100vw - 120px))}
     .pills button{flex:none;border:1px solid var(--hair);background:var(--chip);color:var(--fg);border-radius:22px;padding:10px 16px;font:12px var(--sans);letter-spacing:.06em;cursor:pointer;backdrop-filter:blur(6px)}
     .pills button.on{background:var(--fg);color:var(--on);border-color:var(--fg)}
     .step{flex:none;width:38px;height:38px;border-radius:50%;border:1px solid var(--hair);background:var(--chip);color:var(--fg);font:20px/1 var(--display);cursor:pointer;backdrop-filter:blur(6px)}
     .zoom{position:fixed;right:var(--gut);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:3;border:1px solid var(--hair);background:var(--chip);color:var(--fg);border-radius:22px;padding:10px 18px;font:11px var(--sans);letter-spacing:.18em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(6px)}
-    .hint{position:fixed;right:var(--gut);bottom:calc(40px + env(safe-area-inset-bottom,0px));z-index:3;font-family:var(--italic);font-style:italic;font-size:16px;color:var(--dim)}
+    .hint{position:fixed;right:var(--gut);bottom:calc(130px + env(safe-area-inset-bottom,0px));z-index:3;font-family:var(--italic);font-style:italic;font-size:16px;color:var(--dim)}
 
     .list{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:2px;max-height:46vh;overflow-y:auto;scrollbar-width:thin}
     .list li{display:flex;gap:16px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--hair);font-size:14px}
@@ -175,6 +172,11 @@ const BOARD_SLOTS = 10;
     .about p{color:var(--dim);line-height:1.6;font-size:14px;margin:12px 0 0}
     .about p.fine{font-size:12px;line-height:1.55}
     .about p a{color:var(--fg);text-decoration-color:var(--hair)}
+    .give{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .give a{display:inline-flex;align-items:center;gap:9px;border:1px solid var(--brass);background:rgba(210,174,108,.08);color:var(--fg);border-radius:22px;padding:9px 16px;font:11px var(--sans);letter-spacing:.16em;text-transform:uppercase;text-decoration:none;backdrop-filter:blur(6px);transition:background .25s,color .25s}
+    .give a:hover{background:var(--brass);color:var(--on)}
+    .give svg{width:14px;height:14px;flex:none;fill:currentColor}
+    .about p.copy{margin-top:22px;color:var(--hair)}
 
     .fade{transition:opacity .45s,transform .55s,visibility 0s}
     .fade.out{opacity:0 !important}
@@ -192,6 +194,8 @@ const BOARD_SLOTS = 10;
       .panel h1,.cap h1{font-size:36px}
       .sc{font-size:18px}
       .list{max-height:34vh}
+      .about{max-height:calc(100dvh - 140px - env(safe-area-inset-top,0px));overflow-y:auto;scrollbar-width:none;mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent)}
+      .give{gap:8px} .give a{padding:9px 12px;letter-spacing:.1em}
       .hint{display:none}
       .zoom{bottom:auto;top:calc(104px + env(safe-area-inset-top,0px))}
       .deck{bottom:calc(20px + env(safe-area-inset-bottom,0px));width:calc(100vw - 32px)}

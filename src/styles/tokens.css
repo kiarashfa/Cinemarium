@@ -1,0 +1,6 @@
+/* The site's type and colours (--bg is also BG in src/data/site.ts: the browser's theme colour). */
+:root{
+  --display:'Bodoni Moda Variable',ui-serif,Didot,Georgia,serif; --italic:'Cormorant Garamond',ui-serif,Georgia,serif; --sans:'Manrope Variable',ui-sans-serif,system-ui,sans-serif;
+  --bg:#070707; --fg:#EFE8DC; --dim:rgba(239,232,220,.56); --hair:rgba(239,232,220,.16); --brass:#D2AE6C; --veil:4,6,10; --chip:rgba(0,0,0,.28); --on:#111;
+  --gut:clamp(16px,3vw,44px); color-scheme:dark;
+}

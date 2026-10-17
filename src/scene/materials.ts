@@ -43,7 +43,7 @@ export function plateMaterial(text: string) {
   const map = canvasTexture(1024, 144, (g, w, h) => {
     const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, '#e8cb92'); gr.addColorStop(1, '#a7834a');
     g.fillStyle = gr; g.fillRect(0, 0, w, h); noise(g, w, h, 10, 3);
-    g.fillStyle = '#2b1d0d'; g.font = '56px "Bodoni Moda", Didot, Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#2b1d0d'; g.font = '56px "Bodoni Moda Variable", Didot, Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(text.toUpperCase().split('').join(' '), w / 2, h / 2 + 3);
   }, { repeat: [1, 1] });
   map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;

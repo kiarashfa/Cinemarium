@@ -9,7 +9,7 @@
 - **The case.** One room at a time on a lacquer plinth. Drag to walk around it and lean in close; switch between series and films, order them by personal rank, by year or by IMDb rating, and watch the room sink into the plinth as the next one rises. Every title has its own address.
 - **Rooms that are alive.** Path-traced light baked from real fixtures, real materials, and motion-captured people who work, pause, talk and do their rounds. The terminals run, the clock on the wall keeps your time, rain runs down the windows while lightning flickers in, and down in the hatch the counter runs down from 108 minutes until someone enters the numbers.
 - **Works on desktop and on your phone.** Real-time WebGPU (WebGL 2 where WebGPU is not available). It adapts its quality to the graphics it runs on, from a gaming laptop to integrated graphics and phones, and loads each room only when you visit it.
-- **Completely static.** No backend, no accounts, no trackers.
+- **Free and open.** No backend, no accounts, no ads, nothing to join.
 
 ## Data & credits
 

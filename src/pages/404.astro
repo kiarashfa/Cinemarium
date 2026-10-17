@@ -1,0 +1,43 @@
+---
+// The 404. GitHub Pages serves /404.html for any address it cannot resolve (with a real 404 status), so it stands on
+// its own: plain HTML, no scene to light, every link absolute through the base.
+import Head from '../layouts/Head.astro';
+import { SITE } from '../data/site';
+const base = import.meta.env.BASE_URL;
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <Head title={`Not found · ${SITE}`} description="No case stands at this address." noindex />
+</head>
+<body>
+  <header><a class="mk" href={base}>Cinem<i>arium</i></a></header>
+  <main>
+    <div class="k">404</div>
+    <h1>No case here</h1>
+    <p class="sc">Nothing stands at this address. The club is just through the door.</p>
+    <nav class="go" aria-label="Ways back">
+      <a href={base}>Into the club</a>
+      <a href={`${base}board/`}>The Board</a>
+      <a href={`${base}about/`}>About</a>
+    </nav>
+  </main>
+  <style is:global>
+    *{box-sizing:border-box}
+    html,body{min-height:100%;margin:0}
+    body{background:radial-gradient(ellipse 70% 60% at 72% 40%,rgba(210,174,108,.07),transparent 70%),var(--bg);color:var(--fg);font-family:var(--sans);min-height:100vh;display:flex;flex-direction:column}
+    a{color:inherit}
+    a:focus-visible{outline:1px solid var(--brass);outline-offset:3px}
+    header{padding:calc(24px + env(safe-area-inset-top,0px)) var(--gut) 0}
+    .mk{font-family:var(--display);font-size:22px;text-decoration:none}
+    .mk i{font-family:var(--italic);font-weight:300}
+    main{flex:1;display:flex;flex-direction:column;justify-content:center;padding:48px var(--gut) 15vh;max-width:min(560px,100vw)}
+    .k{font-size:10.5px;letter-spacing:.3em;text-transform:uppercase;color:var(--brass)}
+    h1{font-family:var(--display);font-weight:400;font-size:clamp(40px,4.4vw,64px);line-height:1.02;margin:10px 0 8px}
+    .sc{font-family:var(--italic);font-style:italic;font-size:20px;color:var(--dim);margin:0}
+    .go{display:flex;gap:26px;flex-wrap:wrap;margin-top:26px}
+    .go a{text-decoration:none;font-size:12px;letter-spacing:.2em;text-transform:uppercase;border-bottom:1px solid var(--hair);padding-bottom:3px}
+    .go a:first-child{border-bottom-color:var(--brass)}
+  </style>
+</body>
+</html>

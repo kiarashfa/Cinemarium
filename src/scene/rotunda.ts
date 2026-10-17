@@ -118,7 +118,7 @@ function streetTexture() {
 function exitTexture() {
   const t = canvasTexture(512, 144, (c, w, h) => {
     c.fillStyle = '#050403'; c.fillRect(0, 0, w, h);
-    c.fillStyle = '#fff1d6'; c.font = '64px "Bodoni Moda", Didot, Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillStyle = '#fff1d6'; c.font = '64px "Bodoni Moda Variable", Didot, Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillText('E X I T', w / 2, h / 2 + 4);
   }, { repeat: [1, 1] });
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t;

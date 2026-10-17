@@ -53,6 +53,14 @@ Released into the public domain under [CC0 1.0](https://creativecommons.org/publ
   [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Constitution_of_the_United_States,_page_1.jpg); in the
   public domain. It papers the bay of Saul Goodman's office.
 
+## Typefaces and icons
+
+- [Bodoni Moda](https://github.com/indestructible-type/Bodoni), [Cormorant Garamond](https://github.com/CatharsisFonts/Cormorant)
+  and [Manrope](https://github.com/sharanda/manrope), self-hosted through [Fontsource](https://fontsource.org): each
+  under the [SIL Open Font License 1.1](https://openfontlicense.org).
+- The PayPal and Buy Me a Coffee marks on the About panel come from [Simple Icons](https://simpleicons.org) (CC0); the
+  brands are their owners' trademarks.
+
 ## Title data
 
 - IMDb ratings and vote counts come from the [OMDb API](https://www.omdbapi.com), whose data is licensed
@@ -61,5 +69,6 @@ Released into the public domain under [CC0 1.0](https://creativecommons.org/publ
 
 ## Libraries
 
-[three.js](https://threejs.org) (MIT) and [Astro](https://astro.build) (MIT). Rooms are assembled and lit in
+[three.js](https://threejs.org) (MIT) and [Astro](https://astro.build) (MIT); the link-preview card and icons are drawn
+with [Satori](https://github.com/vercel/satori) (MPL 2.0) and [resvg](https://github.com/linebender/resvg) (MPL 2.0). Rooms are assembled and lit in
 [Blender](https://www.blender.org) (GPL; the files it outputs are not covered by its licence).

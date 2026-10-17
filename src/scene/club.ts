@@ -8,7 +8,7 @@ import { buildRotunda, BOARD, DOOR, RADIUS } from './rotunda';
 import { buildCase } from './case';
 import { CASE, STAGE_LIFT } from './module';
 import { loadRoom, mount, release, type Room } from './rooms';
-import { sorted, honourable, label, subtitle, KIND_NAME, type Kind, type Sort, type Title } from '../data/titles';
+import { TOP, sorted, honourable, label, subtitle, KIND_NAME, type Kind, type Sort, type Title } from '../data/titles';
 import { parse, path, head, titleOf, type Route } from '../data/routes';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -32,7 +32,10 @@ function poseOf(s: Shot, out?: Pose): Pose {
 }
 
 export async function startClub(canvas: HTMLCanvasElement) {
+  // the brass plate and the EXIT sign are drawn in the display face: have it before they are (at most 1.5 s)
+  const face = Promise.race([document.fonts.load('64px "Bodoni Moda Variable"'), new Promise(r => setTimeout(r, 1500))]).catch(() => {});
   const stage = await createStage(canvas, { fov: 46, far: 80 });
+  await face;
   const { renderer, scene, camera } = stage;
   // the room first: its reflections are captured from the case's place before the case stands there
   const club = buildRotunda(scene, renderer, { centre: new THREE.Vector3(0, 1.25, 0), height: 1.6, width: CASE.w + 0.14 },
@@ -88,7 +91,7 @@ export async function startClub(canvas: HTMLCanvasElement) {
     const list = listOf(), t = caseTitle();
     $('pills').innerHTML = list.map(x => `<button data-slug="${x.slug}" class="${x === wanted ? 'on' : ''}">${x.title}</button>`).join('');
     $('bk').textContent = KIND_NAME[kind];
-    $('list').innerHTML = Array.from({ length: 10 }, (_, i) => list[i]).map((x, i) => {
+    $('list').innerHTML = Array.from({ length: TOP },(_, i) => list[i]).map((x, i) => {
       const n = `<span class="n">${String(i + 1).padStart(2, '0')}</span>`;
       return x ? `<li class="${x.room ? '' : 'unbuilt'}">${n}<a href="${path({ view: 'case', slug: x.slug })}">${x.title} <em>${x.year}</em></a></li>` : `<li class="empty">${n}<span>To come</span></li>`;
     }).join('');

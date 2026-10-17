@@ -17,7 +17,7 @@ export function mdrScreen(q: number) {
     glow.addColorStop(0, 'rgba(60,140,170,0.16)'); glow.addColorStop(1, 'rgba(0,0,0,0.35)'); g.fillStyle = glow; g.fillRect(0, 0, W, H);
     // header: the file and how far along it is
     g.fillStyle = '#9fe0f5'; g.fillRect(16, 14, W - 32, 34);
-    g.fillStyle = '#04121a'; g.font = '600 20px "Manrope", ui-sans-serif, sans-serif'; g.textBaseline = 'middle';
+    g.fillStyle = '#04121a'; g.font = '600 20px "Manrope Variable", ui-sans-serif, sans-serif'; g.textBaseline = 'middle';
     g.fillText(FILES[q % 4], 30, 32);
     const pct = Math.min(99, Math.floor((progress + t * 0.0004) * 100)); g.textAlign = 'right'; g.fillText(`${pct}% Complete`, W - 30, 32); g.textAlign = 'left';
     g.strokeStyle = 'rgba(159,224,245,.55)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(16, 60); g.lineTo(W - 16, 60); g.stroke();
