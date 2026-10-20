@@ -319,6 +319,7 @@ def bake_ready(objs):
     for ob in objs:
         if ob.type != 'MESH': continue
         if ob.data.users > 1: ob.data = ob.data.copy()
+        if ob.data.shape_keys: ob.shape_key_clear()   # a shape key keeps its own copy of the vertices: moving the mesh would leave them behind
         apply_modifiers(ob)
         mw = ob.matrix_world.copy(); ob.parent = None; ob.matrix_world = mw
         ob.data.transform(mw); ob.matrix_world = Matrix.Identity(4)

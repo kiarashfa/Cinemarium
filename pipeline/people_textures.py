@@ -1013,5 +1013,148 @@ def breaking_bad():
     for k, v in made.items(): print(k, [os.path.basename(p) for p in v])
 
 
+def _bow_tie(B, neck, colour=(14, 14, 16), w=0.046, h=0.02, at=0.03):
+    """A black bow tie under the collar: two wings widening out from a narrow knot, `at` below the neck joint."""
+    zc = neck - at; ax = np.abs(np.nan_to_num(B.x)); dz = np.abs(np.nan_to_num(B.z) - zc)
+    wing = (ax > 0.008) & (ax < w) & (dz < h * (0.32 + 0.68 * smooth(0.008, w, ax)) / 2)
+    knot = (ax <= 0.009) & (dz < h * 0.32)
+    return B.where((wing | knot) & (B.y < -0.03))
+
+
+def _shirt_front(B, neck, top, bottom, half_top, half_bottom):
+    """The white of a shirt between a jacket's (or waistcoat's) lapels: a V from `half_top` either side of the middle
+    at z = top down to `half_bottom` at z = bottom (heights as offsets below the neck joint)."""
+    z = np.nan_to_num(B.z); t = np.clip(((neck - z) - top) / (bottom - top), 0, 1)
+    half = half_top + (half_bottom - half_top) * t
+    return B.where((np.abs(np.nan_to_num(B.x)) < half) & (B.y < -0.02) & (neck - z > top - 0.02) & (neck - z < bottom))
+
+
+def _studs(b, B, neck, zs, colour=(30, 28, 26), r=0.0045):
+    """Small dark shirt studs down the middle of the front."""
+    for dz in zs:
+        m = B.where((np.hypot(np.nan_to_num(B.x), np.nan_to_num(B.z) - (neck - dz)) < r) & (B.y < -0.03))
+        b = recolour(b, soft(m.astype(np.float32), 0.5), colour, contrast=0.3)
+    return b
+
+
+def the_godfather():
+    """Don Corleone's study on the wedding day, after Anna Hill Johnstone's costumes: the Don in a black single-breasted
+    dinner jacket with satin lapels over a black waistcoat cut in a low V, the white stiff front with its studs, a wing
+    collar and a black bow tie, his hair iron grey and slicked back, a thin moustache (the red rosebud is modelled);
+    Bonasera the undertaker in a black suit, a white shirt and black tie, bald with a dark fringe and a heavy black
+    moustache; Hagen in a black dinner jacket over a white front, his thin light hair; Sonny the groomsman in a black
+    double-breasted dinner jacket, his dark curls (their white carnations are modelled)."""
+    rng = np.random.default_rng(1945)
+    made = {}
+    BLACK = (16, 16, 18); WHITE = (232, 228, 218)
+
+    def suit(av, tex, who, front, waistcoat=None, keep_shirt=False, legs_black=True):
+        """A black suit painted over an avatar's clothes: every bit of cloth above the hem black but the shirt front
+        (`front`: the white V), a waistcoat's narrower V (`waistcoat`) black inside it; the legs and shoes black."""
+        b = load(av, tex); B = Body(tex); H, S, V = hsv(b)
+        J = B.J; neck, pel = J['Bip01 Neck'][2], J['Bip01 Pelvis'][2]
+        hands = B.part('Hand', 'Finger') & (S > 0.28) & (S < 0.55) & (H > 4) & (H < 45) & (V > 0.25)   # skin, not a red cuff or tweed
+        cloth = B.where(~hands & B.part('Spine', 'Clavicle', 'Neck', 'UpperArm', 'Forearm', 'Pelvis', 'Hand') & (B.z > pel - 0.12)
+                        & ~(B.part('Neck') & (B.z > neck + 0.035)))
+        shirt = cloth & _shirt_front(B, neck, *front)
+        collar = cloth & B.where(B.part('Neck', 'Spine2', 'Clavicle') & (B.z > neck - 0.035) & (B.z < neck + 0.03) & (np.abs(B.x) < 0.07) & (B.y < 0.02))
+        white = shirt | collar
+        jacket = cloth & ~white
+        b = recolour(b, B.grow(jacket.astype(np.float32), 24), BLACK, contrast=0.55, flatten=6)
+        b = leftover_black(b, BLACK, keep=B.grow(B.part('Hand', 'Finger').astype(np.float32), 2))
+        H, S, V = hsv(b)                                                         # a coloured shirt left over (a collar, a cuff)
+        red = B.where(~hands & ~B.part('Head') & (S > 0.3) & ((H < 25) | (H > 330)) & (V > 0.12) & ~B.part('Hand', 'Finger'))
+        b = recolour(b, B.grow(red.astype(np.float32), 3), BLACK, contrast=0.5)
+        H, S, V = hsv(b)                                                         # and in the padding round the islands (seams)
+        b = recolour(b, ((S > 0.5) & ((H < 8) | (H > 335)) & ~B.ok).astype(np.float32), BLACK, contrast=0.3)
+        b = recolour(b, soft(white.astype(np.float32), 0.6), WHITE, contrast=0.35, flatten=3)
+        if waistcoat is not None:
+            wc = shirt & ~_shirt_front(B, neck, *waistcoat)
+            b = recolour(b, soft(wc.astype(np.float32), 0.6), (12, 12, 14), contrast=0.3)
+        b = recolour(b, soft(_bow_tie(B, neck).astype(np.float32), 0.4), (10, 10, 12), contrast=0.3)
+        H, S, V = hsv(b)
+        legs = B.where(B.part('Thigh', 'Calf', 'Pelvis', 'Spine') & (B.z < pel + 0.02) & (B.z > 0.09) & ~hands & ~white)
+        if legs_black: b = recolour(b, B.grow(legs.astype(np.float32), 16), (18, 18, 20), contrast=0.6, flatten=2.5)
+        feet = B.where(B.part('Foot', 'Toe') | (B.part('Calf') & (B.z <= 0.09)))
+        b = recolour(b, B.grow(feet.astype(np.float32), 6), (12, 12, 13), contrast=0.7, flatten=1.0)
+        return b, B, neck, pel, jacket, legs
+
+    # Vito (Male_Adult_03): iron-grey hair slicked back, a thin dark moustache, a sallow cast to the skin; the tweed
+    # jacket black, the red shirt's V a white stiff front between the black waistcoat's lapels, two studs, the bow tie
+    hair_c = (46, 43, 40)
+    h = load('Male_Adult_03', 'm004_head_color.tga'); Hd = Body('m004_head_color.tga'); H, S, V = hsv(h)
+    brow, line, ear = _hairline(Hd, front=0.055)
+    face = Hd.where((Hd.y < -0.05) & (Hd.z < brow + 0.03) & (np.abs(Hd.x) < 0.06))
+    hm = soft(Hd.grow(Hd.where((Hd.z > line - 0.006) & ~ear & ~face).astype(np.float32), 3), 1.4)
+    h = recolour(h, hm, hair_c, contrast=1.0)
+    temples = Hd.where((np.abs(Hd.x) > 0.055) & (Hd.z < brow + 0.05) & (Hd.z > brow - 0.04)) & (hm > 0.5)
+    h = recolour(h, soft(temples.astype(np.float32), 4) * 0.45, (118, 114, 108), contrast=1.0)   # grey at the temples
+    mo = _moustache(Hd, width=0.036, low=0.001, high=0.0055)                                  # a thin line, out to the mouth's corners
+    h = _hair_on(h, mo, rng, (50, 44, 40), 0.8); h = _hair_on(h, mo, rng, (96, 90, 84), 0.25)
+    skin = Hd.where(~(hm > 0.5) & (Hd.z < brow + 0.06)).astype(np.float32)
+    h = skin_tone(h, soft(skin, 2) * (1 - mo), (0.96, 0.9, 0.8))
+    made['vito'] = [save(h, 'vito', 'm004_head_color.tga')]
+    o = load('Male_Adult_03', 'm004_opacity_color.tga'); al = load_alpha('Male_Adult_03', 'm004_opacity_color.tga')
+    made['vito'].append(save(recolour(o, np.ones(o.shape[:2], np.float32), hair_c, contrast=1.1), 'vito', 'm004_opacity_color.tga', al))
+    b, B, neck, pel, jacket, legs = suit('Male_Adult_03', 'm004_body_color.tga', 'vito', (0.03, 0.42, 0.085, 0.006), waistcoat=(0.03, 0.4, 0.06, 0.0))
+    b = _studs(b, B, neck, (0.1, 0.17))
+    made['vito'].append(save(b, 'vito', 'm004_body_color.tga'))
+    made['vito'].append(_flat_normals('Male_Adult_03', 'm004_body_normal.tga', 'vito', B.grow(jacket.astype(np.float32), 3) * 0.75))
+
+    # Bonasera (Business_Male_07): the fringe dark, the brows heavy, a full black moustache, olive skin; the white shirt
+    # kept at the collar and in the jacket's V with the tie black; the jacket and trousers black
+    h = load('Business_Male_07', 'm018_head_color.tga'); Hd = Body('m018_head_color.tga'); H, S, V = hsv(h)
+    brow, line, ear = _hairline(Hd, front=0.03)
+    ax = np.abs(Hd.x)
+    fringe = Hd.where(((ax > 0.058) | (Hd.y > 0.03)) & (Hd.z > brow - 0.08) & (Hd.z < brow + 0.02 + 0.02 * smooth(0.0, 0.06, Hd.y)) & ~ear & ~(Hd.y < -0.05))
+    fm = soft(fringe.astype(np.float32), 8) * smooth(brow - 0.085, brow - 0.06, Hd.z)
+    h = _hair_on(h, fm, rng, (44, 38, 34), 0.6); h = _hair_on(h, fm, rng, (70, 64, 60), 0.25)
+    arch = brow + 0.003 + 0.004 * np.cos(np.clip((ax - 0.028) / 0.022, -1.5, 1.5))
+    brows = Hd.where((Hd.y < -0.06) & (np.abs(Hd.z - arch) < 0.0045) & (ax > 0.009) & (ax < 0.046))
+    h = _hair_on(h, soft(brows.astype(np.float32), 1.2), rng, (30, 26, 24), 0.7)
+    mo = blur(_moustache(Hd, width=0.035, low=-0.004, high=0.013), 1.5)
+    h = recolour(h, mo * 0.7, (34, 30, 27), contrast=0.7); h = _hair_on(h, mo, rng, (24, 20, 18), 0.85)
+    h = _hair_on(h, _beard_mask(Hd, moustache=False, cheeks=0.35), rng, (60, 50, 44), 0.18)
+    skin = Hd.where(Hd.z < brow + 0.2).astype(np.float32)
+    h = skin_tone(h, soft(skin, 2) * (1 - mo), (0.92, 0.85, 0.76))
+    made['bonasera'] = [save(h, 'bonasera', 'm018_head_color.tga')]
+    b, B, neck, pel, jacket, legs = suit('Business_Male_07', 'm018_body_color.tga', 'bonasera', (0.03, 0.3, 0.07, 0.004))
+    tie = B.where((np.abs(B.x) < 0.024 - 0.012 * np.clip((neck - B.z - 0.03) / 0.25, 0, 1) + 0.012 * np.clip((neck - B.z - 0.06) / 0.2, 0, 1))
+                  & (neck - B.z > 0.025) & (neck - B.z < 0.3) & (B.y < -0.03))
+    b = recolour(b, soft(tie.astype(np.float32), 0.6), (12, 12, 14), contrast=0.4)
+    made['bonasera'].append(save(b, 'bonasera', 'm018_body_color.tga'))
+    made['bonasera'].append(_flat_normals('Business_Male_07', 'm018_body_normal.tga', 'bonasera', np.maximum(B.grow(jacket.astype(np.float32), 3) * 0.8, B.grow(legs.astype(np.float32), 3) * 0.6)))
+
+    # Hagen (Male_Adult_13): his hair a lighter brown, thinning at the crown; the argyle sweater a black dinner jacket
+    # with a white front and studs, the jeans black, the brown shoes black
+    h = load('Male_Adult_13', 'm010_head_color.tga'); Hd = Body('m010_head_color.tga'); H, S, V = hsv(h)
+    brow, line, ear = _hairline(Hd, front=0.06)
+    face = Hd.where((Hd.y < -0.05) & (Hd.z < brow + 0.035) & (np.abs(Hd.x) < 0.06))
+    hm = soft(Hd.grow(Hd.where((Hd.z > line - 0.006) & ~ear & ~face & (V < 0.5)).astype(np.float32), 3), 1.2)
+    h = recolour(h, hm, (92, 74, 56), contrast=1.15)
+    made['hagen'] = [save(h, 'hagen', 'm010_head_color.tga')]
+    b, B, neck, pel, jacket, legs = suit('Male_Adult_13', 'm010_body_color.tga', 'hagen', (0.03, 0.38, 0.07, 0.008))
+    b = _studs(b, B, neck, (0.1, 0.17))
+    made['hagen'].append(save(b, 'hagen', 'm010_body_color.tga'))
+    made['hagen'].append(_flat_normals('Male_Adult_13', 'm010_body_normal.tga', 'hagen', np.maximum(B.grow(jacket.astype(np.float32), 3) * 0.85, B.grow(legs.astype(np.float32), 3) * 0.6)))
+
+    # Sonny (Male_Adult_06): dark curls, olive skin; the red henley a black double-breasted dinner jacket (its V short,
+    # closing high on the chest), the jeans black, the grey sneakers black shoes
+    hair_c = (36, 27, 22)
+    h = load('Male_Adult_06', 'm011_head_color.tga'); Hd = Body('m011_head_color.tga'); H, S, V = hsv(h)
+    brow, line, ear = _hairline(Hd, front=0.078, nape=-0.14)
+    face = Hd.where((Hd.y < -0.05) & (Hd.z < brow + 0.03) & (np.abs(Hd.x) < 0.06))
+    hm = soft(Hd.grow(Hd.where((Hd.z > line - 0.01) & ~ear & ~face).astype(np.float32), 3), 1.2)
+    h = recolour(h, hm, hair_c, contrast=1.25)
+    h = skin_tone(h, soft(Hd.where(Hd.ok).astype(np.float32), 1) * (1 - hm), (0.95, 0.88, 0.8))
+    made['sonny'] = [save(h, 'sonny', 'm011_head_color.tga')]
+    o = load('Male_Adult_06', 'm011_opacity_color.tga'); al = load_alpha('Male_Adult_06', 'm011_opacity_color.tga')
+    made['sonny'].append(save(recolour(o, np.ones(o.shape[:2], np.float32), hair_c, contrast=1.3), 'sonny', 'm011_opacity_color.tga', al))
+    b, B, neck, pel, jacket, legs = suit('Male_Adult_06', 'm011_body_color.tga', 'sonny', (0.03, 0.2, 0.06, 0.004))
+    made['sonny'].append(save(b, 'sonny', 'm011_body_color.tga'))
+    made['sonny'].append(_flat_normals('Male_Adult_06', 'm011_body_normal.tga', 'sonny', np.maximum(B.grow(jacket.astype(np.float32), 3) * 0.85, B.grow(legs.astype(np.float32), 3) * 0.6)))
+    for k, v in made.items(): print(k, [os.path.basename(p) for p in v])
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()

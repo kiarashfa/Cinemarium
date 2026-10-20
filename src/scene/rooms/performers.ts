@@ -42,6 +42,9 @@ class Performer {
   weight(name: string) { return this.actions.get(name)!.getEffectiveWeight(); }
 }
 
+/** Any act but the last one played (unless it is the only one). */
+const other = (acts: Act[], last: string) => { const rest = acts.filter(a => a.name !== last); return rest.length ? rest : acts; };
+
 function pick(acts: Act[], r: () => number) {
   const total = acts.reduce((s, a) => s + (a.w ?? 1), 0); let x = r() * total;
   for (const a of acts) { x -= a.w ?? 1; if (x <= 0) return a; }
@@ -67,7 +70,7 @@ function seated(p: Performer, acts: Act[], r: () => number, cue: (a: Act, offset
       const lo = work.min ?? 15, hi = work.max ?? 40;   // the first stretch is short, so the room comes alive soon
       onWork = true; until = t + (first ? lo * 0.3 + r() * (hi - lo) * 0.35 : lo + r() * (hi - lo));
     } else {
-      const a = first ?? pick(idles.filter(i => i.name !== last), r); first = undefined;
+      const a = first ?? pick(other(idles, last), r); first = undefined;
       p.play(a.name, false); last = a.name; onWork = false; cue(a);
       until = t + Math.max(1.5, p.duration(a.name) - FADE);
     }
@@ -105,7 +108,7 @@ function rounds(p: Performer, body: THREE.Object3D, meta: PersonMeta, r: () => n
       const cur = p.current!, left = cur.getClip().duration - cur.time;
       if (t >= until) { i = (i + 1) % route.length; state = 'walk'; p.play('walk', true, 0); face = null; }
       else if (left < FADE && cur.loop === THREE.LoopOnce) {                      // a short idle ran out: another one
-        const a = pick(idles.filter(x => x.name !== last), r); p.play(a.name, false); last = a.name;
+        const a = pick(other(idles, last), r); p.play(a.name, false); last = a.name;
       }
     }
     body.position.set(pos.x, 0, pos.y); body.rotation.y = heading;

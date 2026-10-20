@@ -21,6 +21,7 @@ export const ROOMS: Record<string, RoomLoader> = {
   'seinfeld': baked('seinfeld'),
   'the-sopranos': baked('the-sopranos'),
   'breaking-bad': baked('breaking-bad'),
+  'the-godfather': baked('the-godfather'),
 };
 
 const cache = new Map<string, Promise<Room>>();

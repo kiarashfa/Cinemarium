@@ -41,17 +41,30 @@ Released into the public domain under [CC0 1.0](https://creativecommons.org/publ
   *white_plaster_02*, *ceiling_interior*, *decrepit_wallpaper*, *damaged_plaster*, *leather_red_03*, *old_wood_floor*,
   *floral_jacquard*, *concrete_wall_008*, *smooth_concrete_floor*, *brushed_concrete*, *worn_tile_floor*,
   *leather_red_02*, *wood_table_worn*, *laminate_floor_02*, *cotton_jersey*, *painted_plaster_wall*, *sapele_veneer*,
-  *rosewood_veneer1*, *velour_velvet*, *brown_leather*, *waffle_pique_cotton*, *large_floor_tiles_02*; models
-  *wall_clock*, *office_notepads*, *stationery_supplies*, *vintage_stapler*, *binder_notebook*, *fire_alarm*,
-  *mantel_clock_01*, *ornate_mirror_01*, *desk_lamp_arm_01*, *wooden_cutting_board*, *bananas*, *food_apple_01*,
-  *potted_plant_02*.
+  *rosewood_veneer1*, *velour_velvet*, *brown_leather*, *waffle_pique_cotton*, *large_floor_tiles_02*, *wooden_floor_02*,
+  *lacquered_cherry_wood*, *leather_white*; models *wall_clock*, *office_notepads*, *stationery_supplies*,
+  *vintage_stapler*, *binder_notebook*, *fire_alarm*, *mantel_clock_01*, *ornate_mirror_01*, *desk_lamp_arm_01*,
+  *wooden_cutting_board*, *bananas*, *food_apple_01*, *potted_plant_02*, *fancy_picture_frame_01*, *vintage_cabinet_01*,
+  *standing_picture_frame_01*, *standing_picture_frame_02*, *antique_ceramic_vase_01*, *ClassicConsole_01*,
+  *pachira_aquatica_01*, *horse_statue_01*.
 - [ambientCG](https://ambientcg.com): *Carpet012*, *Carpet013*.
+
+## The cat: CC BY 4.0
+
+- The cat in Don Corleone's lap is ["Cat"](https://sketchfab.com/3d-models/cat-69db9de4d5c446a895cec3c2a048f7a8) by
+  [mustafasahinfb](https://sketchfab.com/mustafasahinfb), a photogrammetry scan of a real cat, licensed
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and obtained through the
+  [Objaverse](https://huggingface.co/datasets/allenai/objaverse) mirror. Changes: cut from the cushion it was scanned
+  on and closed underneath, its colours made a little greyer, rigged and animated.
 
 ## Public domain
 
 - The Constitution of the United States (1787), page one: the U.S. National Archives' scan, via
   [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Constitution_of_the_United_States,_page_1.jpg); in the
   public domain. It papers the bay of Saul Goodman's office.
+- The *Vase Carpet* (Iran, 17th century), The Metropolitan Museum of Art, The James F. Ballard Collection, Gift of
+  James F. Ballard, 1922: the museum's photograph, released under its
+  [Open Access](https://www.metmuseum.org/art/collection/search/447526) policy (CC0). It lies on Don Corleone's floor.
 
 ## Typefaces and icons
 

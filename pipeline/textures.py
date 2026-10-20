@@ -582,6 +582,120 @@ def breaking_bad(out):
     tint(ph('rough_linen', 'Diffuse'), f'{out}/linen_color.jpg', (232, 220, 192), size=512, contrast=0.8)
 
 
+def the_godfather(out):
+    """Don Corleone's study on the wedding day: dark-stained boards, mahogany panelling and the carved desk, dusty
+    rose damask above the wainscot, the olive-gold leather of the Don's chair and the black of the others, the Persian
+    vase carpet; books, the family's photographs on the mantel, the crest-framed print; the hall's cream paper with red
+    sprays and its red runner; the garden in the sun, beyond the shutters and the glass of the front door."""
+    import math
+    from PIL import ImageDraw
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    rng = np.random.default_rng(72)
+    # the floor: narrow boards stained almost black-brown, waxed
+    tint(ph('wooden_floor_02', 'Diffuse'), f'{out}/floor_color.jpg', (62, 40, 26), size=2048, contrast=1.15)
+    copy(ph('wooden_floor_02', 'nor_gl'), f'{out}/floor_normal.jpg', size=1024)
+    # panelling, shutters, casings and the hall's wainscot: dark lacquered mahogany; the desk a redder, figured mahogany
+    tint(ph('lacquered_cherry_wood', 'Diffuse'), f'{out}/panel_color.jpg', (54, 30, 20), size=1024, contrast=1.2)
+    copy(ph('lacquered_cherry_wood', 'nor_gl'), f'{out}/panel_normal.jpg', size=1024)
+    tint(ph('rosewood_veneer1', 'Diffuse'), f'{out}/mahogany_color.jpg', (74, 36, 22), size=1024, contrast=1.3)
+    copy(ph('sapele_veneer', 'nor_gl'), f'{out}/wood_normal.jpg', size=1024)
+    # the damask paper above the wainscot: the jacquard's flowers on a dusty rose ground
+    d = np.asarray(Image.open(ph('floral_jacquard', 'Diffuse')).convert('RGB'), np.float32) / 255
+    h, w = d.shape[:2]; d = d[:, :min(w, h)] if w > h else d[:w]                     # a square, whole repeat
+    dl = srgb_to_lin(d) @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    rel = np.asarray(Image.fromarray(((dl / dl.max()) * 255).astype(np.uint8)).resize((1024, 1024), Image.LANCZOS), np.float32) / 255
+    rel = (rel / rel.mean()) ** 1.5
+    mott = 0.94 + 0.08 * _noise(1024, 70, 9)
+    _save(lin((176, 120, 106))[None, None] * (0.78 + 0.22 * rel * mott)[..., None], f'{out}/damask_color.jpg')
+    # leathers: the Don's chair olive-gold, the club chair and the chesterfield black, the side chairs' seats brown
+    tint(ph('leather_white', 'Diffuse'), f'{out}/olive_leather_color.jpg', (92, 80, 46), size=1024, contrast=1.3)
+    copy(ph('leather_white', 'nor_gl'), f'{out}/olive_leather_normal.jpg', size=1024)
+    tint(ph('brown_leather', 'Diffuse'), f'{out}/black_leather_color.jpg', (22, 20, 19), size=1024, contrast=1.1)
+    copy(ph('brown_leather', 'nor_gl'), f'{out}/leather_normal.jpg', size=1024)
+    tint(ph('brown_leather', 'Diffuse'), f'{out}/brown_leather_color.jpg', (72, 40, 24), size=1024, contrast=1.1)
+    # the carpet: the Met's 17th-century vase carpet, its margin trimmed, a shade darker under the Don's low light
+    C = Image.open(os.path.join(CACHE, 'met', 'vase_carpet.jpg')).convert('RGB')
+    a = np.asarray(C, np.float32) / 255; m = a.mean(-1) < 0.55                        # the rug, not the photo's grey ground
+    rows, cols = np.where(m.mean(1) > 0.6)[0], np.where(m.mean(0) > 0.6)[0]
+    iw, ih = (cols.max() - cols.min()) * 0.015, (rows.max() - rows.min()) * 0.012   # the photo is a little askew: inset
+    C = C.crop((int(cols.min() + iw), int(rows.min() + ih), int(cols.max() - iw), int(rows.max() - ih)))
+    C = C.resize((1236, 2048), Image.LANCZOS).transpose(Image.ROTATE_90)            # long side across the room
+    c = srgb_to_lin(np.asarray(C, np.float32) / 255) * 0.82
+    _save(c, f'{out}/rug_color.jpg')
+    copy(ph('velour_velvet', 'nor_gl'), f'{out}/pile_normal.jpg', size=512)
+    # the hall: a cream paper with sprays of red flowers and green leaves (as on the stair), its red velvet runner
+    S = 1024; P = np.ones((S, S, 3), np.float32) * lin((214, 196, 160))[None, None] * (0.94 + 0.08 * _noise(S, 40, 3))[..., None]
+    I = Image.fromarray((lin_to_srgb(P) * 255).astype(np.uint8)); dr = ImageDraw.Draw(I)
+    for j in range(4):
+        for i in range(4):
+            cx, cy = (i + 0.5 + 0.5 * (j % 2)) * S / 4 % S, (j + 0.5) * S / 4
+            for k in range(7):                                                        # leaves round the spray
+                a_ = k * 0.9 + j; lx, ly = cx + 34 * math.cos(a_), cy + 30 * math.sin(a_)
+                dr.ellipse([lx - 14, ly - 6, lx + 14, ly + 6], fill=(92, 112, 64))
+            for k in range(5):                                                        # the blooms
+                bx, by = cx + rng.uniform(-22, 22), cy + rng.uniform(-18, 18); r = rng.uniform(9, 14)
+                dr.ellipse([bx - r, by - r, bx + r, by + r], fill=(176, 52, 38)); dr.ellipse([bx - r / 3, by - r / 3, bx + r / 3, by + r / 3], fill=(120, 30, 24))
+    I.save(f'{out}/hall_paper_color.jpg', quality=92)
+    tint(ph('velour_velvet', 'Diffuse'), f'{out}/runner_color.jpg', (104, 22, 24), size=512, contrast=0.6)
+    tint(ph('white_plaster_02', 'Diffuse'), f'{out}/ceiling_color.jpg', (206, 196, 176), size=512, contrast=0.4)
+    tint(ph('rough_linen', 'Diffuse'), f'{out}/linen_color.jpg', (236, 216, 178), size=512, contrast=0.8)
+    tint(ph('rough_linen', 'Diffuse'), f'{out}/red_shade_color.jpg', (150, 34, 26), size=512, contrast=0.8)
+    # books: two rows of 64 spines, oxblood, bottle green, tan calf and black, gilt bands and labels
+    B = _rect_uv_texture(2048, 1024, lambda im, dr: None, bg=(18, 14, 12)); dr = ImageDraw.Draw(B)
+    pal = [(110, 26, 20), (90, 20, 18), (30, 52, 34), (24, 40, 30), (150, 104, 60), (120, 80, 46), (34, 30, 28), (70, 40, 26), (130, 34, 24)]
+    for r in range(2):
+        for i in range(64):
+            x0 = i * 32; c_ = pal[rng.integers(len(pal))]; c_ = tuple(int(np.clip(v * rng.uniform(0.8, 1.15), 0, 255)) for v in c_)
+            dr.rectangle([x0 + 1, r * 512, x0 + 30, r * 512 + 511], fill=c_)
+            g = (190, 152, 80)
+            for zb in (40, 60, 440, 460): dr.rectangle([x0 + 3, r * 512 + zb, x0 + 28, r * 512 + zb + 5], fill=g)
+            if rng.random() < 0.6: dr.rectangle([x0 + 6, r * 512 + 120, x0 + 25, r * 512 + 180], fill=(16, 14, 12)); dr.rectangle([x0 + 9, r * 512 + 140, x0 + 22, r * 512 + 144], fill=g)
+    B.save(f'{out}/books_color.jpg', quality=92)
+    # the family's photographs: soft sepia and grey portraits, one or two figures against a pale studio ground
+    for k in range(5):
+        Q = np.zeros((640, 512, 3), np.float32); yy, xx = np.mgrid[0:640, 0:512].astype(np.float32)
+        tone = lin((150, 128, 100)) if k % 2 == 0 else lin((140, 138, 132))
+        Q[:] = tone[None, None] * (0.85 + 0.3 * (1 - yy / 640))[..., None]
+        for j, cx in enumerate((256,) if k % 3 else (180, 330)):
+            body = (((xx - cx) / 110) ** 2 + ((yy - 600) / 260) ** 2) < 1; head = (((xx - cx) / 48) ** 2 + ((yy - 290) / 60) ** 2) < 1
+            Q[body] = tone * 0.22; Q[head] = tone * (0.75 + 0.1 * j)
+            hair = head & (yy < 270); Q[hair] = tone * 0.15
+        Q = np.asarray(Image.fromarray((lin_to_srgb(Q) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(5)))
+        Image.fromarray(Q).save(f'{out}/photo{k}.jpg', quality=90)
+    # the crest-framed print over the cabinet: figures in gold on a red ground
+    Pr = _rect_uv_texture(768, 256, lambda im, dr: None, bg=(150, 34, 28)); dr = ImageDraw.Draw(Pr)
+    for k in range(9):
+        x0 = 50 + k * 76; dr.ellipse([x0, 90, x0 + 40, 130], fill=(214, 186, 120)); dr.rectangle([x0 + 6, 125, x0 + 34, 200], fill=(214, 186, 120))
+    dr.rectangle([8, 8, 759, 247], outline=(210, 180, 110), width=6); Pr.save(f'{out}/crest_print.jpg', quality=92)
+    # the garden in the afternoon sun, through louvers and sheers: blown out, warm, green below, a striped awning, the
+    # wedding's pinks and whites; seen only by the camera (the light is the sun's)
+    W_, H_ = 2048, 1024; yy, xx = np.mgrid[0:H_, 0:W_].astype(np.float32); yy /= H_; xx /= W_
+    sky = lin((255, 244, 214)) * (1.0 - 0.15 * yy[..., None])
+    trees = yy > 0.18 + 0.1 * np.sin(xx * 9 + 1) * np.sin(xx * 3.1) + 0.05 * _noise(W_, 30, 7)[:H_, :W_]
+    view = np.where(trees[..., None], lin((150, 170, 92)) * (0.7 + 0.5 * _noise(W_, 12, 8)[:H_, :W_])[..., None], sky)
+    awning = (yy > 0.42) & (yy < 0.5) & (xx > 0.2) & (xx < 0.85)
+    view = np.where(awning[..., None], np.where(((xx * 60) % 2 < 1)[..., None], lin((238, 232, 214)), lin((62, 110, 70))), view)
+    lawn = yy > 0.68
+    view = np.where(lawn[..., None], lin((128, 156, 70)) * (0.85 + 0.25 * _noise(W_, 20, 9)[:H_, :W_])[..., None], view)
+    for k in range(140):                                                             # the guests
+        x0 = rng.uniform(0, 1); y0 = rng.uniform(0.52, 0.8); r = rng.uniform(0.006, 0.012)
+        dot = ((xx - x0) / (r * 0.6)) ** 2 + ((yy - y0) / (r * 2.4)) ** 2 < 1
+        view = np.where(dot[..., None], lin(tuple(int(v) for v in [(232, 170, 176), (240, 236, 226), (40, 36, 34), (200, 120, 110)][k % 4])), view)
+    view = np.asarray(Image.fromarray((lin_to_srgb(view) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(9)))
+    Image.fromarray(view).save(f'{out}/garden_view.jpg', quality=92)
+    # the hall mirror: old silvering, dark and smoky, a little foxed (the model's glass is white in its colour map and
+    # gets its look from its metal map, which the room drops: left white it reads as a blank)
+    m = os.path.join(CACHE, 'polyhaven', 'ornate_mirror_01', 'textures', 'ornate_mirror_01_')
+    D = np.asarray(Image.open(m + 'diff_1k.jpg').convert('RGB'), np.float32)
+    A = np.asarray(Image.open(m + 'arm_1k.jpg').convert('RGB'), np.float32) / 255
+    glass = ((A[..., 2] > 0.5) & (A[..., 1] < 0.25)).astype(np.uint8) * 255
+    k = np.asarray(Image.fromarray(glass).filter(ImageFilter.GaussianBlur(1.5)), np.float32)[..., None] / 255
+    n = _noise(1024, 90, 11)[..., None]; spots = np.clip((150 - D.mean(-1, keepdims=True)) / 80, 0, 1)
+    smoke = np.array((34, 31, 27), np.float32) * (0.8 + 0.35 * n) + spots * 40
+    Image.fromarray((D * (1 - k) + smoke * k).clip(0, 255).astype(np.uint8)).save(f'{out}/mirror_color.jpg', quality=92)
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

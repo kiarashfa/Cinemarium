@@ -61,6 +61,20 @@ async function commons(file, width, out) {
   note(`commons/${out}`, info.descriptionurl, 'Public domain', 1);
 }
 
+// ---------- The Met Open Access (CC0 photographs of public-domain works) ----------
+async function met(id, out) {
+  const o = await (await fetch(`https://collectionapi.metmuseum.org/public/collection/v1/objects/${id}`, { headers: { 'User-Agent': 'Cinemarium/1.0' } })).json();
+  if (!o.isPublicDomain) throw new Error(`The Met ${id} is not open access`);
+  await get(o.primaryImage, join(CACHE, 'met', out));
+  note(`met/${out}`, o.objectURL, 'CC0', 1);
+}
+
+// ---------- Objaverse (Sketchfab models under their authors' licences, mirrored on Hugging Face) ----------
+async function objaverse(uid, shard, out, source, licence) {
+  await get(`https://huggingface.co/datasets/allenai/objaverse/resolve/main/glbs/${shard}/${uid}.glb`, join(CACHE, 'objaverse', out));
+  note(`objaverse/${out}`, source, licence, 1);
+}
+
 const ROOMS = {
   async severance() {
     mkdirSync(join(CACHE, 'rocketbox'), { recursive: true });
@@ -164,6 +178,31 @@ const ROOMS = {
     for (const t of ['Carpet012', 'Carpet013']) await ambientcg(t);
     // the wallpaper behind the desk: the Constitution's first page (National Archives scan)
     await commons('Constitution_of_the_United_States,_page_1.jpg', 2400, 'constitution_page1.jpg');
+  },
+  async 'the-godfather'() {
+    // Vito (Male_Adult_03, cached for Severance), Hagen (Male_Adult_13) and Sonny (Male_Adult_06), cached for Seinfeld; Bonasera
+    for (const a of ['Adults/Male_Adult_03', 'Adults/Male_Adult_13', 'Adults/Male_Adult_06', 'Professions/Business_Male_07']) await avatar(a);
+    const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+    // Vito behind the desk and Hagen in his armchair: breathing bases and idles
+    for (const c of ['breathe_01', 'idle_neutral_01', 'idle_relaxed_01', 'gestic_thoughtful', 'idle_touch_face', 'idle_look_around', 'idle_scratch_head',
+      'idle_waiting_01']) await clip(S, `m_sit_chair_${c}`);
+    // Bonasera's plea and the listeners; Sonny's wine at the window; Hagen's papers
+    for (const c of ['m_gestic_talk_sad_01', 'm_gestic_listen_sad_01', 'm_gestic_talk_nervous_01', 'm_gestic_talk_neutral_01', 'm_gestic_talk_relaxed_01',
+      'm_gestic_listen_neutral_01', 'm_gestic_listen_accept_01', 'm_gestic_thoughtful_01', 'm_idle_breathe_01', 'm_idle_breathe_02', 'm_idle_neutral_01',
+      'm_idle_neutral_02', 'm_idle_look_around_01', 'm_idle_waiting_01', 'm_idle_nervous_01', 'm_idle_scratch_head_01', 'm_drink_drinking', 'm_drink_idle',
+      'm_documents_check', 'm_documents_idle', 'm_documents_note', 'm_try_door_inwards']) await clip(S, c);
+    // up out of the chairs and down again, Vito's walk to the window and round the desk, Bonasera out to the hall and back
+    for (const c of ['m_sit_stand_up_chair_01', 'm_sit_down_chair_01', 'm_gestic_talk_self_assured_01', 'm_turn_left_180', 'm_turn_right_180']) await clip(XYZ, c);
+    for (const c of ['m_walk_slow_01', 'm_walk_neutral_02', 'm_walk_stroll_01']) await clip(XY, c);
+    for (const t of ['wooden_floor_02', 'leather_white', 'lacquered_cherry_wood', 'rosewood_veneer1', 'sapele_veneer', 'brown_leather', 'floral_jacquard',
+      'velour_velvet', 'rough_linen', 'white_plaster_02']) await polyhaven(t, '2k', 'tex');
+    for (const m of ['fancy_picture_frame_01', 'vintage_cabinet_01', 'standing_picture_frame_01', 'standing_picture_frame_02', 'antique_ceramic_vase_01',
+      'ClassicConsole_01', 'pachira_aquatica_01', 'horse_statue_01', 'mantel_clock_01', 'potted_plant_02', 'ornate_mirror_01']) await polyhaven(m, '1k', 'gltf');
+    // the rug: a 17th-century Persian vase carpet (The Met, open access)
+    await met(447526, 'vase_carpet.jpg');
+    // the Don's cat: a photogrammetry scan of a grey tabby lying on its back
+    await objaverse('69db9de4d5c446a895cec3c2a048f7a8', '000-014', 'cat_mustafasahinfb.glb',
+      'https://sketchfab.com/3d-models/cat-69db9de4d5c446a895cec3c2a048f7a8 (by mustafasahinfb)', 'CC BY 4.0');
   },
 };
 

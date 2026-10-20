@@ -887,12 +887,12 @@ def anchor(arm, act, ref):
     return act
 
 
-def check_acts(arm, acts, spot=0.05, turn=15.0, drift=0.3, roam=()):
+def check_acts(arm, acts, spot=0.05, turn=15.0, drift=0.3, roam=(), pelvis='Bip01 Pelvis'):
     """Every act must begin where the first act begins (the same spot within `spot` m, the same heading within `turn`
     degrees) and stay near there (`drift` m): the web crossfades acts in place, so an act baked in another frame
     makes the person jump. An act named in `roam` may wander (a walk out of the room and back), but must end where it
-    began. Raises with the culprits."""
-    pelvis = arm.pose.bones['Bip01 Pelvis']
+    began. Raises with the culprits. `pelvis`: the bone that carries the body (an animal's own root)."""
+    pelvis = arm.pose.bones[pelvis]
     def at(action, f):
         pose_at(arm, action, f); M = arm.matrix_world @ pelvis.matrix; return M.translation.copy(), M.to_quaternion()
     flat = lambda v: math.hypot(v.x, v.y)
@@ -910,10 +910,10 @@ def check_acts(arm, acts, spot=0.05, turn=15.0, drift=0.3, roam=()):
     cine.log('acts in place', arm.get('person', arm.name), ', '.join(acts))
 
 
-def export_person(arm, mesh, acts, path, image_size=1024, roam=()):
+def export_person(arm, mesh, acts, path, image_size=1024, roam=(), pelvis='Bip01 Pelvis'):
     """One glTF per person: body, rig and every act as its own animation (NLA tracks, each named after its act).
     The acts are checked first (check_acts): a person whose acts do not share one spot is never exported."""
-    check_acts(arm, acts, roam=roam)
+    check_acts(arm, acts, roam=roam, pelvis=pelvis)
     for slot in mesh.material_slots:
         for nd in slot.material.node_tree.nodes:
             if nd.type == 'TEX_IMAGE' and nd.image and nd.image.size[0] > image_size: nd.image.scale(image_size, image_size)
