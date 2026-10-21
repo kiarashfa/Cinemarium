@@ -75,6 +75,12 @@ async function objaverse(uid, shard, out, source, licence) {
   note(`objaverse/${out}`, source, licence, 1);
 }
 
+// ---------- Sketchfab (downloaded by hand while signed in; placed under cache/sketchfab/) ----------
+function sketchfab(out, source, licence) {
+  if (!existsSync(join(CACHE, 'sketchfab', out))) return console.warn(`missing pipeline/cache/sketchfab/${out}: download it from ${source} (signed in)`);
+  note(`sketchfab/${out}`, source, licence, 1);
+}
+
 const ROOMS = {
   async severance() {
     mkdirSync(join(CACHE, 'rocketbox'), { recursive: true });
@@ -203,6 +209,42 @@ const ROOMS = {
     // the Don's cat: a photogrammetry scan of a grey tabby lying on its back
     await objaverse('69db9de4d5c446a895cec3c2a048f7a8', '000-014', 'cat_mustafasahinfb.glb',
       'https://sketchfab.com/3d-models/cat-69db9de4d5c446a895cec3c2a048f7a8 (by mustafasahinfb)', 'CC BY 4.0');
+  },
+  async 'game-of-thrones'() {
+    // Robert, Ned, Jaime, Joffrey, Littlefinger; Varys (Business_Male_04), Tyrion's body (Male_Adult_06), the Hound's (Male_Adult_12)
+    // and Cersei's (Female_Adult_15) are cached for earlier rooms
+    for (const a of ['Adults/Male_Adult_05', 'Professions/Medical_Male_01', 'Adults/Male_Adult_16', 'Adults/Male_Adult_11', 'Adults/Male_Adult_07',
+      'Professions/Business_Male_04', 'Adults/Male_Adult_06', 'Adults/Male_Adult_12', 'Adults/Female_Adult_15']) await avatar(a);
+    const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+    // the king on his throne: seated bases and idles; the court standing round it; the talk and the laughter
+    for (const c of ['breathe_01', 'idle_neutral_01', 'idle_neutral_02', 'idle_relaxed_01', 'gestic_thoughtful', 'gestic_shrug_01', 'idle_look_around',
+      'idle_waiting_01']) await clip(S, `m_sit_chair_${c}`);
+    for (const c of ['m_gestic_talk_neutral_01', 'm_gestic_talk_neutral_02', 'm_gestic_talk_relaxed_01', 'm_gestic_talk_self_assured_01', 'm_gestic_talk_cool',
+      'm_gestic_listen_neutral_01', 'm_gestic_listen_neutral_02', 'm_gestic_listen_neutral_03', 'm_gestic_listen_accept_01', 'm_gestic_laugh_loud',
+      'm_gestic_laugh_low', 'm_gestic_laugh_extreme', 'm_gestic_thoughtful_01', 'm_idle_breathe_01', 'm_idle_breathe_02', 'm_idle_breathe_03',
+      'm_idle_neutral_01', 'm_idle_neutral_02', 'm_idle_neutral_03', 'm_idle_neutral_04', 'm_idle_neutral_05', 'm_idle_look_around_01',
+      'm_idle_look_around_02', 'm_idle_waiting_01', 'm_idle_waiting_02', 'm_idle_roll_head_01', 'm_idle_touch_face_01', 'm_drink_drinking', 'm_drink_idle',
+      'm_moderate_01', 'm_gestic_presentation_left_01', 'm_crouch_idle', 'm_crouch_gestic',
+      'f_idle_neutral_01', 'f_idle_neutral_03', 'f_idle_breathe_01', 'f_idle_breathe_02', 'f_idle_look_around_02', 'f_drink_idle', 'f_drink_drinking',
+      'f_gestic_listen_self-assured_01', 'f_gestic_talk_self-assured_01']) await clip(S, c);
+    // Ned's kneel, the walks in and out of the doors, the turns; up from the throne and the step and down again
+    for (const c of ['m_crouch_in', 'm_crouch_out', 'm_walk_slow_01', 'm_walk_neutral_01', 'm_walk_neutral_02', 'm_walk_neutral_03', 'm_walk_cool_01', 'm_walk_stroll_01', 'm_walk_stroll_02',
+      'f_walk_slow_01', 'f_walk_neutral_01', 'f_walk_self-assured']) await clip(XY, c);
+    for (const c of ['m_sit_stand_up_chair_01', 'm_sit_down_chair_01', 'm_gestic_talk_self_assured_02', 'm_turn_left_90', 'm_turn_right_90',
+      'm_turn_left_120', 'm_turn_left_180', 'm_turn_right_180', 'f_turn_left_180', 'f_turn_right_180']) await clip(XYZ, c);
+    // the walls (warm ashlar), the arches and plinths (sandstone), the dais (rough dark stone), the floor (marble)
+    for (const t of ['stone_block_wall', 'sandstone_blocks_08', 'slate_floor', 'medieval_blocks_03', 'marble_01', 'painted_plaster_wall', 'velour_velvet',
+      'rough_linen']) await polyhaven(t, '2k', 'tex');
+    // the court's cloth: the queen's satin, Varys's silk, brocade, leather, wool
+    for (const t of ['crepe_satin', 'quatrefoil_jacquard_fabric', 'floral_jacquard', 'brown_leather', 'leather_red_02', 'poly_wool_herringbone']) await polyhaven(t, '2k', 'tex');
+    // the Iron Throne; Tyrion's and Cersei's heads (fan sculpts, CC BY), the Hound's (signed-in download)
+    await objaverse('19840e7ca3b840218e51a58ed701a27a', '000-128', 'iron_throne_the_mangle.glb',
+      'https://sketchfab.com/3d-models/iron-throne-19840e7ca3b840218e51a58ed701a27a (by The Mangle)', 'CC BY 4.0');
+    await objaverse('bc675241a3094b34b213bcf3ee1e08ed', '000-149', 'tyrion_head_kling.glb',
+      'https://sketchfab.com/3d-models/tyrion-lannister-fanart-lowpoly-game-of-thrones-bc675241a3094b34b213bcf3ee1e08ed (by kling)', 'CC BY 4.0');
+    await objaverse('874b0953c9ac453ba75d77ad202f90de', '000-090', 'cersei_head_imthirutj.glb',
+      'https://sketchfab.com/3d-models/cersei-lannister-game-of-thrones-874b0953c9ac453ba75d77ad202f90de (by imthirutj)', 'CC BY 4.0');
+    sketchfab('the_hound_madcatd.glb', 'https://sketchfab.com/3d-models/the-hound-4afb31e3e247445b88fd0955d720b34d (by MadCatD)', 'CC BY 4.0');
   },
 };
 

@@ -1156,5 +1156,309 @@ def the_godfather():
     for k, v in made.items(): print(k, [os.path.basename(p) for p in v])
 
 
+def _hair_recolour(avatar, name, who, out_name, colour, contrast=1.0, shine=1.0):
+    """A donor's hair cards in another colour: the strands' own light and dark kept (raised to `contrast`), their alpha
+    kept; `shine` scales the highlights (greasy hair duller)."""
+    a = load(avatar, name); al = load_alpha(avatar, name)
+    l = lum(a); m = al > 0.3
+    rel = np.clip(l / max(l[m].mean(), 1e-4), 0.2, 2.5) ** contrast
+    rel = np.where(rel > 1, 1 + (rel - 1) * shine, rel)
+    col = np.array(colour, np.float32)[None, None, :] / 255 * rel[..., None]
+    return save(col, who, out_name, alpha=al)
+
+
+def _gt_pat(B, name, scale, contrast=1.0, _cache={}):
+    """A cloth's pattern (a Poly Haven texture's light and dark, mean 1) laid on the body by its position."""
+    if name not in _cache:
+        im = np.asarray(Image.open(os.path.join(ROOT, 'pipeline', 'cache', 'polyhaven', name, 'Diffuse.png')).convert('L').resize((1024, 1024), Image.LANCZOS), np.float32) / 255
+        _cache[name] = im / max(im.mean(), 1e-4)
+    L = _cache[name]; n = L.shape[0]
+    u = ((np.nan_to_num(B.x) + 0.6 * np.nan_to_num(B.y)) / scale) % 1.0; v = (np.nan_to_num(B.z) / scale) % 1.0
+    return np.clip(L[(v * (n - 1)).astype(int), (u * (n - 1)).astype(int)], 0.2, 3.0) ** contrast
+
+
+def _gt_cloth(name, size=1024):
+    im = np.asarray(Image.open(os.path.join(ROOT, 'pipeline', 'cache', 'polyhaven', name, 'Diffuse.png')).convert('L').resize((size, size), Image.LANCZOS), np.float32) / 255
+    return im / max(im.mean(), 1e-4)
+
+
+def _gt_fill(b, B, mask, colour, pattern=None, k=0.45, flatten=3, grow=8):
+    """Paint `colour` where mask is (grown into the padding), keeping the cloth's folds by `k`, times a pattern."""
+    m = B.grow(mask.astype(np.float32), grow) if grow else mask.astype(np.float32)
+    out = recolour(b, m, colour, contrast=k, flatten=flatten)
+    if pattern is not None: out = out * (1 - m[..., None]) + out * m[..., None] * pattern[..., None]
+    return out
+
+
+def _gt_regions(B):
+    """The body's parts for a costume: torso (to the hips), arms, hands, thighs (with the seat), calves, feet."""
+    J = B.J; neck, pel = J['Bip01 Neck'][2], J['Bip01 Pelvis'][2]; knee = J['Bip01 L Calf'][2]
+    hands = B.part('Hand', 'Finger')
+    torso = B.where(B.part('Spine', 'Clavicle', 'Pelvis', 'Neck') & (B.z > pel - 0.1) & ~(B.part('Neck') & (B.z > neck + 0.035)))
+    arms = B.part('UpperArm', 'Forearm') & ~hands
+    thighs = B.where(B.part('Thigh') | (B.part('Pelvis', 'Spine') & (B.z <= pel - 0.1)))
+    return dict(J=J, neck=neck, pel=pel, knee=knee, hands=hands, torso=torso, arms=arms, thighs=thighs, calves=B.part('Calf'), feet=B.part('Foot', 'Toe'))
+
+
+def _gt_clasps(b, B, xs, zs, r, colour=(196, 160, 86)):
+    m = np.zeros(B.x.shape, np.float32)
+    for x0 in xs:
+        for z0 in zs: m = np.maximum(m, B.where((((B.x - x0) / r) ** 2 + ((B.z - z0) / (r * 0.7)) ** 2 < 1) & (B.y < 0)).astype(np.float32))
+    return _gt_fill(b, B, soft(m, 0.6) > 0.3, colour, k=0.3, flatten=0, grow=1)
+
+
+def _gt_head_hair(h, Hd, colour, front=0.06, contrast=1.0):
+    brow, line, ear = _hairline(Hd, front=front)
+    face = Hd.where((Hd.y < -0.05) & (Hd.z < brow + 0.03) & (np.abs(Hd.x) < 0.06))
+    hm = soft(Hd.grow(Hd.where((Hd.z > line - 0.01) & ~ear & ~face).astype(np.float32), 3), 1.4)
+    return recolour(h, hm, colour, contrast=contrast), hm, brow
+
+
+def _gt_beard(h, Hd, mask, rng, colour, n=9000, length=9, base=0.55, grey=0.0):
+    """A beard of strands: the skin under it darkened toward `colour` (by `base`), then `n` short strokes drawn down
+    the face (along the texture's own downward direction, from the texel map), each a little lighter or darker; `grey`
+    is the share of grey hairs."""
+    from PIL import ImageDraw
+    h = recolour(h, np.clip(mask * 1.3, 0, 1) * base, colour, contrast=0.6)
+    z = np.where(Hd.ok, Hd.z, np.nan); gy, gx = np.gradient(z)
+    gx, gy = np.nan_to_num(-gx), np.nan_to_num(-gy); g = np.hypot(gx, gy) + 1e-9; dx, dy = gx / g, gy / g   # down the face, in pixels
+    H_, W_ = mask.shape; layer = Image.new('RGBA', (W_, H_), (0, 0, 0, 0)); d = ImageDraw.Draw(layer)
+    p = np.clip(mask, 0, 1).ravel(); p = p / p.sum()
+    idx = rng.choice(p.size, n, p=p); col = np.array(colour, np.float32)
+    for i in idx:
+        y, x = divmod(int(i), W_)
+        if not Hd.ok[y, x]: continue
+        L = length * rng.uniform(0.6, 1.3); a = rng.uniform(-0.35, 0.35)
+        ux, uy = dx[y, x] * np.cos(a) - dy[y, x] * np.sin(a), dx[y, x] * np.sin(a) + dy[y, x] * np.cos(a)
+        c = col * rng.uniform(0.6, 1.45) if rng.random() > grey else np.array([150, 144, 138], np.float32) * rng.uniform(0.8, 1.1)
+        d.line([(x, y), (x + ux * L, y + uy * L)], fill=tuple(int(v) for v in np.clip(c, 0, 255)) + (int(200 * mask[y, x] ** 0.5),), width=1)
+    lay = np.asarray(layer, np.float32) / 255; k = lay[..., 3:4]
+    return h * (1 - k) + lay[..., :3] * k
+
+
+def game_of_thrones():
+    """King Robert's court, season one (costumes by Michele Clapton). The hair cards are generated in the build; here
+    Cersei's own long cards (Female_Adult_15) turn honey gold; then each costume on its body, and the cloth of the
+    modelled gown, robe and cloak."""
+    _hair_recolour('Female_Adult_15', 'f018_opacity_color.tga', 'cersei', 'f018_opacity_color.tga', (214, 174, 108), contrast=1.15)
+    _hair_recolour('Male_Adult_07', 'm013_opacity_color.tga', 'littlefinger', 'm013_opacity_color.tga', (40, 34, 30))
+    rng = np.random.default_rng(2011)
+    pat, fill = _gt_pat, _gt_fill
+
+    # ---- King Robert (Male_Adult_05): a long sleeveless surcoat of deep purple-navy wool, gold knotwork clasps down
+    # its front, a brown belt with its long tail; tan leather sleeves with tooled gold at the shoulders; brown boots;
+    # his hair and full beard near black
+    b = load('Male_Adult_05', 'm009_body_color.tga'); B = Body('m009_body_color.tga'); r = _gt_regions(B)
+    coat = r['torso'] | (r['thighs'] & B.where(B.z > r['knee'] - 0.02))
+    b = fill(b, B, coat, (52, 40, 70), pat(B, 'poly_wool_herringbone', 0.35, 0.6))
+    b = fill(b, B, r['arms'], (138, 100, 58), pat(B, 'brown_leather', 0.3, 0.8))
+    caps = B.where(B.part('UpperArm', 'Clavicle') & (np.abs(B.x) > 0.15) & (np.abs(B.x) < 0.27) & (B.z > r['neck'] - 0.12))
+    b = fill(b, B, caps, (176, 136, 70), pat(B, 'floral_jacquard', 0.12, 1.2), k=0.3, grow=4)
+    b = _gt_clasps(b, B, [0.0], [r['neck'] - 0.1 - 0.075 * k for k in range(5)], 0.022)
+    belt = B.where((np.abs(B.z - (r['pel'] + 0.07)) < 0.025) & B.part('Spine', 'Pelvis'))
+    tail = B.where((B.x > 0.03) & (B.x < 0.06) & (B.z < r['pel'] + 0.07) & (B.z > r['pel'] - 0.32) & (B.y < 0))
+    b = fill(b, B, belt | tail, (86, 54, 32), pat(B, 'brown_leather', 0.2), k=0.3, grow=2)
+    boots = r['calves'] | r['feet'] | B.where(B.part('Thigh') & (B.z < r['knee'] - 0.02))
+    b = fill(b, B, boots, (70, 46, 30), pat(B, 'brown_leather', 0.25))
+    save(b, 'robert', 'm009_body_color.tga')
+    _flat_normals('Male_Adult_05', 'm009_body_normal.tga', 'robert', B.grow((coat | r['arms'] | boots).astype(np.float32), 4) * 0.8)
+    h = load('Male_Adult_05', 'm009_head_color.tga'); Hd = Body('m009_head_color.tga')
+    h, hm, brow = _gt_head_hair(h, Hd, (38, 30, 25), front=0.05)
+    bm_ = _beard_mask(Hd, moustache=True, cheeks=0.9)
+    h = _gt_beard(h, Hd, bm_, rng, (44, 32, 24), n=14000, length=10, base=0.75, grey=0.04)
+    save(h, 'robert', 'm009_head_color.tga')
+    save_rough(np.maximum(bm_, hm) * 0.9, 0.9, 0.55, 'robert', 'm009_head_rough.png')
+
+    wool = _gt_cloth('poly_wool_herringbone')
+    save(np.array([52, 40, 70], np.float32)[None, None] / 255 * np.clip(wool ** 0.6, 0.7, 1.3)[..., None], 'robert', 'coat.tga')
+
+    # ---- Ned (Medical_Male_01): a sleeveless brown leather jerkin quilted in long ribs, laced up the front, over a dark
+    # grey-green wool tunic; the Hand's gold pin on his left breast; dark breeches and boots; a short dark brown beard
+    b = load('Medical_Male_01', 'm152_body_color.tga'); B = Body('m152_body_color.tga'); r = _gt_regions(B)
+    jerkin = r['torso'] | (r['thighs'] & B.where(B.z > r['pel'] - 0.22))
+    ribs = 0.86 + 0.14 * np.abs(np.sin(np.nan_to_num(B.x) * np.pi / 0.03))
+    b = fill(b, B, jerkin, (92, 62, 40), pat(B, 'brown_leather', 0.25, 0.8) * ribs)
+    lace = B.where((np.abs(B.x) < 0.012) & (B.z > r['pel']) & (B.z < r['neck'] - 0.05) & (B.y < 0))
+    b = fill(b, B, lace, (40, 28, 20), k=0.2, flatten=0, grow=1)
+    b = fill(b, B, r['arms'], (52, 58, 48), pat(B, 'rough_linen', 0.2, 0.6))
+    legs = r['thighs'] & B.where(B.z <= r['pel'] - 0.22)
+    b = fill(b, B, legs, (48, 38, 30), pat(B, 'rough_linen', 0.3, 0.4))
+    boots = r['calves'] | r['feet'] | B.where(B.part('Thigh') & (B.z < r['knee'] + 0.02))
+    b = fill(b, B, boots, (40, 30, 24), pat(B, 'brown_leather', 0.25))
+    pin = B.where((np.abs(B.x - 0.085) < 0.011) & (np.abs(B.z - (r['neck'] - 0.15)) < 0.03) & (B.y < 0))
+    b = fill(b, B, pin, (206, 168, 80), k=0.2, flatten=0, grow=1)
+    save(b, 'ned', 'm152_body_color.tga')
+    _flat_normals('Medical_Male_01', 'm152_body_normal.tga', 'ned', B.grow((jerkin | r['arms'] | legs | boots).astype(np.float32), 4) * 0.85)
+    h = load('Medical_Male_01', 'm152_head_color.tga'); Hd = Body('m152_head_color.tga')
+    bm_ = _beard_mask(Hd, moustache=True, cheeks=0.6)
+    h = _gt_beard(h, Hd, bm_, rng, (62, 44, 30), n=9000, length=6, base=0.55, grey=0.03)
+    h, hm, brow = _gt_head_hair(h, Hd, (82, 60, 42), front=0.075)
+    save(h, 'ned', 'm152_head_color.tga')
+    save_rough(np.maximum(bm_, hm) * 0.9, 0.9, 0.55, 'ned', 'm152_head_rough.png')
+
+    # ---- Jaime (Male_Adult_16): the Kingsguard's gilded armour, a breastplate with a skirt of gilt scales to mid thigh,
+    # scaled pauldrons, brown leather bracers, a cream padded coat below, brown boots (the white cloak is modelled);
+    # light stubble
+    b = load('Male_Adult_16', 'm019_body_color.tga'); B = Body('m019_body_color.tga'); r = _gt_regions(B)
+    X, Z = np.nan_to_num(B.x), np.nan_to_num(B.z)
+    def scales(sc):
+        row = np.floor(Z / (sc * 0.7)); off = 0.5 * (row % 2)
+        return 0.72 + 0.4 * np.sin((X / sc + off) * np.pi) ** 2 * ((Z / (sc * 0.7)) % 1) ** 0.6
+    plate = r['torso'] & B.where(B.z > r['pel'] - 0.02)
+    ribs_ = 0.9 + 0.1 * np.cos(np.nan_to_num(B.z) * np.pi / 0.045) ** 8         # the breastplate's lames, edge on edge
+    b = fill(b, B, plate, (206, 158, 74), ribs_, k=0.5, flatten=6)
+    skirt_ = (r['torso'] & B.where(B.z <= r['pel'] - 0.02)) | (r['thighs'] & B.where(B.z > r['pel'] - 0.3))
+    sk = scales(0.035); b = fill(b, B, skirt_, (190, 142, 64), sk, k=0.4)
+    paul = r['arms'] & B.part('UpperArm')
+    pl = scales(0.03); b = fill(b, B, paul, (198, 150, 70), pl, k=0.4)
+    brace = r['arms'] & B.part('Forearm')
+    b = fill(b, B, brace, (186, 140, 64), ribs_, k=0.4)
+    legs = r['thighs'] & B.where((B.z <= r['pel'] - 0.3) & (B.z > r['knee'] - 0.02))
+    b = fill(b, B, legs, (70, 46, 30), pat(B, 'brown_leather', 0.25, 0.7))
+    boots = r['calves'] | r['feet'] | B.where(B.part('Thigh') & (B.z < r['knee'] - 0.02))
+    b = fill(b, B, boots, (84, 56, 36), pat(B, 'brown_leather', 0.25))
+    save(b, 'jaime', 'm019_body_color.tga')
+    gilt = B.grow((plate | skirt_ | paul | brace).astype(np.float32), 4)
+    save_rough(gilt * np.clip(0.55 + 0.45 * (np.where(skirt_, sk, 1) * np.where(paul, pl, 1) - 0.72) / 0.4, 0, 1), 1.0, 0.0, 'jaime', 'm019_body_metal.png')
+    save_rough(gilt, 0.3, 0.7, 'jaime', 'm019_body_rough.png')
+    _flat_normals('Male_Adult_16', 'm019_body_normal.tga', 'jaime', B.grow((plate | skirt_ | paul | brace | legs | boots).astype(np.float32), 4) * 0.95)
+    h = load('Male_Adult_16', 'm019_head_color.tga'); Hd = Body('m019_head_color.tga')
+    h = _hair_on(h, _beard_mask(Hd, moustache=True, cheeks=0.7), rng, (150, 118, 80), 0.3)
+    h, hm, brow = _gt_head_hair(h, Hd, (186, 150, 92), contrast=1.1)
+    save(h, 'jaime', 'm019_head_color.tga')
+    weave = _gt_cloth('rough_linen', 512)
+    save(np.ones((512, 512, 3), np.float32) * np.array([226, 220, 204], np.float32)[None, None] / 255 * (0.82 + 0.18 * weave)[..., None] * 0.92, 'jaime', 'cloak.tga')
+
+    # ---- Joffrey (Male_Adult_11): a knee-length coat of crimson brocade with a black and gold damask, high at the
+    # collar; a black belt; black breeches and boots; his short hair gold
+    b = load('Male_Adult_11', 'm001_body_color.tga'); B = Body('m001_body_color.tga'); r = _gt_regions(B)
+    coat = r['torso'] | r['arms'] | (r['thighs'] & B.where(B.z > r['knee'] + 0.04))
+    b = fill(b, B, coat, (118, 24, 30), np.clip(pat(B, 'floral_jacquard', 0.16, 1.4), 0.45, 1.6))
+    b = fill(b, B, B.where((np.abs(B.z - (r['pel'] + 0.05)) < 0.02) & B.part('Spine', 'Pelvis')), (18, 16, 16), k=0.3, grow=2)
+    legs = (r['thighs'] & B.where(B.z <= r['knee'] + 0.04)) | r['calves'] | r['feet']
+    b = fill(b, B, legs, (22, 20, 20), pat(B, 'brown_leather', 0.25, 0.5))
+    save(b, 'joffrey', 'm001_body_color.tga')
+    _flat_normals('Male_Adult_11', 'm001_body_normal.tga', 'joffrey', B.grow((coat | legs).astype(np.float32), 4) * 0.85)
+    h = load('Male_Adult_11', 'm001_head_color.tga'); Hd = Body('m001_head_color.tga')
+    h, hm, brow = _gt_head_hair(h, Hd, (170, 134, 76), contrast=0.5)
+    save(h, 'joffrey', 'm001_head_color.tga')
+
+    fj = _gt_cloth('floral_jacquard')
+    save(np.array([118, 24, 30], np.float32)[None, None] / 255 * np.clip(fj ** 1.4, 0.45, 1.6)[..., None], 'joffrey', 'coat.tga')
+
+    # ---- Littlefinger (Male_Adult_07): the long dark brown coat ribbed with fine pale stripes, high collared, to the
+    # calf; dark breeches and boots; the silver mockingbird; short dark hair greying at the temples, goatee, moustache
+    b = load('Male_Adult_07', 'm013_body_color.tga'); B = Body('m013_body_color.tga'); r = _gt_regions(B)
+    coat = r['torso'] | r['arms'] | r['thighs'] | B.where(r['calves'] & (B.z > r['knee'] - 0.16))
+    st = _stripes(B, 0.022, [(0.5, 0.12, (122, 98, 66))], (58, 42, 32))
+    b = _paint(b, B.grow(coat.astype(np.float32), 8), st, k=0.5, flatten=3)
+    boots = B.where(r['calves'] & (B.z <= r['knee'] - 0.16)) | r['feet']
+    b = fill(b, B, boots, (26, 22, 20), pat(B, 'brown_leather', 0.25))
+    pin = B.where(((B.x - 0.07) ** 2 + (B.z - (r['neck'] - 0.09)) ** 2 < 0.006 ** 2) & (B.y < 0))     # the mockingbird, a small silver brooch
+    b = fill(b, B, pin, (150, 150, 152), k=0.3, flatten=0, grow=1)
+    save(b, 'littlefinger', 'm013_body_color.tga')
+    _flat_normals('Male_Adult_07', 'm013_body_normal.tga', 'littlefinger', B.grow((coat | boots).astype(np.float32), 4) * 0.85)
+    h = load('Male_Adult_07', 'm013_head_color.tga'); Hd = Body('m013_head_color.tga')
+    J = Hd.J; ax = np.abs(Hd.x); low = J['Bip01 MBottomLip'][2]
+    goatee = blur(Hd.where((ax < 0.015 + 0.004 * smooth(low - 0.05, low - 0.01, Hd.z)) & (Hd.z < low - 0.004) & (Hd.z > low - 0.045) & (Hd.y < -0.04)).astype(np.float32), 4)
+    mo = _moustache(Hd, width=0.026, low=0.0, high=0.007)
+    h = _gt_beard(h, Hd, np.maximum(goatee, mo), rng, (40, 33, 28), n=3500, length=5, base=0.5, grey=0.08)
+    h = _hair_on(h, _beard_mask(Hd, moustache=False, cheeks=0.5), rng, (60, 50, 44), 0.2)
+    h, hm, brow = _gt_head_hair(h, Hd, (40, 34, 30))
+    temples = Hd.where((ax > 0.052) & (Hd.z < brow + 0.06) & (Hd.z > brow - 0.04)) & (hm > 0.5)
+    h = recolour(h, soft(temples.astype(np.float32), 4) * 0.5, (110, 106, 100), contrast=1.0)
+    save(h, 'littlefinger', 'm013_head_color.tga')
+
+    uu = (np.arange(1024)[None, :] / 1024 * 46) % 1.0                        # 46 pale ribs round the coat
+    rib = np.clip((0.06 - np.abs(uu - 0.5)) / 0.02 + 0.5, 0, 1) * np.ones((1024, 1))
+    base = np.array([58, 42, 32], np.float32) / 255; line = np.array([122, 98, 66], np.float32) / 255
+    save((base[None, None] * (1 - rib[..., None]) + line[None, None] * rib[..., None]) * (0.9 + 0.2 * _gt_cloth('rough_linen'))[..., None], 'littlefinger', 'coat.tga')
+
+    # ---- Varys (Business_Male_04): a robe of pale gold silk with a large woven pattern, a blue-grey brocade stole down
+    # either side of its front, soft dark slippers (the robe's skirt is modelled)
+    b = load('Business_Male_04', 'm015_body_color.tga'); B = Body('m015_body_color.tga'); r = _gt_regions(B)
+    robe = r['torso'] | r['arms'] | r['thighs'] | r['calves']
+    b = fill(b, B, robe, (204, 180, 124), np.clip(pat(B, 'quatrefoil_jacquard_fabric', 0.3, 0.9), 0.6, 1.4))
+    stole = B.where((np.abs(B.x) > 0.045) & (np.abs(B.x) < 0.11) & (B.y < 0.0) & (B.z < r['neck'] + 0.02)) & (r['torso'] | r['thighs'])
+    b = fill(b, B, stole, (112, 116, 128), pat(B, 'floral_jacquard', 0.12, 1.2), k=0.4, grow=3)
+    b = fill(b, B, r['feet'], (40, 32, 28), k=0.4)
+    save(b, 'varys', 'm015_body_color.tga')
+    _flat_normals('Business_Male_04', 'm015_body_normal.tga', 'varys', B.grow(robe.astype(np.float32), 4) * 0.9)
+    q = _gt_cloth('quatrefoil_jacquard_fabric'); fj = _gt_cloth('floral_jacquard')
+    img = np.array([204, 180, 124], np.float32)[None, None] / 255 * np.clip(q ** 0.9, 0.6, 1.4)[..., None]
+    uu = np.arange(1024)[None, :] / 1024
+    front = np.broadcast_to((uu < 0.07) | (uu > 0.93), (1024, 1024))       # the stole's ends down the front, either side
+    img = np.where(front[..., None], np.array([112, 116, 128], np.float32)[None, None] / 255 * fj[..., None], img)
+    save(img, 'varys', 'robe.tga')
+
+    # ---- Tyrion (Male_Adult_06; the head is sculpted): a sleeveless jerkin of maroon brocade with gold toggles over
+    # dark red sleeves; black breeches and boots
+    b = load('Male_Adult_06', 'm011_body_color.tga'); B = Body('m011_body_color.tga'); r = _gt_regions(B)
+    jerk = r['torso'] | (r['thighs'] & B.where(B.z > r['pel'] - 0.2))
+    b = fill(b, B, jerk, (88, 24, 28), np.clip(pat(B, 'floral_jacquard', 0.14, 1.1), 0.5, 1.5))
+    b = fill(b, B, r['arms'], (104, 30, 30), pat(B, 'leather_red_02', 0.2, 0.6))
+    b = _gt_clasps(b, B, [0.0], [r['neck'] - 0.1 - 0.06 * k for k in range(5)], 0.014, colour=(190, 150, 80))
+    legs = (r['thighs'] & B.where(B.z <= r['pel'] - 0.2)) | r['calves'] | r['feet']
+    b = fill(b, B, legs, (30, 26, 24), pat(B, 'brown_leather', 0.25, 0.5))
+    save(b, 'tyrion', 'm011_body_color.tga')
+    _flat_normals('Male_Adult_06', 'm011_body_normal.tga', 'tyrion', B.grow((jerk | r['arms'] | legs).astype(np.float32), 4) * 0.85)
+
+    # ---- Cersei (Female_Adult_15; the head is sculpted): the red silk gown, gold embroidery round its deep V, a wide
+    # gold sash at the waist, long red sleeves with gold at the cuffs (its skirt is modelled)
+    b = load('Female_Adult_15', 'f018_body_color.tga'); B = Body('f018_body_color.tga'); r = _gt_regions(B)
+    gown = r['torso'] | r['arms'] | r['thighs'] | r['calves'] | r['feet']
+    open_ = np.clip((B.z - (r['neck'] - 0.24)) / 0.2, 0, 1) * 0.05
+    vee = B.where((np.abs(B.x) < open_) & (B.z > r['neck'] - 0.24) & (B.y < 0))
+    H_, S_, V_ = hsv(b)
+    bare = (H_ < 40) & (S_ > 0.22) & (V_ > 0.3)                             # the avatar's own skin in its open neck
+    collar = B.where((B.z > r['neck'] - 0.09) & ~bare & ~r['hands'])          # the blouse's white collar
+    vee = vee & B.where(B.z <= r['neck'] - 0.09)
+    b = fill(b, B, (gown | collar) & ~vee, (148, 22, 28), pat(B, 'crepe_satin', 0.3, 0.7))
+    trim = B.where((np.abs(np.abs(B.x) - open_) < 0.014) & (B.z > r['neck'] - 0.26) & (B.y < 0))
+    b = fill(b, B, trim, (196, 156, 82), pat(B, 'floral_jacquard', 0.06, 1.2), k=0.3, grow=2)
+    sash = B.where((np.abs(B.z - (r['pel'] + 0.1)) < 0.045) & B.part('Spine', 'Pelvis'))
+    b = fill(b, B, sash, (186, 148, 80), pat(B, 'floral_jacquard', 0.1, 0.8), k=0.3, grow=2)
+    wrist = abs(r['J']['Bip01 L Hand'][0]); cuff = B.where(B.part('Forearm') & (np.abs(B.x) > wrist - 0.06))
+    b = fill(b, B, cuff, (190, 150, 80), k=0.3, grow=2)
+    match = np.array([1.0, 1.1, 1.22], np.float32)                         # her skin as the sculpted face has it (paler, less orange)
+    b = _skin_paint(b, B, vee, rng, warm=tuple(match))
+    hs = B.where(r['hands'] & bare)[..., None]; b = np.clip(b * np.where(hs, match[None, None, :], 1.0), 0, 1)
+    save(b, 'cersei', 'f018_body_color.tga')
+    h = load('Female_Adult_15', 'f018_head_color.tga'); Hd = Body('f018_head_color.tga')
+    lift = 1 + 0.22 * smooth(r['neck'] + 0.02, r['neck'] + 0.07, np.nan_to_num(Hd.z))   # the neck's top lit as the face above it (no chin over it now)
+    low = smooth(r['neck'], r['neck'] - 0.05, np.nan_to_num(Hd.z, nan=9))[..., None]      # the open neckline: paler, less orange
+    k_ = np.array([0.9, 0.92, 0.96], np.float32)[None, None, :] * (1 - low) + np.array([0.98, 1.06, 1.16], np.float32)[None, None, :] * low
+    save(np.clip(h * k_ * lift[..., None], 0, 1), 'cersei', 'f018_head_color.tga')
+    _flat_normals('Female_Adult_15', 'f018_body_normal.tga', 'cersei', B.grow(gown.astype(np.float32), 4) * 0.9)
+    cs = _gt_cloth('crepe_satin'); fj = _gt_cloth('floral_jacquard')
+    img = np.array([148, 22, 28], np.float32)[None, None] / 255 * np.clip(cs ** 0.8, 0.7, 1.3)[..., None]
+    vv = np.arange(1024)[:, None] / 1024; uu = np.arange(1024)[None, :] / 1024
+    gold = np.array([196, 156, 82], np.float32)[None, None] / 255 * np.clip(fj, 0.6, 1.4)[..., None]
+    panel = ((uu < 0.06) | (uu > 0.94)) | (vv > 0.94)                      # the gold underskirt seen in front, the hem's border
+    img = np.where(np.broadcast_to(panel, (1024, 1024))[..., None], gold, img)
+    save(img, 'cersei', 'gown.tga')
+
+    # ---- the Hound (Male_Adult_12; the head is sculpted, with its gorget): dark steel, a coat of riveted rings over the
+    # chest and down to mid thigh, plates at the shoulders, a diagonal baldric, dark leather forearms and gloves, dark
+    # breeches and boots
+    b = load('Male_Adult_12', 'm007_body_color.tga'); B = Body('m007_body_color.tga'); r = _gt_regions(B)
+    X, Z = np.nan_to_num(B.x), np.nan_to_num(B.z)
+    rings = 0.7 + 0.5 * (np.sin(X * np.pi / 0.012) ** 2 * np.sin(Z * np.pi / 0.012) ** 2)
+    coat = r['torso'] | (r['thighs'] & B.where(B.z > r['pel'] - 0.28))
+    b = fill(b, B, coat, (74, 74, 78), rings, k=0.5)
+    plates = r['arms'] & B.part('UpperArm')
+    b = fill(b, B, plates, (88, 88, 94), k=0.4, flatten=6)
+    b = fill(b, B, (r['arms'] & B.part('Forearm')) | r['hands'], (42, 34, 28), pat(B, 'brown_leather', 0.2))
+    baldric = B.where((np.abs((X + Z * 0.55) - (r['neck'] * 0.55 - 0.02)) < 0.03) & (B.z > r['pel']) & (B.y < 0)) & r['torso']
+    b = fill(b, B, baldric, (72, 50, 34), pat(B, 'brown_leather', 0.15), k=0.4, grow=2)
+    legs = (r['thighs'] & B.where(B.z <= r['pel'] - 0.28)) | r['calves'] | r['feet']
+    b = fill(b, B, legs, (30, 28, 26), pat(B, 'brown_leather', 0.25, 0.5))
+    save(b, 'hound', 'm007_body_color.tga')
+    steel = B.grow((coat & ~baldric).astype(np.float32), 3); pl_ = B.grow(plates.astype(np.float32), 3)
+    save_rough(np.maximum(steel * np.clip((rings - 0.7) / 0.5, 0.3, 1.0) * 0.85, pl_ * 0.9), 1.0, 0.0, 'hound', 'm007_body_metal.png')
+    save_rough(np.maximum(steel, pl_), 0.45, 0.75, 'hound', 'm007_body_rough.png')
+    _flat_normals('Male_Adult_12', 'm007_body_normal.tga', 'hound', B.grow((coat | plates | legs).astype(np.float32), 4) * 0.85)
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()

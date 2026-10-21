@@ -42,7 +42,8 @@ Released into the public domain under [CC0 1.0](https://creativecommons.org/publ
   *floral_jacquard*, *concrete_wall_008*, *smooth_concrete_floor*, *brushed_concrete*, *worn_tile_floor*,
   *leather_red_02*, *wood_table_worn*, *laminate_floor_02*, *cotton_jersey*, *painted_plaster_wall*, *sapele_veneer*,
   *rosewood_veneer1*, *velour_velvet*, *brown_leather*, *waffle_pique_cotton*, *large_floor_tiles_02*, *wooden_floor_02*,
-  *lacquered_cherry_wood*, *leather_white*; models *wall_clock*, *office_notepads*, *stationery_supplies*,
+  *lacquered_cherry_wood*, *leather_white*, *stone_block_wall*, *sandstone_blocks_08*, *slate_floor*, *medieval_blocks_03*,
+  *marble_01*, *crepe_satin*, *quatrefoil_jacquard_fabric*; models *wall_clock*, *office_notepads*, *stationery_supplies*,
   *vintage_stapler*, *binder_notebook*, *fire_alarm*, *mantel_clock_01*, *ornate_mirror_01*, *desk_lamp_arm_01*,
   *wooden_cutting_board*, *bananas*, *food_apple_01*, *potted_plant_02*, *fancy_picture_frame_01*, *vintage_cabinet_01*,
   *standing_picture_frame_01*, *standing_picture_frame_02*, *antique_ceramic_vase_01*, *ClassicConsole_01*,
@@ -56,6 +57,25 @@ Released into the public domain under [CC0 1.0](https://creativecommons.org/publ
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and obtained through the
   [Objaverse](https://huggingface.co/datasets/allenai/objaverse) mirror. Changes: cut from the cushion it was scanned
   on and closed underneath, its colours made a little greyer, rigged and animated.
+
+## The Iron Throne and three heads: CC BY 4.0
+
+Licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The first three were obtained through the
+[Objaverse](https://huggingface.co/datasets/allenai/objaverse) mirror, the fourth from Sketchfab.
+
+- The throne in the Game of Thrones room is ["Iron Throne"](https://sketchfab.com/3d-models/iron-throne-19840e7ca3b840218e51a58ed701a27a)
+  by [The Mangle](https://sketchfab.com/pizzapizza). Changes: scaled to the throne's height, its metal made rougher, and
+  modelled blades added to its crown.
+- Tyrion's head is ["Tyrion Lannister FanArt Lowpoly Game of Thrones"](https://sketchfab.com/3d-models/tyrion-lannister-fanart-lowpoly-game-of-thrones-bc675241a3094b34b213bcf3ee1e08ed)
+  by [kling](https://sketchfab.com/kling).
+- Cersei's head is ["cersei Lannister | Game Of thrones"](https://sketchfab.com/3d-models/cersei-lannister-game-of-thrones-874b0953c9ac453ba75d77ad202f90de)
+  by [imthirutj](https://sketchfab.com/imthirutj). Changes: lit as a surface, its colours warmed to the body's, the
+  collar on its neck painted as skin and its hair recoloured.
+- The Hound's head is ["The Hound"](https://sketchfab.com/3d-models/the-hound-4afb31e3e247445b88fd0955d720b34d) by
+  [MadCatD](https://sketchfab.com/MadCatD). Changes: part of its strand hair and beard thinned out, recoloured, its
+  skin warmed.
+
+Each head is set on a Rocketbox body (see above): cut at the neck, matched to the body's eyes and skinned to its head.
 
 ## Public domain
 

@@ -27,7 +27,7 @@ export const TOP = 10;
 
 const LIST: Title[] = [
   { slug: 'breaking-bad', kind: 'series', rank: 1, title: 'Breaking Bad', year: 2008, imdb: { id: 'tt0903747' }, scene: "Saul Goodman's office", room: 'breaking-bad' },
-  { slug: 'the-leftovers', kind: 'series', rank: 2, title: 'The Leftovers', year: 2014, imdb: { id: 'tt2699128' } },
+  { slug: 'the-leftovers', kind: 'series', rank: 11, title: 'The Leftovers', year: 2014, imdb: { id: 'tt2699128' } },
   { slug: 'seinfeld', kind: 'series', rank: 3, title: 'Seinfeld', year: 1989, imdb: { id: 'tt0098904' }, scene: "Jerry's apartment, 5A", room: 'seinfeld' },
   { slug: 'house-md', kind: 'series', rank: 4, title: 'House M.D.', year: 2004, imdb: { id: 'tt0412142' } },
   { slug: 'the-americans', kind: 'series', rank: 5, title: 'The Americans', year: 2013, imdb: { id: 'tt2149175' } },
@@ -36,7 +36,7 @@ const LIST: Title[] = [
   { slug: 'the-sopranos', kind: 'series', rank: 8, title: 'The Sopranos', year: 1999, imdb: { id: 'tt0141842' }, scene: "Dr. Melfi's office", room: 'the-sopranos' },
   { slug: 'succession', kind: 'series', rank: 9, title: 'Succession', year: 2018, imdb: { id: 'tt7660850' } },
   { slug: 'severance', kind: 'series', rank: 10, title: 'Severance', year: 2022, imdb: { id: 'tt11280740' }, scene: 'Macrodata Refinement, Lumon', room: 'severance' },
-  { slug: 'game-of-thrones', kind: 'series', rank: 11, title: 'Game of Thrones', year: 2011, imdb: { id: 'tt0944947' } },
+  { slug: 'game-of-thrones', kind: 'series', rank: 2, title: 'Game of Thrones', year: 2011, imdb: { id: 'tt0944947' }, scene: 'The throne room', room: 'game-of-thrones' },
   { slug: 'twin-peaks', kind: 'series', rank: 12, title: 'Twin Peaks', year: 1990, imdb: { id: 'tt0098936' } },
   { slug: 'sons-of-anarchy', kind: 'series', rank: 13, title: 'Sons of Anarchy', year: 2008, imdb: { id: 'tt1124373' } },
   { slug: 'fargo', kind: 'series', rank: 14, title: 'Fargo', year: 2014, imdb: { id: 'tt2802850' } },

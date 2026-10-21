@@ -185,6 +185,667 @@ def reshape(arm, mesh, shape, k=1.0):
     cine.log('reshape', mesh.get('person', mesh.name), shape, f'max {np.abs(D).max() * 100:.1f} cm')
 
 
+def reproportion(arm, mesh, k):
+    """Change the length of limb segments, mesh and skeleton together, before any clip is retargeted: `k` maps a bone
+    name to the factor for the segment from its head to its child's (e.g. {'Thigh': 0.5, 'Calf': 0.55}, both sides).
+    Every bone keeps its rest orientation (only heads move), so clips still apply; a vertex moves with its bones'
+    segments, blended by its skin weights. Sets arm['leg_k'] (the legs' new length over the old) for `retarget`."""
+    J = {b.name: (arm.matrix_world @ b.head_local).copy() for b in arm.data.bones}
+    kids = {b.name: [c.name for c in b.children] for b in arm.data.bones}
+    def main_child(b):
+        c = kids[b]
+        if not c: return None
+        return max(c, key=lambda n: (J[n] - J[b]).length) if len(c) > 1 and not any(s in b for s in ('Hand',)) else c[0]
+    delta = {}
+    def walk(b, d):
+        delta[b] = d
+        f = k.get(b.split(' ')[-1])
+        for c in kids[b]:                                          # a scaled segment carries all its children's heads
+            walk(c, d + (J[c] - J[b]) * (f - 1.0) if f is not None else d)
+    root = next(b.name for b in arm.data.bones if b.parent is None); walk(root, Vector())
+    # the feet stay on the floor: everything comes down by what the legs lost
+    drop = Vector((0, 0, (delta['Bip01 L Foot'].z + delta['Bip01 R Foot'].z) / 2))
+    for b in delta: delta[b] = delta[b] - drop
+    # the mesh: each vertex follows its bones; on a scaled segment, the share of the change by where it lies along it
+    me = mesh.data; M = mesh.matrix_world; Mi = M.inverted()
+    names = [g.name for g in mesh.vertex_groups]
+    for v in me.vertices:
+        p = M @ v.co; tot, w_sum = Vector(), 0.0
+        for g in v.groups:
+            b = names[g.group]
+            if b not in delta or g.weight <= 0: continue
+            d = delta[b]; ch = main_child(b)
+            if ch is not None and b.split(' ')[-1] in k:
+                seg = J[ch] - J[b]; t = min(max((p - J[b]).dot(seg) / max(seg.length_squared, 1e-9), 0.0), 1.0)
+                d = delta[b] + (delta[ch] - delta[b]) * t
+            tot += d * g.weight; w_sum += g.weight
+        if w_sum > 0: v.co = Mi @ (p + tot / w_sum)
+    _fresh_normals(mesh)
+    # the skeleton: heads (and tails, keeping each bone's direction) moved by their deltas
+    bpy.context.view_layer.objects.active = arm; arm.select_set(True)
+    bpy.ops.object.mode_set(mode='EDIT')
+    Ai = arm.matrix_world.inverted().to_3x3()
+    for eb in arm.data.edit_bones:
+        d = Ai @ delta.get(eb.name, Vector())
+        eb.head = eb.head + d; eb.tail = eb.tail + d
+    bpy.ops.object.mode_set(mode='OBJECT')
+    J2 = {b.name: (arm.matrix_world @ b.head_local) for b in arm.data.bones}
+    leg = lambda JJ: (JJ['Bip01 L Thigh'] - JJ['Bip01 L Foot']).length
+    arm['leg_k'] = leg(J2) / leg(J)
+    bpy.context.view_layer.update()
+    cine.log('reproportion', mesh.get('person', mesh.name), {kk: round(v, 2) for kk, v in k.items()}, f"legs x{arm['leg_k']:.2f}")
+
+
+def swap_head(arm, mesh, glb, keep, front, eyes, cut=0.0, fan_cut=-0.03, decimate=None, skin=None, thin=None, keep_cards=False, tone=None, neck_skin=False, match_neck=False, follow=0.0, scalp=None):
+    """Put a sculpted head (a fan's model) on a Rocketbox body: the avatar's own head and hair go above the neck; the
+    model's parts named in `keep` (substrings of object names, or all) are joined, turned so its face looks along the
+    avatar's (-y; `front` is the model's own facing axis after import, '+y' or '-y'), scaled and moved so its eyes sit
+    on the avatar's eye joints (`eyes`: the object whose two clusters are the eyeballs, or two points in the model's
+    space), cut below `fan_cut` metres under the neck joint (a bust's shoulders), skinned to the head (the neck below
+    the jaw blending into the neck bone) and joined into the body mesh. `cut`: how far above the neck joint the
+    avatar's own skin is cut away. `decimate`: {part substring: ratio} thins dense parts (strand hair). `tone`: an RGB
+    factor on the model's colour images (a photographed face matched to the body's skin). `neck_skin`: what is dark
+    on the model's neck below the jaw (a costume's collar in the photographs) is painted as the neck's own skin.
+    `match_neck`: the model's neck below the jaw widens or narrows to meet the body's neck where it was cut.
+    `follow` (metres): the body's head is cut that far above the model's own lower edge, round the neck, instead of
+    flat at `cut` (a short neck with a slanted edge). `scalp`: the hair painted on the model's scalp recoloured
+    (sRGB 0-255). Returns the model's material names (for the export to keep their images)."""
+    import bmesh
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=glb)
+    new = [o for o in bpy.data.objects if o not in before]
+    parts = [o for o in new if o.type == 'MESH' and (keep is None or any(s in o.name for s in keep))]
+    for o in new:
+        if o not in parts and o.type == 'MESH': bpy.data.objects.remove(o, do_unlink=True)
+    bpy.context.view_layer.update()
+    for o in parts:
+        mw = o.matrix_world.copy(); o.parent = None; o.matrix_world = mw
+        if decimate:
+            r = next((v for s_, v in decimate.items() if s_ in o.name), None)
+            if r:
+                md = o.modifiers.new('thin', 'DECIMATE'); md.ratio = r
+                with bpy.context.temp_override(object=o, active_object=o): bpy.ops.object.modifier_apply(modifier=md.name)
+        if thin:                                                                    # strand hair: keep a share of its strands
+            r = next((v for s_, v in thin.items() if s_ in o.name), None)
+            if r:
+                import random
+                rnd = random.Random(7); bmt = bmesh.new(); bmt.from_mesh(o.data)
+                bmesh.ops.delete(bmt, geom=[f for f in bmt.faces if rnd.random() > r], context='FACES')
+                bmesh.ops.delete(bmt, geom=[v for v in bmt.verts if not v.link_faces], context='VERTS')
+                bmt.to_mesh(o.data); bmt.free(); o.data.update()
+    for o in [o for o in bpy.data.objects if o.type == 'EMPTY' and o in new]: bpy.data.objects.remove(o, do_unlink=True)
+    for o in parts:                                                   # an unlit scan (emission only) becomes a lit surface
+        for sl in o.material_slots:
+            m = sl.material
+            if not m or not m.node_tree or any(n.type == 'BSDF_PRINCIPLED' for n in m.node_tree.nodes): continue
+            nt = m.node_tree; img = next((n.image for n in nt.nodes if n.type == 'TEX_IMAGE' and n.image), None)
+            for n in list(nt.nodes): nt.nodes.remove(n)
+            out = nt.nodes.new('ShaderNodeOutputMaterial'); p = nt.nodes.new('ShaderNodeBsdfPrincipled')
+            nt.links.new(p.outputs['BSDF'], out.inputs['Surface'])
+            if img is not None: t = nt.nodes.new('ShaderNodeTexImage'); t.image = img; nt.links.new(t.outputs['Color'], p.inputs['Base Color'])
+            try: m.surface_render_method = 'DITHERED'; m.blend_method = 'OPAQUE'
+            except Exception: pass
+            cine.log('unlit material made lit', m.name)
+    # the model's eyes, in the world (as imported)
+    if isinstance(eyes, str):
+        eo = next(o for o in parts if eyes in o.name)
+        P = [eo.matrix_world @ v.co for v in eo.data.vertices]
+        zmid = (min(p.z for p in P) + max(p.z for p in P)) / 2; P = [p for p in P if p.z >= zmid]   # the eyes, not a neck ring with them
+        cx = sum(p.x for p in P) / len(P)
+        L = [p for p in P if p.x >= cx]; R_ = [p for p in P if p.x < cx]
+        e1, e2 = sum(L, Vector()) / len(L), sum(R_, Vector()) / len(R_)
+    else: e1, e2 = Vector(eyes[0]), Vector(eyes[1])
+    # the avatar's eyes and facing (-y in the rest pose)
+    J = _joints(arm); aL, aR = J['Bip01 LEye'], J['Bip01 REye']
+    am = (aL + aR) / 2; ad = (aL - aR).length
+    # turn the model about z so its face looks along -y (its eyes then span x); scale to the avatar's eye distance
+    rz = math.pi if front == '+y' else 0.0
+    Rz = Matrix.Rotation(rz, 4, 'Z')
+    m1, m2 = Rz @ e1, Rz @ e2; mm = (m1 + m2) / 2; md_ = (m1 - m2).length
+    s = ad / md_
+    # level the eye line (a small roll about y) and match the eyes' side order to the avatar's (L at +x)
+    ev = (m1 - m2) if (m1 - m2).x * (aL - aR).x > 0 else (m2 - m1)
+    roll = math.atan2(ev.z, ev.x) - math.atan2((aL - aR).z, (aL - aR).x)
+    Ry = Matrix.Rotation(roll, 4, 'Y')
+    T_ = Matrix.Translation(am) @ Ry @ Matrix.Diagonal((s, s, s, 1)) @ Matrix.Translation(-mm) @ Rz
+    for o in parts: o.matrix_world = T_ @ o.matrix_world
+    bpy.context.view_layer.update()
+    # the avatar's own head: its skin above the cut, its eyes and teeth and hair cards
+    neck = J['Bip01 Neck']; zc = neck.z + cut
+    me = mesh.data; M = mesh.matrix_world
+    head_mats = {i for i, sl in enumerate(mesh.material_slots) if sl.material and ('head' in sl.material.name or ('opacity' in sl.material.name and not keep_cards))}
+    bm = bmesh.new(); bm.from_mesh(me)
+    dead = {f for f in bm.faces if f.material_index in head_mats and min((M @ v.co).z for v in f.verts) > zc}
+    if follow:                                                      # the cut follows the model's own lower edge, round the neck
+        F_ = [o.matrix_world @ v.co for o in parts for v in o.data.vertices]
+        bins = [None] * 36
+        for q in F_:
+            k_ = int((math.atan2(q.y - neck.y, q.x - neck.x) + math.pi) / (2 * math.pi) * 36) % 36
+            if bins[k_] is None or q.z < bins[k_]: bins[k_] = q.z
+        def edge_z(q):
+            k_ = int((math.atan2(q.y - neck.y, q.x - neck.x) + math.pi) / (2 * math.pi) * 36) % 36
+            return (bins[k_] if bins[k_] is not None else zc - follow) + follow
+        dead = {f for f in bm.faces if f.material_index in head_mats and (lambda q: q.z > edge_z(q))(M @ f.calc_center_median())}
+    # below the cut: a long hair mass modelled down the back, and small pieces of the head's material (a necklace's beads)
+    def behind(f):
+        q = M @ f.calc_center_median(); r = math.hypot(q.x - neck.x, q.y - neck.y)
+        return q.y > neck.y + 0.075 or (q.y > neck.y + 0.01 and r > 0.075)
+    dead |= {f for f in bm.faces if f.material_index in head_mats and behind(f)}
+    seen = set()
+    for f in bm.faces:
+        if f in seen or f.material_index not in head_mats: continue
+        comp, stack = [], [f]; seen.add(f)
+        while stack:
+            g = stack.pop(); comp.append(g)
+            for e in g.edges:
+                for h in e.link_faces:
+                    if h not in seen: seen.add(h); stack.append(h)
+        if len(comp) < 80 and max((M @ v.co).z for g in comp for v in g.verts) < neck.z: dead |= set(comp)
+    bmesh.ops.delete(bm, geom=list(dead), context='FACES'); bm.to_mesh(me); bm.free(); me.update()
+    # the model: everything below the fan cut goes (a bust's shoulders, a collar)
+    zf = neck.z + fan_cut
+    for o in parts:
+        bmf = bmesh.new(); bmf.from_mesh(o.data); W_ = o.matrix_world
+        bmesh.ops.delete(bmf, geom=[v for v in bmf.verts if (W_ @ v.co).z < zf], context='VERTS')
+        bmf.to_mesh(o.data); bmf.free(); o.data.update()
+    # skin: the head bone, the neck bone blended in below the jaw
+    jaw = J.get('Bip01 MJaw', J['Bip01 Head']).z - 0.03
+    if neck_skin: _neck_skin(parts, jaw)
+    if scalp: _scalp_colour(parts, am, scalp)
+    if match_neck: _match_neck(mesh, head_mats, parts, zc, jaw)
+    for o in parts:
+        for vg in list(o.vertex_groups): o.vertex_groups.remove(vg)
+        gh, gn = o.vertex_groups.new(name='Bip01 Head'), o.vertex_groups.new(name='Bip01 Neck')
+        W_ = o.matrix_world
+        for v in o.data.vertices:
+            z = (W_ @ v.co).z; t = min(max((jaw - z) / 0.07, 0.0), 1.0)
+            if t < 1: gh.add([v.index], 1.0 - t, 'REPLACE')
+            if t > 0: gn.add([v.index], t, 'REPLACE')
+        for p in o.data.polygons: p.use_smooth = True
+    mats = [sl.material.name for o in parts for sl in o.material_slots if sl.material]
+    for o in parts:                                               # glTF's default is metallic: skin and hair are not
+        for sl in o.material_slots:
+            p = next((n for n in sl.material.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None) if sl.material and sl.material.node_tree else None
+            if p is None: continue
+            for inp in ('Metallic', 'Roughness'):                     # packed metal/rough maps: the exporter cannot split them
+                for l in list(p.inputs[inp].links): sl.material.node_tree.links.remove(l)
+            p.inputs['Metallic'].default_value = 0.0; p.inputs['Roughness'].default_value = 0.55
+            p.inputs['Specular IOR Level'].default_value = 0.4
+            if tone:
+                for l in p.inputs['Base Color'].links:
+                    im = getattr(l.from_node, 'image', None)
+                    if im is None or im.get('toned'): continue
+                    px = np.empty(len(im.pixels), np.float32); im.pixels.foreach_get(px); px = px.reshape(-1, 4)
+                    px[:, :3] = np.clip(px[:, :3] * np.array(tone, np.float32)[None, :], 0, 1)
+                    im.pixels.foreach_set(px.ravel()); im.pack(); im['toned'] = 1
+    if skin:
+        for o in parts:
+            for sl in o.material_slots:
+                if sl.material and any(k_ in sl.material.name for k_ in skin): sl.material['fan_skin'] = 1
+    for o in parts:                                               # a scan's vertex colours: the web multiplies them into the face
+        for ca in list(o.data.color_attributes): o.data.color_attributes.remove(ca)
+    uvname = mesh.data.uv_layers.active.name                      # a join keeps UV maps by name: give the model's the body's
+    for o in parts:
+        for l in list(o.data.uv_layers)[1:]: o.data.uv_layers.remove(l)
+        if o.data.uv_layers: o.data.uv_layers[0].name = uvname
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in parts: o.select_set(True)
+    mesh.select_set(True); bpy.context.view_layer.objects.active = mesh
+    bpy.ops.object.join()
+    _fresh_normals(mesh)
+    cine.log('head swapped', mesh.get('person', mesh.name), os.path.basename(glb), f'scale {s:.4f}', f'{len(parts)} parts')
+    return mats
+
+
+def _match_neck(mesh, head_mats, parts, zc, jaw):
+    """The model's neck meets the body's: below the jaw its vertices move toward the ring of the body's neck at the
+    cut (its middle and radius), fully at the cut and below it, where they sit just inside."""
+    M = mesh.matrix_world
+    av = [M @ mesh.data.vertices[i].co for p in mesh.data.polygons if p.material_index in head_mats for i in p.vertices]
+    def ring(P, z0, dz=0.01):
+        Q = [q for q in P if abs(q.z - z0) < dz]
+        if len(Q) < 8: return None
+        c = sum(Q, Vector()) / len(Q); return c, sum(math.hypot(q.x - c.x, q.y - c.y) for q in Q) / len(Q)
+    fan = [(o, v, o.matrix_world @ v.co) for o in parts for v in o.data.vertices]
+    zr = min(min(w.z for _, _, w in fan) + 0.006, zc - 0.006)                    # where the two necks overlap
+    a = ring(av, zr, 0.006); f = ring([w for _, _, w in fan], zr, 0.006)
+    if a is None or f is None:
+        cine.log('neck rings not found', len(av), len(fan), round(zc, 3), min((w.z for _, _, w in fan), default=0), a is None, f is None); return
+    (ca, ra), (cf, rf) = a, f; k = ra / rf
+    def sm(e0, e1, x): t = min(max((x - e0) / (e1 - e0), 0.0), 1.0); return t * t * (3 - 2 * t)
+    for o, v, w in fan:
+        if w.z >= jaw: continue
+        t = sm(jaw, min(zr + 0.01, jaw - 0.005), w.z); inner = 1.0 - 0.03 * sm(zc, zc - 0.01, w.z)
+        nx = ca.x + (w.x - cf.x) * k * inner; ny = ca.y + (w.y - cf.y) * k * inner
+        v.co = o.matrix_world.inverted() @ Vector((w.x + (nx - w.x) * t, w.y + (ny - w.y) * t, w.z))
+    for o in parts: o.data.update()
+    cine.log(f'neck matched: body r {ra:.3f}, model r {rf:.3f}, centres {(ca - cf).length * 100:.1f} cm apart')
+
+
+def _uv_fill(m, pts):
+    """A polygon (UV pixels) filled into a boolean mask, as a triangle fan."""
+    for a, b, c in ((pts[0], pts[i], pts[i + 1]) for i in range(1, len(pts) - 1)):
+        x0, x1 = int(max(min(a[0], b[0], c[0]), 0)), int(min(max(a[0], b[0], c[0]) + 1, m.shape[1]))
+        y0, y1 = int(max(min(a[1], b[1], c[1]), 0)), int(min(max(a[1], b[1], c[1]) + 1, m.shape[0]))
+        if x1 <= x0 or y1 <= y0: continue
+        yy, xx = np.mgrid[y0:y1, x0:x1] + 0.5
+        d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1])
+        if abs(d) < 1e-9: continue
+        l1 = ((b[1] - c[1]) * (xx - c[0]) + (c[0] - b[0]) * (yy - c[1])) / d
+        l2 = ((c[1] - a[1]) * (xx - c[0]) + (a[0] - c[0]) * (yy - c[1])) / d
+        m[y0:y1, x0:x1] |= (l1 >= -0.02) & (l2 >= -0.02) & (l1 + l2 <= 1.02)
+
+
+def _uv_paint(parts, select, paint, what):
+    """Repaint a model's colour images where its faces are `select`ed (by their world centre): `paint(rgb, mask,
+    skin)` changes the texels in place (`skin`: the skin-coloured ones)."""
+    for o in parts:
+        uv = o.data.uv_layers.active
+        if uv is None: continue
+        W_ = o.matrix_world
+        for k, sl in enumerate(o.material_slots):
+            p = next((n for n in sl.material.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None) if sl.material else None
+            im = next((l.from_node.image for l in p.inputs['Base Color'].links if getattr(l.from_node, 'image', None)), None) if p else None
+            if im is None: continue
+            w, h = im.size; m = np.zeros((h, w), bool)                          # rows bottom-up, as Blender's pixels
+            for poly in o.data.polygons:
+                if poly.material_index == k and select(W_ @ poly.center):
+                    _uv_fill(m, [(uv.data[li].uv.x * w, uv.data[li].uv.y * h) for li in poly.loop_indices])
+            px = np.empty(w * h * 4, np.float32); im.pixels.foreach_get(px); px = px.reshape(h, w, 4)
+            rgb = px[..., :3]; mx = rgb.max(-1); mn = rgb.min(-1); sat = (mx - mn) / (mx + 1e-6)
+            skin = m & (mx > 0.35) & (sat > 0.12) & (sat < 0.6) & (rgb[..., 0] >= rgb[..., 1])
+            n = paint(rgb, m, skin)
+            px[..., :3] = rgb; im.pixels.foreach_set(px.ravel()); im.pack()
+            cine.log(what, o.name, n, 'texels')
+
+
+def _neck_skin(parts, jaw):
+    """Paint over the dark parts of a model's colour image where its neck is (faces below the jaw): a collar the
+    photographs caught becomes the neck's skin (the median of the skin-coloured texels there)."""
+    def paint(rgb, m, skin):
+        if skin.sum() < 50: return 0
+        tone_ = np.median(rgb[skin], 0); dark = m & ~skin
+        rgb[dark] = tone_[None, :] * (0.94 + 0.08 * np.random.default_rng(3).random((int(dark.sum()), 1)))
+        return int(dark.sum())
+    _uv_paint(parts, lambda q: q.z < jaw - 0.005, paint, 'neck painted as skin')
+
+
+def _scalp_colour(parts, eyes, colour):
+    """The hair a model's photographs caught on its scalp (above the brows, behind the ears) in another colour (sRGB
+    0-255), its light and dark kept."""
+    col = np.array(colour, np.float32) / 255
+    def paint(all_):
+        def p_(rgb, m, skin):
+            hair = m if all_ else m & ~skin; l = rgb[hair] @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+            rgb[hair] = col[None, :] * np.clip((l / max(l.mean(), 1e-4)) ** 0.4, 0.7, 1.2)[:, None]
+            return int(hair.sum())
+        return p_
+    top = lambda q: q.z > eyes.z + 0.06 or q.y > eyes.y + 0.11                      # well above the hairline: all hair
+    _uv_paint(parts, lambda q: q.z > eyes.z + 0.035 and not top(q), paint(False), 'hairline recoloured')
+    _uv_paint(parts, top, paint(True), 'scalp recoloured')
+
+
+def _joined(mesh, ob):
+    bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); mesh.select_set(True); bpy.context.view_layer.objects.active = mesh
+    bpy.ops.object.join()
+
+
+def skirt(arm, mesh, mat, hem=0.02, top=0.0, ease=0.018, flare=0.22, folds=14, depth=0.012, front_open=0.0, seg=72, rows=26, name='skirt'):
+    """A long skirt (a gown, a robe) from the waist (`top` metres above the pelvis joint) to `hem` (z, rest pose),
+    hugging the hips (`ease` out from them) and flaring as it falls (`flare` metres wider at the hem than at the
+    hip), pleated in `folds` soft folds `depth` deep; `front_open` (radians) leaves a split in front. Skinned: the
+    waist to the pelvis, then each part to the thigh and calf on its side, the middle front and back shared between
+    both legs so it parts as they walk. `mat`: its material (0..1 UVs round and down). Joined into the body mesh."""
+    import bmesh
+    J = _joints(arm); bvh = _bvh(mesh)
+    pel = J['Bip01 Pelvis']; zt = pel.z + top
+    c = Vector((pel.x, pel.y, 0)); bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap'); grid = []
+    r_hip = 0.0
+    for j in range(rows + 1):
+        t = j / rows; z = zt + (hem - zt) * t; ring = []
+        for i in range(seg):
+            a = 2 * math.pi * i / seg; d = Vector((math.sin(a), -math.cos(a), 0))     # a = 0: the front (-y)
+            o = Vector((c.x, c.y, z)) + d * 0.6; h = bvh.ray_cast(o, -d, 0.6)[0]
+            r_body = (Vector((h.x, h.y, 0)) - c).length if h is not None and (Vector((h.x, h.y, 0)) - c).length < 0.3 else 0.12
+            e = 0.004 + (ease - 0.004) * min(t / 0.25, 1.0)                          # the waist hugs the body; the ease comes below it
+            if j == 0: ring.append(r_body + e)
+            else:
+                r_prev = grid[j - 1][i]                                                # never in; wider by the flare as it falls
+                ring.append(max(r_prev, r_body + e) + flare * ((t ** 1.3) - (((j - 1) / rows) ** 1.3)))
+        grid.append(ring)
+    V = []
+    for j, ring in enumerate(grid):
+        t = j / rows; z = zt + (hem - zt) * t; row = []
+        for i, r in enumerate(ring):
+            a = 2 * math.pi * i / seg; d = Vector((math.sin(a), -math.cos(a), 0))
+            r += depth * math.sin(folds * a) * t ** 0.8
+            row.append(bm.verts.new(Vector((c.x, c.y, z)) + d * r))
+        V.append(row)
+    for j in range(rows):
+        for i in range(seg):
+            a0 = 2 * math.pi * i / seg
+            if front_open and (min(a0, 2 * math.pi - a0) < front_open / 2): continue
+            i2 = (i + 1) % seg
+            f = bm.faces.new((V[j][i], V[j][i2], V[j + 1][i2], V[j + 1][i]))
+            for l, (uu, vv) in zip(f.loops, ((i / seg, j / rows), ((i + 1) / seg, j / rows), ((i + 1) / seg, (j + 1) / rows), (i / seg, (j + 1) / rows))): l[uvl].uv = (uu, 1 - vv)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    for f in bm.faces: f.smooth = True
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    ob = bpy.data.objects.new(name, me); [cl.objects.link(ob) for cl in mesh.users_collection]; me.materials.append(mat)
+    # weights: the waist band to the pelvis; below it, each side to its thigh then calf; the middle shared
+    gs = {n: ob.vertex_groups.new(name=n) for n in ('Bip01 Pelvis', 'Bip01 L Thigh', 'Bip01 R Thigh', 'Bip01 L Calf', 'Bip01 R Calf')}
+    kz = J['Bip01 L Calf'].z
+    def sm(e0, e1, x): x = min(max((x - e0) / (e1 - e0), 0.0), 1.0); return x * x * (3 - 2 * x)
+    for v in me.vertices:
+        p = v.co; wp = 1 - sm(zt - 0.12, zt - 0.32, p.z)
+        side = sm(-0.05, 0.05, p.x - c.x)                                           # 0: the right leg, 1: the left
+        mid = 1 - abs(side * 2 - 1)
+        wl, wr = side * (1 - wp), (1 - side) * (1 - wp)
+        calf = sm(kz + 0.05, kz - 0.15, p.z) * 0.6
+        for n, w in (('Bip01 Pelvis', wp + mid * 0.25 * (1 - wp)), ('Bip01 L Thigh', wl * (1 - calf) * (1 - 0.25 * mid)), ('Bip01 R Thigh', wr * (1 - calf) * (1 - 0.25 * mid)),
+                     ('Bip01 L Calf', wl * calf), ('Bip01 R Calf', wr * calf)):
+            if w > 1e-4: gs[n].add([v.index], w, 'REPLACE')
+    me.transform(mesh.matrix_world.inverted()); ob.matrix_world = mesh.matrix_world
+    me.uv_layers[0].name = mesh.data.uv_layers.active.name
+    _joined(mesh, ob); cine.log('skirt on', mesh.get('person', mesh.name), f'hem at z {hem:.2f}')
+
+
+def cape(arm, mesh, mat, hem, width=0.5, drop_out=0.06, folds=9, depth=0.02, seg=40, rows=22, collar=0.02, name='cape'):
+    """A cloak hung from the shoulders down the back to `hem` (z, rest pose): across the shoulders from collar bone to
+    collar bone, `width` wide at the shoulders widening by half again to the hem, standing `drop_out` off the back,
+    pleated; skinned to the upper back and collar bones at the top, the pelvis and the thighs lower down (it swings
+    with the walk). Joined into the body mesh."""
+    import bmesh
+    J = _joints(arm); bvh = _bvh(mesh)
+    neck = J['Bip01 Neck']; top = neck.z - collar; sh = (J['Bip01 L UpperArm'] + J['Bip01 R UpperArm']) / 2
+    bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap'); V = []
+    for j in range(rows + 1):
+        t = j / rows; z = top + (hem - top) * t; row = []
+        w = width * (1 + 0.5 * t ** 0.8)
+        for i in range(seg + 1):
+            s = i / seg - 0.5; x = neck.x + s * w
+            o = Vector((x, neck.y + 0.6, z)); h = bvh.ray_cast(o, Vector((0, -1, 0)), 0.9)[0]
+            yb = (h.y if h is not None else neck.y + 0.12)
+            y = yb + 0.012 + drop_out * t ** 0.7 + depth * math.sin(folds * math.pi * s * 2) * t
+            # over the shoulders: the top rows wrap forward round the shoulders' tops
+            if j == 0: y = min(y, sh.y + 0.05 + abs(s) * 0.06)
+            row.append(bm.verts.new(Vector((x, y, z))))
+        V.append(row)
+    for j in range(rows):
+        for i in range(seg):
+            f = bm.faces.new((V[j][i], V[j][i + 1], V[j + 1][i + 1], V[j + 1][i]))
+            for l, (uu, vv) in zip(f.loops, ((i / seg, j / rows), ((i + 1) / seg, j / rows), ((i + 1) / seg, (j + 1) / rows), (i / seg, (j + 1) / rows))): l[uvl].uv = (uu, 1 - vv)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    for f in bm.faces: f.smooth = True
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    ob = bpy.data.objects.new(name, me); [cl.objects.link(ob) for cl in mesh.users_collection]; me.materials.append(mat)
+    names = ('Bip01 Spine2', 'Bip01 L Clavicle', 'Bip01 R Clavicle', 'Bip01 Spine', 'Bip01 Pelvis', 'Bip01 L Thigh', 'Bip01 R Thigh')
+    gs = {n: ob.vertex_groups.new(name=n) for n in names}
+    pel = J['Bip01 Pelvis']
+    def sm(e0, e1, x): x = min(max((x - e0) / (e1 - e0), 0.0), 1.0); return x * x * (3 - 2 * x)
+    for v in me.vertices:
+        p = v.co; up = sm(pel.z, top - 0.05, p.z); low = 1 - up
+        side = sm(-0.08, 0.08, p.x - neck.x)
+        top_side = up * sm(0.05, 0.18, abs(p.x - neck.x))
+        wts = {'Bip01 Spine2': up * (1 - top_side) * 0.8, 'Bip01 L Clavicle' if p.x > neck.x else 'Bip01 R Clavicle': top_side, 'Bip01 Spine': up * (1 - top_side) * 0.2,
+               'Bip01 Pelvis': low * (1 - sm(pel.z - 0.05, pel.z - 0.4, p.z)) + low * sm(pel.z - 0.05, pel.z - 0.4, p.z) * 0.5,
+               'Bip01 L Thigh': low * sm(pel.z - 0.05, pel.z - 0.4, p.z) * 0.5 * side, 'Bip01 R Thigh': low * sm(pel.z - 0.05, pel.z - 0.4, p.z) * 0.5 * (1 - side)}
+        for n, w in wts.items():
+            if w > 1e-4: gs[n].add([v.index], w, 'REPLACE')
+    me.transform(mesh.matrix_world.inverted()); ob.matrix_world = mesh.matrix_world
+    me.uv_layers[0].name = mesh.data.uv_layers.active.name
+    _joined(mesh, ob); cine.log('cape on', mesh.get('person', mesh.name), f'hem at z {hem:.2f}')
+
+
+def remove_hair_cards(mesh):
+    """Drop the avatar's own hair cards (the 'opacity' material's faces): a hair shell or a sculpted head replaces them."""
+    import bmesh
+    k = {i for i, sl in enumerate(mesh.material_slots) if sl.material and 'opacity' in sl.material.name}
+    bm = bmesh.new(); bm.from_mesh(mesh.data)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.material_index in k], context='FACES'); bm.to_mesh(mesh.data); bm.free(); mesh.data.update()
+
+
+def transplant_hair(arm, mesh, donor, image, hem=None, fit=1.04, lift=0.0, back=0.0, stretch=1.0, flare=0.15, front_keep=0.03, name='hair'):
+    """Another avatar's hair cards on this head: the donor's 'opacity' faces, moved and scaled so its eyes sit on
+    these eyes (`fit` scales them a little more about the skull's middle: a man's head is larger), `lift` and `back`
+    (metres) nudge them; `stretch` lengthens what hangs below the ears (behind them, from `front_keep` metres back of
+    the skull's middle) by that factor, `flare` pushing it out as it falls (metres per metre); cut off below `hem` (z,
+    rest pose) if given; their texture replaced by `image` (an RGBA file: the donor's own, recoloured); skinned head ->
+    neck -> upper back; joined into the body mesh."""
+    import bmesh
+    before = set(bpy.data.objects)
+    _import_fbx(os.path.join(RB, 'avatars', donor, 'Export', f'{donor}.fbx'))
+    new = [o for o in bpy.data.objects if o not in before]
+    darm = next(o for o in new if o.type == 'ARMATURE'); dmesh = next(o for o in new if o.type == 'MESH')
+    bpy.context.view_layer.update()
+    DJ = {b.name: darm.matrix_world @ b.head_local for b in darm.data.bones}
+    k = [i for i, sl in enumerate(dmesh.material_slots) if sl.material and 'opacity' in sl.material.name and 'glasses' not in sl.material.name]
+    bm = bmesh.new(); bm.from_mesh(dmesh.data); bm.transform(dmesh.matrix_world)
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.material_index not in k], context='FACES')
+    J = _joints(arm)
+    dm = (DJ['Bip01 LEye'] + DJ['Bip01 REye']) / 2; tm = (J['Bip01 LEye'] + J['Bip01 REye']) / 2
+    s = (J['Bip01 LEye'] - J['Bip01 REye']).length / (DJ['Bip01 LEye'] - DJ['Bip01 REye']).length * fit
+    dc = dm + Vector((0, 0.06, 0.03))                                           # the donor's skull middle
+    T_ = Matrix.Translation(tm + Vector((0, 0.06 + back, 0.03 + lift))) @ Matrix.Diagonal((s, s, s, 1)) @ Matrix.Translation(-dc)
+    bm.transform(T_)
+    if stretch != 1.0:                                                          # longer hair: what falls below the ears, longer
+        c = tm + Vector((0, 0.06 + back, 0.03 + lift)); zr = c.z - 0.035
+        for v in bm.verts:
+            p = v.co
+            if p.z >= zr: continue
+            behind = min(max((p.y - (c.y - front_keep)) / 0.04, 0.0), 1.0)
+            dz = (p.z - zr) * (stretch - 1.0) * behind
+            out = Vector((p.x - c.x, p.y - c.y, 0)); out = out.normalized() if out.length > 1e-6 else Vector((0, 1, 0))
+            v.co = Vector((p.x, p.y, p.z + dz)) + out * (-dz) * flare
+    if hem is not None:
+        res = bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(0, 0, hem), plane_no=(0, 0, 1))
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.co.z < hem - 1e-5], context='VERTS')
+    for f in bm.faces: f.material_index = 0
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    uv = me.uv_layers[0].name if me.uv_layers else None
+    for l in list(me.uv_layers)[1:]: me.uv_layers.remove(l)
+    for o in new: bpy.data.objects.remove(o, do_unlink=True)
+    ob = bpy.data.objects.new(name, me); [cl.objects.link(ob) for cl in mesh.users_collection]
+    img = bpy.data.images.load(image, check_existing=True)
+    me.materials.clear(); me.materials.append(_hair_material(f"hair_{mesh.get('person', 'x')}", img, rough=0.5))
+    _skin_by_height(ob, J, tm.x)
+    me.transform(mesh.matrix_world.inverted()); ob.matrix_world = mesh.matrix_world
+    if me.uv_layers: me.uv_layers[0].name = mesh.data.uv_layers.active.name
+    for p in me.polygons: p.use_smooth = True
+    bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); mesh.select_set(True); bpy.context.view_layer.objects.active = mesh
+    bpy.ops.object.join()
+    cine.log('hair from', donor, 'on', mesh.get('person', mesh.name), f'scale {s:.3f}', f'cut at {hem:.2f}' if hem is not None else '')
+
+
+def _hair_image(name, colour, seed, size=(1024, 512), streak=0.5, jag=0.14, curl=0.0, clumps=False):
+    """An RGBA strand texture: u across the strands (fine streaks in clumps), v down their length; the ends (v near 1)
+    ragged in the alpha. `colour` sRGB 0-255; `curl` waves the streaks (curly or wavy hair)."""
+    rng = np.random.default_rng(seed); W_, H_ = size
+    u = np.arange(W_) / W_; v = np.arange(H_)[:, None] / H_
+    col = np.zeros(W_)
+    for f, a in ((8, 0.45), (40, 0.3), (160, 0.25), (500, 0.18)):                 # clumps and single strands
+        ph = rng.random(f) * 2 * np.pi; col += a * np.interp(u * f, np.arange(f + 1), np.r_[np.sin(ph), np.sin(ph[0])])
+    shift = (curl * 0.02 * np.sin(v * 2 * np.pi * 6 + u[None, :] * 40)) if curl else 0.0
+    idx = ((u[None, :] + shift) % 1.0 * W_).astype(int) % W_
+    lum_ = (1.0 + streak * 0.5 * col[idx] / np.abs(col).max()) * np.ones((H_, 1))
+    lum_ *= 0.82 + 0.18 * np.clip(v * 4, 0, 1)                                      # darker at the roots
+    lum_ *= 1.0 + 0.12 * np.sin(v * 2 * np.pi * 3 + u[None, :] * 13) * curl         # waves catch the light
+    base = np.array(colour, np.float32) / 255
+    rgb = np.clip(base[None, None, :] * lum_[..., None], 0, 1)
+    ends = 1 - jag * rng.random(W_) ** 0.6                                           # each strand's own length
+    ends = np.convolve(ends, np.ones(3) / 3, mode='same')
+    alpha = (v < ends[None, :]).astype(np.float32)
+    if clumps:                                                                      # strands in clumps with gaps between them
+        g = np.zeros(W_)
+        for f, a_ in ((24, 0.6), (90, 0.4), (300, 0.3)):
+            ph = rng.random(f) * 2 * np.pi; g += a_ * np.interp(u * f, np.arange(f + 1), np.r_[np.sin(ph), np.sin(ph[0])])
+        keep = (g > np.quantile(g, 0.32)).astype(np.float32)
+        alpha = alpha * keep[None, :]
+    img = bpy.data.images.new(name, W_, H_, alpha=True)
+    px = np.dstack([rgb, alpha])[::-1].astype(np.float32)                           # Blender's rows run bottom-up
+    img.pixels.foreach_set(px.ravel()); img.pack()
+    return img
+
+
+def _hair_material(name, img, rough=0.5):
+    m = bpy.data.materials.new(name); nt = m.node_tree; p = nt.nodes['Principled BSDF']
+    t = nt.nodes.new('ShaderNodeTexImage'); t.image = img
+    nt.links.new(t.outputs['Color'], p.inputs['Base Color']); nt.links.new(t.outputs['Alpha'], p.inputs['Alpha'])
+    p.inputs['Roughness'].default_value = rough; p.inputs['Specular IOR Level'].default_value = 0.35
+    try: m.blend_method = 'CLIP'; m.alpha_threshold = 0.45
+    except Exception: pass
+    try: m.surface_render_method = 'DITHERED'
+    except Exception: pass
+    return m
+
+
+def _bvh(mesh):
+    from mathutils.bvhtree import BVHTree
+    deps = bpy.context.evaluated_depsgraph_get(); ev = mesh.evaluated_get(deps); M = mesh.matrix_world
+    me = ev.to_mesh(); verts = [M @ v.co for v in me.vertices]; polys = [tuple(p.vertices) for p in me.polygons]
+    ev.to_mesh_clear()
+    return BVHTree.FromPolygons(verts, polys)
+
+
+def _head_frame(arm):
+    """The skull's middle (rest pose, the avatar facing -y) and the eye height."""
+    J = _joints(arm); em = (J['Bip01 LEye'] + J['Bip01 REye']) / 2
+    return Vector((em.x, em.y + 0.06, em.z + 0.03)), em, J
+
+
+def _skin_by_height(ob, J, side_x=0.0):
+    """Hair or beard weights: the head above the jaw, the neck, then the upper back and the collar bones below."""
+    neck, head = J['Bip01 Neck'], J['Bip01 Head']
+    names = ['Bip01 Head', 'Bip01 Neck', 'Bip01 Spine2', 'Bip01 L Clavicle', 'Bip01 R Clavicle']
+    gs = {n: ob.vertex_groups.new(name=n) for n in names}
+    def sm(e0, e1, x): t = min(max((x - e0) / (e1 - e0), 0.0), 1.0); return t * t * (3 - 2 * t)
+    for v in ob.data.vertices:
+        p = v.co; z = p.z
+        wh = sm(neck.z + 0.02, head.z + 0.03, z)                              # head above, the neck below
+        wn = (1 - wh) * sm(neck.z - 0.1, neck.z - 0.01, z)
+        rest = 1 - wh - wn
+        side = sm(0.04, 0.16, abs(p.x - side_x))
+        wc = rest * 0.6 * side; ws = rest - wc
+        for n, w in (('Bip01 Head', wh), ('Bip01 Neck', wn), ('Bip01 Spine2', ws), ('Bip01 L Clavicle' if p.x > side_x else 'Bip01 R Clavicle', wc)):
+            if w > 1e-4: gs[n].add([v.index], w, 'ADD')
+
+
+def hair_shell(arm, mesh, colour, hem, thick=0.008, fall=0.012, front=30.0, temple=12.0, nape=-28.0, fringe=None, curl=0.0, seed=4, name='hair',
+               lie=0.6, tuck=0.35, back_only=100.0, layers=3, ncol=56, width=0.032, gap=0.006, swept_cards=False):
+    """Long hair as cards: `layers` x `ncol` narrow ribbons (`width` metres) laid along paths from the crown over the
+    scalp (`thick` out from it, each layer `gap` further) to the hairline (the face left open: the hairline at `front`
+    degrees above the skull's middle in front, `temple` at the sides, `nape` behind), and from behind the ears
+    (`back_only` degrees either side of the back) straight down to `hem` (z, rest pose), resting on the neck and
+    shoulders (`fall` out from them, spreading by `lie`, tucking in by `tuck` as they fall). A strand texture cuts
+    each card into clumps (alpha), the ends ragged; skinned head -> neck -> upper back; joined into the body."""
+    import bmesh
+    c, em, J = _head_frame(arm); bvh = _bvh(mesh)
+    rng = np.random.default_rng(seed)
+    def hit_in(origin, d, maxd=0.6):
+        h = bvh.ray_cast(origin, d, maxd); return h[0]
+    def hairline(phi):
+        a = abs(math.degrees(phi)); b = front if fringe is None else fringe
+        if a >= 140: return math.radians(b)
+        if a >= 95: return math.radians(temple + (b - temple) * ((a - 95) / 45) ** 2)
+        return math.radians(nape + (temple - nape) * (a / 95) ** 1.5)
+    def path(phi, t_off, back=0.0):
+        th_end = hairline(phi) + math.radians(back); pts, nrm = [], []
+        swept = abs(math.degrees(phi)) >= back_only                         # over the brow: from the hairline back over the crown
+        th0 = math.radians(150) if swept else math.radians(86)
+        for k in range(16 if swept else 12):
+            th = th0 + (th_end - th0) * (k / (15 if swept else 11))
+            d = Vector((math.cos(th) * math.sin(phi), math.cos(th) * math.cos(phi), math.sin(th)))
+            h = hit_in(c + d * 0.35, -d)
+            lay = 0.35 if swept else 1.0                                              # swept back: close on the scalp
+            pts.append((h if h is not None else c + d * 0.1) + d * t_off * lay); nrm.append(d)
+        if abs(math.degrees(phi)) < back_only:
+            dxy = Vector((math.sin(phi), math.cos(phi), 0)); ax = Vector((c.x, c.y - 0.02, 0))
+            r_prev = (pts[-1] - Vector((ax.x, ax.y, pts[-1].z))).dot(dxy)
+            z0 = pts[-1].z; zh = hem + 0.025 * rng.standard_normal(); n = max(4, int((z0 - zh) / 0.022)); dz = (z0 - zh) / n
+            for k in range(1, n + 1):
+                z = z0 - dz * k; o = Vector((ax.x, ax.y, z)) + dxy * 0.5
+                h = hit_in(o, -dxy, 0.6)
+                r = ((h - Vector((ax.x, ax.y, z))).dot(dxy) + fall + t_off) if h is not None else r_prev
+                if r > r_prev + 0.06 or r > 0.2: r = r_prev
+                r = r_prev + (r - r_prev) * lie if r > r_prev else max(r, r_prev - tuck * dz)
+                r_prev = r; pts.append(Vector((ax.x, ax.y, z)) + dxy * r); nrm.append(dxy)
+        return pts, nrm
+    bm = bmesh.new(); uvl = bm.loops.layers.uv.new('UVMap'); ncards = 0
+    for L in range(layers):
+        for i in range(ncol):
+            phi = -math.pi + 2 * math.pi * (i + 0.5 + 0.5 * (L % 2) + rng.uniform(-0.25, 0.25)) / ncol
+            sw = abs(math.degrees(phi)) >= back_only
+            if sw and (L > 0 or not swept_cards): continue                       # over the brow: the scalp's painted hair, or one close layer
+            pts, nrm = path(phi, thick + gap * L + rng.uniform(0, gap * 0.5), back=rng.uniform(0, 4))
+            if len(pts) < 2: continue
+            w = width * rng.uniform(0.85, 1.25) * (1.6 if sw else 1.0); u0 = rng.uniform(0, 0.75); L_ = np.r_[0, np.cumsum([(b - a).length for a, b in zip(pts, pts[1:])])]
+            row = []
+            for k, (p, n) in enumerate(zip(pts, nrm)):
+                tng = (pts[min(k + 1, len(pts) - 1)] - pts[max(k - 1, 0)]).normalized()
+                side = tng.cross(n).normalized() * (w / 2)
+                row.append((bm.verts.new(p - side), bm.verts.new(p + side), L_[k] / max(L_[-1], 1e-6)))
+            for a, b in zip(row, row[1:]):                                       # over the brow: roots at the hairline, swept back
+                f = bm.faces.new((a[0], a[1], b[1], b[0]))
+                for l, (uu, vv) in zip(f.loops, ((u0, a[2]), (u0 + 0.25, a[2]), (u0 + 0.25, b[2]), (u0, b[2]))): l[uvl].uv = (uu, vv if sw else 1 - vv)
+            ncards += 1
+    for f in bm.faces: f.smooth = True
+    me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
+    ob = bpy.data.objects.new(name, me); [cl.objects.link(ob) for cl in mesh.users_collection]
+    me.materials.append(_hair_material(f"hair_{mesh.get('person', 'x')}", _hair_image(f"hair_{mesh.get('person', 'x')}", colour, seed, curl=curl, clumps=True, jag=0.45)))
+    _skin_by_height(ob, J, c.x)
+    me.transform(mesh.matrix_world.inverted()); ob.matrix_world = mesh.matrix_world
+    me.uv_layers[0].name = mesh.data.uv_layers.active.name
+    bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); mesh.select_set(True); bpy.context.view_layer.objects.active = mesh
+    bpy.ops.object.join()
+    cine.log('hair cards', mesh.get('person', mesh.name), ncards, f'cards to z {hem:.2f}')
+
+
+def beard_shell(arm, mesh, colour, thick=0.012, chin=0.022, top=-0.035, moustache=True, neck=0.04, seed=6, mats=('head',), name='beard'):
+    """A beard grown off the face: the head's own faces below the cheekbones (`top` metres under the eyes) and under the
+    jaw down `neck` below the chin, offset out along their normals (`thick`, more at the chin), the lips left clear (and
+    the upper lip too without `moustache`); textured with short strands, skinned to the head; joined into the body."""
+    import bmesh
+    c, em, J = _head_frame(arm)
+    me = mesh.data; M = mesh.matrix_world
+    ks = {i for i, sl in enumerate(mesh.material_slots) if sl.material and any(k in sl.material.name for k in mats)}
+    lip = J.get('Bip01 MUpperLip', em - Vector((0, 0.03, 0.06))); jawz = lip.z - 0.075
+    def inside(p):
+        if p.y > c.y - 0.01 or p.z > em.z + top: return False                     # the front of the head, below the cheekbones
+        if p.z < jawz - neck: return False
+        dx = abs(p.x - em.x)
+        if dx > 0.072: return False
+        mouth = ((p.x - lip.x) / 0.026) ** 2 + ((p.z - (lip.z - 0.012)) / 0.012) ** 2 < 1
+        if mouth: return False
+        if not moustache and p.z > lip.z - 0.006 and dx < 0.03: return False
+        if p.z > lip.z - 0.004 and dx < 0.028 and p.z < lip.z + 0.016 and not moustache: return False
+        return True
+    bm = bmesh.new(); bm.from_mesh(me); bm.transform(M)
+    keep = [f for f in bm.faces if f.material_index in ks and all(inside(v.co) for v in f.verts)]
+    out = bmesh.new(); uvl = out.loops.layers.uv.new('UVMap'); vmap = {}
+    for f in keep:
+        vs = []
+        for v in f.verts:
+            if v.index not in vmap:
+                n = v.normal.normalized(); t = thick + chin * max(0.0, 1 - abs(v.co.x - em.x) / 0.04) * max(0.0, (lip.z - 0.03 - v.co.z) / 0.06)
+                vmap[v.index] = out.verts.new(v.co + n * t)
+            vs.append(vmap[v.index])
+        try:
+            nf = out.faces.new(vs)
+            for l in nf.loops: l[uvl].uv = ((l.vert.co.x - em.x) * 12 + 0.5, (l.vert.co.z - jawz) * 8)
+        except ValueError: pass
+    bm.free()
+    for f in out.faces: f.smooth = True
+    bm2 = bpy.data.meshes.new(name); out.to_mesh(bm2); out.free()
+    ob = bpy.data.objects.new(name, bm2); [cl.objects.link(ob) for cl in mesh.users_collection]
+    bm2.materials.append(_hair_material(f"beard_{mesh.get('person', 'x')}", _hair_image(f"beard_{mesh.get('person', 'x')}", colour, seed, size=(512, 256), streak=0.7, jag=0.0), rough=0.6))
+    vg = ob.vertex_groups.new(name='Bip01 Head'); vg.add(list(range(len(bm2.vertices))), 1.0, 'REPLACE')
+    ob.matrix_world = Matrix.Identity(4); bm2.transform(mesh.matrix_world.inverted()); ob.matrix_world = mesh.matrix_world
+    bm2.uv_layers[0].name = mesh.data.uv_layers.active.name
+    bpy.ops.object.select_all(action='DESELECT'); ob.select_set(True); mesh.select_set(True); bpy.context.view_layer.objects.active = mesh
+    bpy.ops.object.join()
+    cine.log('beard', mesh.get('person', mesh.name), len(keep), 'faces')
+
+
 def hair_volume(arm, mesh, lift=0.016, curl=0.005, seed=3):
     """Fuller hair: move the scalp (everything above the hairline but the ears) out along its normals, lumpy."""
     J = _joints(arm); M = mesh.matrix_world; Mi = M.inverted(); N3 = M.to_3x3()
@@ -334,7 +995,9 @@ def retarget(arm, name, inplace=False, cycles=1, action_name=None, limit=None):
     carried by a helper placed as the avatar has been placed: an act baked after the avatar was seated lands on the
     seat, not at the room's origin."""
     src, act, travel = _clip_armature(name, inplace, cyclic=cycles > 1)
-    P = placement(arm); grow = P.to_scale().x                 # a taller avatar strides further
+    # a taller avatar strides further; one with shorter legs (`leg_k`, from `reproportion`) carries the clip's pelvis
+    # lower and strides shorter: the clip's skeleton is scaled by it about the feet (rotations are what is copied)
+    P = placement(arm) @ Matrix.Scale(arm.get('leg_k', 1.0), 4); grow = P.to_scale().x
     carrier = bpy.data.objects.new('__carrier', None); bpy.context.scene.collection.objects.link(carrier)
     carrier.matrix_world = P; src.parent = carrier; src.matrix_parent_inverse.identity()
     f0, f1 = int(act.frame_range[0]), int(act.frame_range[1])

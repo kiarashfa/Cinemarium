@@ -696,6 +696,114 @@ def the_godfather(out):
     Image.fromarray((D * (1 - k) + smoke * k).clip(0, 255).astype(np.uint8)).save(f'{out}/mirror_color.jpg', quality=92)
 
 
+def game_of_thrones(out):
+    """The Red Keep's throne room in King Robert's day: warm red-brown ashlar walls, honey sandstone in the arches,
+    plinths and colonnettes, rough near-black stone in the dais, cream marble underfoot; the columns' salmon plaster
+    with grey-green vines climbing it; the tall stained-glass window of stags behind the throne; the iron, wax and oak
+    of the candelabra and the doors."""
+    import math
+    from PIL import ImageDraw
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    rng = np.random.default_rng(1105)
+    # the walls: ashlar 4 m square at 2 mm a texel, courses 0.32 m, blocks 0.5-1.0 m, each its own shade of the set's
+    # painted red-brown stone; the stone_block_wall's grain over it, the joints sunk and darker
+    S = 2048; px = S / 4.0
+    grain = _lum(ph('stone_block_wall', 'Diffuse'), S); grain = (grain / grain.mean()) ** 0.55
+    tone = np.zeros((S, S, 3), np.float32); joint = np.zeros((S, S), np.float32)
+    pal = [(118, 86, 68), (108, 78, 62), (126, 92, 72), (100, 74, 60), (132, 98, 78), (112, 84, 66), (96, 70, 56), (140, 106, 84)]
+    course = int(0.3 * px)
+    for r in range(S // course + 1):
+        y0 = r * course; x = -rng.uniform(0, 0.8) * px
+        while x < S:
+            w = rng.uniform(0.38, 0.7) * px; c = lin(pal[rng.integers(len(pal))]) * rng.uniform(0.92, 1.08)
+            for xs in ((int(x), int(x + w)),):
+                a, b = max(xs[0], 0), min(xs[1], S); tone[y0:y0 + course, a:b] = c
+                joint[y0:y0 + course, max(a, 0):max(a, 0) + 3] = 1; joint[y0:y0 + 3, a:b] = 1
+            x += w
+    joint = np.asarray(Image.fromarray((joint * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(1.6)), np.float32) / 255
+    wall = tone * grain[..., None] * (1 - 0.55 * joint[..., None]) * (0.93 + 0.12 * _noise(S, 60, 3))[..., None]
+    _save(wall, f'{out}/ashlar_color.jpg')
+    hgt = 1 - joint + 0.25 * (grain - 1)
+    _normal_from_height(hgt.astype(np.float32), 2.2).save(f'{out}/ashlar_normal.jpg', quality=92)
+    # honey sandstone (arches, plinths, colonnettes, the doors' surrounds)
+    tint(ph('sandstone_blocks_08', 'Diffuse'), f'{out}/sandstone_color.jpg', (176, 138, 96), size=1024, contrast=1.15)
+    copy(ph('sandstone_blocks_08', 'nor_gl'), f'{out}/sandstone_normal.jpg', size=1024)
+    # the dais: rough dark stone blocks, almost black, a little warm
+    tint(ph('medieval_blocks_03', 'Diffuse'), f'{out}/dais_color.jpg', (44, 39, 36), size=1024, contrast=1.35)
+    copy(ph('medieval_blocks_03', 'nor_gl'), f'{out}/dais_normal.jpg', size=1024)
+    # the floor: cream marble slabs, warm; the inlaid bands a dark grey-brown marble
+    tint(ph('marble_01', 'Diffuse'), f'{out}/marble_color.jpg', (206, 184, 146), size=2048, contrast=1.25)
+    copy(ph('marble_01', 'nor_gl'), f'{out}/marble_normal.jpg', size=1024)
+    tint(ph('marble_01', 'Diffuse'), f'{out}/marble_dark_color.jpg', (58, 50, 44), size=1024, contrast=1.6)
+    # the columns: salmon-ochre plaster, the vines climbing it in grey-green with five-lobed leaves (u: once round a
+    # 1.2 m column, 3.77 m; v: 3.77 m up), raised a little (the normal map)
+    S = 2048; P = np.ones((S, S, 3), np.float32) * lin((196, 132, 96))[None, None] * (0.9 + 0.16 * _noise(S, 50, 4))[..., None]
+    P *= (_lum(ph('painted_plaster_wall', 'Diffuse'), S) / 0.5).clip(0.75, 1.25)[..., None] ** 0.5
+    V = Image.new('L', (S, S), 0); dv = ImageDraw.Draw(V)
+    def leaf(cx, cy, r, ang):
+        pts = []
+        for k in range(81):                                                          # five pointed lobes, the vine leaf's
+            t = 2 * math.pi * k / 80; tri = 1 - abs(((5 * t / (2 * math.pi)) % 1) * 2 - 1)
+            rr = r * (0.6 + 0.4 * tri ** 0.8) * (0.75 if abs(math.sin(t / 2)) < 0.2 else 1.0)
+            pts.append((cx + rr * math.cos(t + ang), cy + rr * math.sin(t + ang)))
+        dv.polygon(pts, fill=255)
+    for s in range(4):                                                               # four stems, each winding up
+        ph0 = s / 4 + rng.uniform(-0.04, 0.04); pts = []
+        for k in range(400):
+            v = k / 399; u = (ph0 + 0.25 * math.sin(2 * math.pi * (v * 1.5 + s * 0.3))) % 1.0
+            pts.append((u * S, (1 - v) * S))
+        for a, b in zip(pts, pts[1:]):
+            if abs(a[0] - b[0]) < S / 2: dv.line([a, b], fill=255, width=13)
+        for k in range(0, 400, 17):                                                  # leaves and tendrils off the stem
+            x0, y0 = pts[k]; side = 1 if (k // 17) % 2 else -1
+            lx, ly = x0 + side * rng.uniform(50, 95), y0 - rng.uniform(10, 60)
+            dv.line([(x0, y0), (lx, ly)], fill=255, width=7); leaf(lx, ly, rng.uniform(46, 70), rng.uniform(0, 6.28))
+            if rng.random() < 0.5:
+                cx_, cy_ = x0 - side * 30, y0 - 40
+                dv.arc([cx_ - 22, cy_ - 22, cx_ + 22, cy_ + 22], 0, 270, fill=255, width=4)
+    v = np.asarray(V.filter(ImageFilter.GaussianBlur(1.2)), np.float32) / 255
+    vine = lin((70, 78, 64)) * (0.85 + 0.3 * _noise(S, 6, 5))[..., None]
+    _save(P * (1 - v[..., None]) + vine * v[..., None], f'{out}/column_color.jpg')
+    _normal_from_height(np.asarray(V.filter(ImageFilter.GaussianBlur(3)), np.float32) / 255, 3.0).save(f'{out}/column_normal.jpg', quality=92)
+    # the stag window: 1.5 x 5.2 m of glass in lead cames, a forest of greens and ambers, a sky of blue at the top, two
+    # stags rearing face to face in the middle (only its lower half shows over the throne, under the cut)
+    Wd, Hd = 440, 1520; G = np.zeros((Hd, Wd, 3), np.float32); yy, xx = np.mgrid[0:Hd, 0:Wd].astype(np.float32)
+    cells = rng.uniform(0, 1, (300, 2)) * (Wd, Hd)
+    d2 = ((xx[..., None] - cells[:, 0]) ** 2 + ((yy[..., None] - cells[:, 1]) * 0.8) ** 2)
+    idx = d2.argmin(-1); srt = np.sort(d2, -1); lead = (np.sqrt(srt[..., 1]) - np.sqrt(srt[..., 0])) < 2.6
+    greens = [(46, 120, 52), (88, 150, 48), (30, 92, 64), (140, 170, 60), (60, 130, 90)]
+    ambers = [(220, 150, 40), (196, 104, 30), (236, 190, 70), (170, 70, 24)]
+    blues = [(60, 110, 190), (90, 150, 210), (40, 70, 150)]
+    colours = np.zeros((len(cells), 3), np.float32)
+    for i, (cx, cy) in enumerate(cells):
+        band = cy / Hd
+        pal_ = blues if band < 0.14 else (ambers if (band > 0.93 or rng.random() < 0.26) else greens)
+        colours[i] = lin(pal_[rng.integers(len(pal_))])
+    G = colours[idx]
+    Im = Image.fromarray((lin_to_srgb(G) * 255).astype(np.uint8)); dr = ImageDraw.Draw(Im)
+    def stag(cx, base, s, flip):
+        f = -1 if flip else 1; X = lambda x: cx + f * x * s; Y = lambda y: base - y * s
+        body = [(X(-60), Y(160)), (X(10), Y(190)), (X(70), Y(230)), (X(80), Y(260)), (X(60), Y(270)), (X(20), Y(240)), (X(-50), Y(220)),
+                (X(-80), Y(200)), (X(-90), Y(150)), (X(-80), Y(70)), (X(-60), Y(0)), (X(-45), Y(0)), (X(-55), Y(80)), (X(-30), Y(120)), (X(0), Y(110)),
+                (X(10), Y(40)), (X(25), Y(40)), (X(20), Y(140)), (X(40), Y(180))]
+        dr.polygon(body, fill=(26, 22, 20))
+        hx, hy = X(78), Y(265)
+        for a in (-0.4, 0.15, 0.7):                                                   # the antlers
+            for b in (0.0, 0.5):
+                x1 = hx + f * 60 * s * math.cos(1.2 + a + b); y1 = hy - 90 * s * math.sin(1.2 + a + b) - 20 * s
+                dr.line([(hx, hy), (x1, y1)], fill=(26, 22, 20), width=max(2, int(7 * s)))
+    stag(Wd * 0.3, Hd * 0.955, 0.95, False); stag(Wd * 0.7, Hd * 0.955, 0.95, True)        # in the lower part, the one under the cut
+    Gs = np.asarray(Im, np.float32) / 255
+    Gs[lead] = (0.05, 0.045, 0.04)
+    for x0 in (0, Wd - 14):                                                           # the frame's iron edges
+        Gs[:, x0:x0 + 14] = 0.05
+    for y0 in range(0, Hd, Hd // 9): Gs[y0:y0 + 6] = 0.05                             # saddle bars
+    Image.fromarray((Gs * 255).astype(np.uint8)).save(f'{out}/stag_window.jpg', quality=94)
+    # oak (the doors), black iron (candelabra), wax (the candles)
+    tint(ph('stone_block_wall', 'Diffuse'), f'{out}/passage_color.jpg', (74, 56, 44), size=1024, contrast=1.2)
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)
