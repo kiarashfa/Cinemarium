@@ -43,11 +43,12 @@ Released into the public domain under [CC0 1.0](https://creativecommons.org/publ
   *leather_red_02*, *wood_table_worn*, *laminate_floor_02*, *cotton_jersey*, *painted_plaster_wall*, *sapele_veneer*,
   *rosewood_veneer1*, *velour_velvet*, *brown_leather*, *waffle_pique_cotton*, *large_floor_tiles_02*, *wooden_floor_02*,
   *lacquered_cherry_wood*, *leather_white*, *stone_block_wall*, *sandstone_blocks_08*, *slate_floor*, *medieval_blocks_03*,
-  *marble_01*, *crepe_satin*, *quatrefoil_jacquard_fabric*; models *wall_clock*, *office_notepads*, *stationery_supplies*,
+  *marble_01*, *crepe_satin*, *quatrefoil_jacquard_fabric*, *oak_veneer_01*, *dark_wood*, *american_walnut_veneer*,
+  *red_brick_03*, *wool_boucle*, *ribbed_corduroy*, *knitted_fleece*; models *wall_clock*, *office_notepads*, *stationery_supplies*,
   *vintage_stapler*, *binder_notebook*, *fire_alarm*, *mantel_clock_01*, *ornate_mirror_01*, *desk_lamp_arm_01*,
   *wooden_cutting_board*, *bananas*, *food_apple_01*, *potted_plant_02*, *fancy_picture_frame_01*, *vintage_cabinet_01*,
   *standing_picture_frame_01*, *standing_picture_frame_02*, *antique_ceramic_vase_01*, *ClassicConsole_01*,
-  *pachira_aquatica_01*, *horse_statue_01*.
+  *pachira_aquatica_01*, *horse_statue_01*, *wine_bottles_01*.
 - [ambientCG](https://ambientcg.com): *Carpet012*, *Carpet013*.
 
 ## The cat: CC BY 4.0
@@ -77,6 +78,23 @@ Licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The first th
 
 Each head is set on a Rocketbox body (see above): cut at the neck, matched to the body's eyes and skinned to its head.
 
+## The hunting lodge's trophies, armour and candelabra: CC BY 4.0
+
+Licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and obtained through the
+[Objaverse](https://huggingface.co/datasets/allenai/objaverse) mirror. They dress the ballroom in the Succession room.
+
+- ["White-Tailed Deer Skull With Antlers"](https://sketchfab.com/3d-models/white-tailed-deer-skull-with-antlers-29bccce82a184e93bea39933d33b4760)
+  by [RISDNaturelab](https://sketchfab.com/RISDNaturelab). Changes: simplified, its colours warmed; hung on a modelled
+  shield.
+- ["3D scan of a set of mounted deer antlers"](https://sketchfab.com/3d-models/3d-scan-of-a-set-of-mounted-deer-antlers-4996e5cb1c624bd88b43deba79f713be)
+  by [c.turansky](https://sketchfab.com/c.turansky). Changes: simplified, tilted upright, its colours neutralised;
+  repeated round the walls.
+- ["Lowpoly PBR Knight Armour"](https://sketchfab.com/3d-models/lowpoly-pbr-knight-armour-7e8485a272784e6cb3b5bda68ff319fa)
+  by [soidev](https://sketchfab.com/soidev). Changes: one of its three suits, simplified, the steel blackened and the
+  cloth darkened; set on a stand.
+- ["Candelabra"](https://sketchfab.com/3d-models/candelabra-f00558f1fba44a9698a2df0d9feb0d59) by
+  [AndreiVNK](https://sketchfab.com/AndreiVNK). Changes: made black iron.
+
 ## Public domain
 
 - The Constitution of the United States (1787), page one: the U.S. National Archives' scan, via
@@ -85,6 +103,9 @@ Each head is set on a Rocketbox body (see above): cut at the neck, matched to th
 - The *Vase Carpet* (Iran, 17th century), The Metropolitan Museum of Art, The James F. Ballard Collection, Gift of
   James F. Ballard, 1922: the museum's photograph, released under its
   [Open Access](https://www.metmuseum.org/art/collection/search/447526) policy (CC0). It lies on Don Corleone's floor.
+- Gustave Courbet, *Fighting Stags in a Forest*, Statens Museum for Kunst, Copenhagen (KMS1957): the museum's
+  photograph, via [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Gustave_Courbet_-_Fighting_Stags_in_a_Forest_-_KMS1957_-_Statens_Museum_for_Kunst.jpg);
+  in the public domain. It hangs, toned as old varnish, over the fireplace of the hunting lodge.
 
 ## Typefaces and icons
 

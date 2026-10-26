@@ -804,6 +804,92 @@ def game_of_thrones(out):
     tint(ph('stone_block_wall', 'Diffuse'), f'{out}/passage_color.jpg', (74, 56, 44), size=1024, contrast=1.2)
 
 
+def succession(out):
+    """The Grand Ballroom at Oheka dressed as the Roys' hunting lodge: oak strips with walnut bands, cream boiserie,
+    walnut for the table, doors and chairs, cognac leather, the fireplace's cream stone, rose-tan veined marble slips and
+    sooty brick, champagne silk drapes, the brocade runner, a dark rug with a pale trellis, Courbet's stags
+    over the mantel, the lamps' parchment shades."""
+    from PIL import ImageDraw
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    rng = np.random.default_rng(2019)
+    # the floor: narrow oak strips (7 cm, a metre or two long, staggered), the veneer's grain in each, a little honey
+    # and amber between them; one tile is 1 m square
+    S = 2048; g = _lum(ph('oak_veneer_01', 'Diffuse'), S); g = g / g.mean()
+    n_strips = 14; F = np.zeros((S, S), np.float32); seams = np.zeros((S, S), np.float32)
+    w = S // n_strips
+    for i in range(n_strips):
+        y0 = i * w; off = int(rng.integers(0, S)); x = 0
+        cuts = [0]
+        while cuts[-1] < S: cuts.append(cuts[-1] + int(rng.uniform(0.6, 1.4) * S))
+        for a, b in zip(cuts, cuts[1:]):
+            tone = rng.uniform(0.86, 1.14); src = np.roll(g, int(rng.integers(0, S)), axis=1)[(y0 + int(rng.integers(0, S // 2))) % S:][:w]
+            if src.shape[0] < w: src = np.vstack([src, g[:w - src.shape[0]]])
+            xs = (np.arange(a, min(b, a + S)) + off) % S
+            F[y0:y0 + w, xs] = src[:, :len(xs)] * tone
+            seams[y0:y0 + w, xs[0]:xs[0] + 3] = 1
+        seams[y0:y0 + 2, :] = 1
+    F = np.clip(F, 0.4, 1.8)
+    col = lin((150, 100, 58))[None, None] * F[..., None] * (1 - 0.55 * seams[..., None])
+    _save(col, f'{out}/floor_color.jpg')
+    copy(ph('oak_veneer_01', 'nor_gl'), f'{out}/floor_normal.jpg', size=1024)
+    # walnut: the bands in the floor, the table, the doors, the chairs' frames
+    tint(ph('american_walnut_veneer', 'Diffuse'), f'{out}/walnut_color.jpg', (64, 40, 26), size=1024, contrast=1.5)
+    copy(ph('american_walnut_veneer', 'nor_gl'), f'{out}/walnut_normal.jpg', size=1024)
+    # the boiserie: cream paint over plaster, a faint mottle
+    tint(ph('white_plaster_02', 'Diffuse'), f'{out}/wall_color.jpg', (214, 198, 164), size=1024, contrast=0.18)
+    copy(ph('white_plaster_02', 'nor_gl'), f'{out}/wall_normal.jpg', size=1024)
+    # the fireplace: a cream limestone, the marble slips round the opening rose-tan with darker veins, the firebox's
+    # brick sooted toward its top
+    tint(ph('marble_01', 'Diffuse'), f'{out}/stone_color.jpg', (206, 190, 158), size=1024, contrast=0.5)
+    S = 1024; yy, xx = np.mgrid[0:S, 0:S].astype(np.float32) / S
+    def smooth_noise(cells, seed):
+        r = np.random.default_rng(seed).random((cells, cells)).astype(np.float32)
+        return np.asarray(Image.fromarray((r * 255).astype(np.uint8)).resize((S, S), Image.BICUBIC), np.float32) / 255
+    warp = smooth_noise(4, 4) * 1.1 + smooth_noise(12, 5) * 0.25 + smooth_noise(40, 6) * 0.05
+    vein = np.clip(1 - np.abs(np.sin((xx * 1.1 + yy * 0.6 + warp) * np.pi * 2.6)) / 0.045, 0, 1) * np.clip(smooth_noise(6, 9) * 1.6 - 0.2, 0, 1)
+    cloud = 0.82 + 0.3 * smooth_noise(10, 7) + 0.08 * smooth_noise(60, 8)
+    m = lin((164, 124, 96))[None, None] * cloud[..., None] * (1 - 0.6 * vein[..., None])
+    _save(m, f'{out}/marble_color.jpg')
+    b = _lum(ph('red_brick_03', 'Diffuse'), 1024); b = b / b.mean()
+    soot = np.linspace(0.35, 1.0, 1024)[::-1][:, None] ** 0.8
+    _save(lin((112, 64, 44))[None, None] * np.clip(b, 0.3, 2.0)[..., None] * soot[..., None], f'{out}/brick_color.jpg')
+    copy(ph('red_brick_03', 'nor_gl'), f'{out}/brick_normal.jpg', size=1024)
+    # leather: the chairs' cognac, worn lighter on the arms and seats by the grain
+    tint(ph('brown_leather', 'Diffuse'), f'{out}/leather_color.jpg', (118, 66, 36), size=1024, contrast=1.15)
+    copy(ph('brown_leather', 'nor_gl'), f'{out}/leather_normal.jpg', size=1024)
+    # cloth: the drapes' champagne silk, the lamp shades' parchment, the runner's gold-brown brocade
+    tint(ph('crepe_satin', 'Diffuse'), f'{out}/drape_color.jpg', (190, 164, 124), size=512, contrast=1.0)
+    copy(ph('crepe_satin', 'nor_gl'), f'{out}/drape_normal.jpg', size=512)
+    tint(ph('rough_linen', 'Diffuse'), f'{out}/shade_color.jpg', (226, 202, 156), size=512, contrast=0.6)
+    d = _lum(ph('floral_jacquard', 'Diffuse'), 512); d = (d / d.mean()) ** 1.6
+    _save(lin((138, 98, 52))[None, None] * np.clip(d, 0.4, 2.0)[..., None], f'{out}/runner_color.jpg')
+    tint(ph('dark_wood', 'Diffuse'), f'{out}/dark_wood_color.jpg', (40, 26, 18), size=1024, contrast=1.3)
+    # the rug: a deep olive-brown field, a pale trellis of lozenges with a small flower at each crossing, a dark border
+    # with a guard stripe (2:1, the long side along the table)
+    W_, H_ = 2048, 1024; I = Image.new('RGB', (W_, H_), (40, 34, 24)); dr = ImageDraw.Draw(I)
+    B = 70
+    dr.rectangle([B, B, W_ - B, H_ - B], fill=(46, 40, 28)); dr.rectangle([B - 14, B - 14, W_ - B + 14, H_ - B + 14], outline=(150, 128, 92), width=6)
+    dr.rectangle([B + 10, B + 10, W_ - B - 10, H_ - B - 10], outline=(110, 54, 34), width=5)
+    cell = 96
+    for j in range(-2, 2 * H_ // cell + 3):
+        for i in range(-2, W_ // cell + 3):
+            cx, cy = i * cell + (cell // 2 if j % 2 else 0), j * cell * 0.5 + B + 30
+            if not (B + 20 < cx < W_ - B - 20 and B + 20 < cy < H_ - B - 20): continue
+            pts = [(cx, cy - cell * 0.5), (cx + cell * 0.5, cy), (cx, cy + cell * 0.5), (cx - cell * 0.5, cy)]
+            dr.line(pts + [pts[0]], fill=(132, 116, 84), width=3)
+            dr.ellipse([cx - 7, cy - 7, cx + 7, cy + 7], fill=(150, 70, 44)); dr.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill=(196, 170, 120))
+    R = srgb_to_lin(np.asarray(I.filter(ImageFilter.GaussianBlur(1.2)), np.float32) / 255)
+    pile = 0.88 + 0.24 * np.asarray(Image.fromarray((_noise(1024, 3, 8) * 255).astype(np.uint8)).resize((W_, H_)), np.float32)[..., None] / 255
+    _save(R * pile, f'{out}/rug_color.jpg')
+    copy(ph('velour_velvet', 'nor_gl'), f'{out}/pile_normal.jpg', size=512)
+    # Courbet's stags, as varnish has darkened them: warm browns and olive, deep in the trees
+    P = np.asarray(Image.open(os.path.join(CACHE, 'commons', 'courbet_fighting_stags.jpg')).convert('RGB'), np.float32) / 255
+    l = srgb_to_lin(P) @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    warm = np.stack([l * 1.0, l * 0.84, l * 0.56], -1) * 1.05
+    _save(warm, f'{out}/painting_color.jpg')
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

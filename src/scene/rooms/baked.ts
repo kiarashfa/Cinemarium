@@ -49,10 +49,11 @@ class RoomMaterial extends THREE.MeshPhysicalNodeMaterial {
   }
 }
 
-const COPY = ['color', 'map', 'roughness', 'roughnessMap', 'metalness', 'metalnessMap', 'normalMap', 'normalScale', 'emissive', 'emissiveMap',
+// no transmission: inside the case's glass it would vanish, and its screen-sized back buffer breaks the lower rungs
+const COPY = ['color','map', 'roughness', 'roughnessMap', 'metalness', 'metalnessMap', 'normalMap', 'normalScale', 'emissive', 'emissiveMap',
   'emissiveIntensity', 'aoMap', 'aoMapIntensity', 'alphaMap', 'alphaTest', 'transparent', 'opacity', 'side', 'vertexColors',
   'clearcoat', 'clearcoatRoughness', 'clearcoatMap', 'clearcoatRoughnessMap', 'clearcoatNormalMap', 'sheen', 'sheenColor', 'sheenRoughness',
-  'specularIntensity', 'specularColor', 'ior', 'transmission', 'thickness', 'name'] as const;
+  'specularIntensity', 'specularColor', 'ior', 'name'] as const;
 
 function roomMaterial(src: THREE.MeshStandardMaterial, extra: Partial<RoomMaterial> = {}) {
   const m = new RoomMaterial();

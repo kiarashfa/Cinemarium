@@ -246,6 +246,47 @@ const ROOMS = {
       'https://sketchfab.com/3d-models/cersei-lannister-game-of-thrones-874b0953c9ac453ba75d77ad202f90de (by imthirutj)', 'CC BY 4.0');
     sketchfab('the_hound_madcatd.glb', 'https://sketchfab.com/3d-models/the-hound-4afb31e3e247445b88fd0955d720b34d (by MadCatD)', 'CC BY 4.0');
   },
+  async succession() {
+    // Logan (Male_Adult_03), Greg (Male_Adult_02), Tom (Male_Adult_06), Roman (Male_Adult_08), Karl (Male_Adult_13),
+    // Kendall (Business_Male_06), Frank (Business_Male_07), the waiter (Business_Male_01), Gerri (Business_Female_02)
+    for (const a of ['Adults/Male_Adult_03', 'Adults/Male_Adult_02', 'Adults/Male_Adult_06', 'Adults/Male_Adult_08', 'Adults/Male_Adult_13',
+      'Professions/Business_Male_06', 'Professions/Business_Male_07', 'Professions/Business_Male_01', 'Professions/Business_Female_02']) await avatar(a);
+    const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+    // the diners: seated at the table, their idles; Gerri's own
+    for (const c of ['breathe_01', 'idle_look_around', 'idle_neutral_01', 'idle_neutral_02', 'gestic_thoughtful', 'idle_touch_face', 'idle_nervous_01',
+      'gestic_shrug_01', 'idle_scratch_head', 'idle_relaxed_01']) await clip(S, `m_sit_table_${c}`);
+    for (const c of ['breathe_01', 'idle_look_around', 'idle_neutral_01', 'gestic_thoughtful', 'idle_touch_hair', 'idle_touch_face']) await clip(S, `f_sit_table_${c}`);
+    for (const c of ['breathe_01', 'idle_neutral_01']) await clip(S, `m_sit_chair_${c}`);
+    // talk, laughter, the phone, the wine; the boars on their knees; the waiter at the wall
+    for (const c of ['m_gestic_talk_neutral_01', 'm_gestic_talk_neutral_02', 'm_gestic_talk_relaxed_01', 'm_gestic_talk_cool', 'm_gestic_talk_excited_01',
+      'm_gestic_listen_neutral_01', 'm_gestic_listen_neutral_02', 'm_gestic_listen_nervous_01', 'm_gestic_laugh_loud', 'm_gestic_laugh_low',
+      'm_gestic_laugh_extreme', 'm_gestic_thoughtful_01', 'm_gestic_shrug_01', 'm_gestic_presentation_left_01', 'm_cell_phone_textmessage', 'm_take_picture',
+      'm_crouch_idle', 'm_crouch_gestic', 'm_idle_breathe_01', 'm_idle_breathe_02', 'm_idle_breathe_03', 'm_idle_neutral_01', 'm_idle_neutral_02',
+      'm_idle_look_around_01', 'm_idle_waiting_01', 'm_idle_nervous_01', 'm_drink_drinking', 'm_drink_idle', 'm_trolley_idle']) await clip(S, c);
+    // Logan up from his chair, round the table with the sausages and back; the boars down onto the boards; the waiter's round
+    for (const c of ['m_crouch_in', 'm_crouch_out', 'm_walk_slow_01', 'm_walk_slow_02', 'm_walk_neutral_01', 'm_walk_neutral_02', 'm_walk_stroll_01']) await clip(XY, c);
+    for (const c of ['m_sit_stand_up_table_left', 'm_sit_stand_up_table_right', 'm_sit_down_table_left', 'm_sit_down_table_right', 'm_sit_stand_up_chair_01',
+      'm_sit_down_chair_01', 'm_gestic_talk_angry_01', 'm_gestic_talk_self_assured_01', 'm_gestic_talk_self_assured_02', 'm_turn_left_180', 'm_turn_right_180',
+      'm_turn_left_90', 'm_turn_right_90']) await clip(XYZ, c);
+    // the ballroom: oak strip floor, cream boiserie, the walnut table and doors, cognac leather, the fireplace's marble and brick,
+    // champagne silk drapes, the brocade runner, the rug's pile
+    for (const t of ['oak_veneer_01', 'dark_wood', 'american_walnut_veneer', 'brown_leather', 'marble_01', 'red_brick_03', 'white_plaster_02',
+      'crepe_satin', 'velour_velvet', 'rough_linen', 'floral_jacquard']) await polyhaven(t, '2k', 'tex');
+    // the people's cloth: Logan's tweed (a glen check), Greg's cords, the knits, Roman's shirt, Kendall's leather, Karl's wool
+    for (const t of ['poly_wool_herringbone', 'ribbed_corduroy', 'knitted_fleece', 'cotton_jersey', 'leather_red_02', 'wool_boucle']) await polyhaven(t, '2k', 'tex');
+    for (const m of ['wine_bottles_01', 'ClassicConsole_01']) await polyhaven(m, '1k', 'gltf');
+    // over the mantel: Courbet's Fighting Stags in a Forest (Statens Museum for Kunst, public domain)
+    await commons('Gustave Courbet - Fighting Stags in a Forest - KMS1957 - Statens Museum for Kunst.jpg', 1600, 'courbet_fighting_stags.jpg');
+    // the trophies: a stag's skull with its antlers, a scanned roe frontlet on its plaque; the suits of armour; the candelabra
+    await objaverse('29bccce82a184e93bea39933d33b4760', '000-152', 'deer_skull_risd.glb',
+      'https://sketchfab.com/3d-models/white-tailed-deer-skull-with-antlers-29bccce82a184e93bea39933d33b4760 (by RISDNaturelab)', 'CC BY 4.0');
+    await objaverse('4996e5cb1c624bd88b43deba79f713be', '000-107', 'mounted_antlers_turansky.glb',
+      'https://sketchfab.com/3d-models/3d-scan-of-a-set-of-mounted-deer-antlers-4996e5cb1c624bd88b43deba79f713be (by c.turansky)', 'CC BY 4.0');
+    await objaverse('7e8485a272784e6cb3b5bda68ff319fa', '000-056', 'knight_armour_soidev.glb',
+      'https://sketchfab.com/3d-models/lowpoly-pbr-knight-armour-7e8485a272784e6cb3b5bda68ff319fa (by soidev)', 'CC BY 4.0');
+    await objaverse('f00558f1fba44a9698a2df0d9feb0d59', '000-150', 'candelabra_andreivnk.glb',
+      'https://sketchfab.com/3d-models/candelabra-f00558f1fba44a9698a2df0d9feb0d59 (by AndreiVNK)', 'CC BY 4.0');
+  },
 };
 
 const room = process.argv[2];
