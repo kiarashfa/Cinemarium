@@ -3,7 +3,8 @@
 //   node tools/shots/shot.mjs <path> <out-name> [both|d|m] [frames=30]
 //   e.g. node tools/shots/shot.mjs "/Cinemarium/?still" tower both
 // Writes shots/<out-name>-d.png and -m.png. Env: BASE (default http://127.0.0.1:4321), CHROME (path to chrome.exe),
-// GPU=low (run on the integrated GPU, to test the quality ladder), WAIT=<seconds> (let the quality settle first).
+// GPU=low (run on the integrated GPU, to test the quality ladder), WAIT=<seconds> (let the quality settle first),
+// STILL=1 (reduced motion: the case holds its view while the people move).
 import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
 
@@ -18,7 +19,7 @@ const browser = await chromium.launch({
 const sizes = { d: [1440, 900, +(process.env.DPR || 1)], m: [390, 844, 3] };
 for (const tag of mode === 'both' ? ['d', 'm'] : [mode]) {
   const [w, h, dpr] = sizes[tag];
-  const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, isMobile: tag === 'm', hasTouch: tag === 'm' });
+  const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, isMobile: tag === 'm', hasTouch: tag === 'm', reducedMotion: process.env.STILL ? 'reduce' : 'no-preference' });
   const page = await ctx.newPage(), log = [];
   page.on('console', m => { if (['error', 'warning'].includes(m.type()) && !/powerPreference/.test(m.text())) log.push(`${m.type()}: ${m.text().slice(0, 300)}`); });
   page.on('pageerror', e => log.push('pageerror: ' + e.message));

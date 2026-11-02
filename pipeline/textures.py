@@ -992,6 +992,115 @@ def the_big_lebowski(out):
     im.save(f'{out}/score_color.jpg', quality=92)
 
 
+def interstellar(out):
+    """Murph's bedroom in the farmhouse: wide pine boards worn honey-brown, plaster painted a pale dove grey, the dark
+    stained wood of the shelves, door and trim, the bed's dusty rose quilt and white sheets, a braided rag rug; the
+    books (an atlas of spines, and their page edges for the tesseract's side), the corkboard of Murph's drawings, a
+    farm print; the evening sky over the corn outside the windows; the tesseract's world lines (the room's colours
+    drawn out into streaks)."""
+    from PIL import ImageDraw
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    rng = np.random.default_rng(2014)
+    # the floor: wide pine boards, honey to brown, worn pale along the paths
+    tint(ph('wood_floor_worn', 'Diffuse'), f'{out}/floor_color.jpg', (128, 86, 52), contrast=1.15)
+    copy(ph('wood_floor_worn', 'nor_gl'), f'{out}/floor_normal.jpg', size=1024)
+    copy(ph('wood_floor_worn', 'Rough'), f'{out}/floor_rough.jpg', size=1024, mode='L')
+    # the walls: old plaster, painted a pale dove grey
+    tint(ph('plastered_wall_04', 'Diffuse'), f'{out}/wall_color.jpg', (196, 196, 190), size=1024, contrast=0.35)
+    copy(ph('plastered_wall_04', 'nor_gl'), f'{out}/wall_normal.jpg', size=1024)
+    # the stained wood: the shelves, the door and its casing, the skirting, the desk
+    tint(ph('dark_wood', 'Diffuse'), f'{out}/stain_color.jpg', (62, 38, 24), size=1024, contrast=1.1)
+    copy(ph('dark_wood', 'nor_gl'), f'{out}/stain_normal.jpg', size=1024)
+    # the quilt: dusty rose satin, stitched in diamonds (the stitching darker, the puffs lighter)
+    S = 1024; base = _lum(ph('crepe_satin', 'Diffuse'), S); base = base / base.mean()
+    yy, xx = np.mgrid[0:S, 0:S].astype(np.float32) / S
+    u, v = (xx + yy) * 8 % 1.0, (xx - yy) * 8 % 1.0
+    d_ = np.minimum(np.minimum(u, 1 - u), np.minimum(v, 1 - v))
+    puff = np.clip(d_ / 0.12, 0, 1) ** 0.5
+    q = lin((172, 122, 124))[None, None] * (0.72 + 0.34 * puff)[..., None] * (0.85 + 0.15 * base)[..., None]
+    _save(q, f'{out}/quilt_color.jpg')
+    _normal_from_height(puff, 6.0).save(f'{out}/quilt_normal.jpg', quality=92)
+    tint(ph('cotton_jersey', 'Diffuse'), f'{out}/sheet_color.jpg', (226, 224, 216), size=512, contrast=0.4)
+    # the rag rug: an oval braided in rings of faded colours (mapped 0..1 across it)
+    R_ = 1024; I = Image.new('RGB', (R_, R_), (90, 70, 56)); d = ImageDraw.Draw(I)
+    cols = [(150, 84, 64), (196, 176, 140), (92, 104, 120), (168, 128, 92), (122, 72, 60), (200, 190, 168), (110, 116, 98)]
+    for i in range(46):
+        f = 1 - i / 46; c = cols[i % len(cols)]
+        d.ellipse([R_ / 2 - f * R_ / 2, R_ / 2 - f * R_ / 2, R_ / 2 + f * R_ / 2, R_ / 2 + f * R_ / 2], fill=tuple(int(x * rng.uniform(0.9, 1.05)) for x in c))
+    a = np.asarray(I, np.float32) / 255 * (0.85 + 0.25 * _noise(R_, 2, 4))[..., None]
+    _save(srgb_to_lin(a), f'{out}/rug_color.jpg')
+    # the books: an atlas of 32 x 4 spines (each a cell 1/32 wide, 1/4 tall: cloth, leather, paper jackets; bands and
+    # titles in gilt or ink) on the left half, the page edges (cream, ruled, a little grey at the top) on the right
+    W_, H_ = 2048, 1024; I = Image.new('RGB', (W_, H_), (230, 220, 196)); d = ImageDraw.Draw(I)
+    pal = [(112, 32, 28), (132, 46, 34), (40, 52, 82), (28, 40, 58), (44, 70, 54), (30, 30, 30), (150, 120, 80), (180, 160, 120), (92, 58, 36),
+           (60, 36, 26), (190, 186, 172), (168, 60, 40), (70, 86, 110), (120, 110, 90), (210, 196, 160), (60, 80, 70), (150, 40, 50), (36, 60, 100)]
+    cw, ch = (W_ // 2) // 32, H_ // 4
+    for j in range(4):
+        for i in range(32):
+            x0, y0 = i * cw, j * ch; c = pal[int(rng.integers(len(pal)))]
+            c = tuple(int(v * rng.uniform(0.82, 1.1)) for v in c)
+            d.rectangle([x0, y0, x0 + cw - 1, y0 + ch - 1], fill=c)
+            gilt = (196, 160, 90) if sum(c) < 330 else (40, 30, 24)
+            for b in range(int(rng.integers(0, 4))):                               # bands across the spine
+                yb = y0 + int(ch * rng.uniform(0.05, 0.95)); d.rectangle([x0 + 2, yb, x0 + cw - 3, yb + int(rng.integers(2, 7))], fill=gilt)
+            t0 = y0 + int(ch * rng.uniform(0.2, 0.4)); t1 = t0 + int(ch * rng.uniform(0.25, 0.45))   # the title: a strip of letters
+            for yt in range(t0, min(t1, y0 + ch - 4), 5):
+                if rng.random() < 0.8: d.rectangle([x0 + cw // 2 - 3, yt, x0 + cw // 2 + 2, yt + 3], fill=gilt)
+            d.line([x0, y0, x0, y0 + ch], fill=tuple(int(v * 0.6) for v in c))
+    pages = (np.full((H_, W_ // 2), 0.9, np.float32) * (0.92 + 0.08 * np.sin(np.arange(W_ // 2) * 1.7)[None, :]))
+    pages *= (0.9 + 0.1 * rng.random((H_, W_ // 2))).astype(np.float32)
+    a = np.asarray(I, np.float32) / 255
+    a[:, W_ // 2:] = np.array([0.93, 0.88, 0.76], np.float32)[None, None] * pages[..., None]
+    _save(srgb_to_lin(a), f'{out}/books_color.jpg')
+    # the corkboard: cork, Murph's drawings and notes pinned on it (rockets, planets, a lander), pins
+    cb = Image.new('RGB', (1024, 768), (160, 118, 76)); d = ImageDraw.Draw(cb)
+    cork = (np.asarray(cb, np.float32) / 255) * (0.8 + 0.35 * _noise(1024, 1, 7)[:768, :, None])
+    cb = Image.fromarray((np.clip(cork, 0, 1) * 255).astype(np.uint8)); d = ImageDraw.Draw(cb)
+    for k in range(14):
+        w, h = int(rng.integers(130, 240)), int(rng.integers(110, 200)); x, y = int(rng.integers(10, 1024 - w)), int(rng.integers(10, 768 - h))
+        paper = (236, 232, 220) if rng.random() < 0.7 else (220, 206, 150)
+        d.rectangle([x, y, x + w, y + h], fill=paper, outline=(190, 186, 176))
+        ink = [(40, 60, 140), (150, 40, 40), (40, 40, 40), (30, 110, 60)][k % 4]
+        if k % 3 == 0:                                                              # a rocket
+            cx = x + w // 2; d.polygon([(cx, y + 15), (cx + 18, y + h - 40), (cx - 18, y + h - 40)], outline=ink, width=3)
+            d.line([cx - 18, y + h - 40, cx - 34, y + h - 15], fill=ink, width=3); d.line([cx + 18, y + h - 40, cx + 34, y + h - 15], fill=ink, width=3)
+        elif k % 3 == 1:                                                            # a planet with its ring
+            cx, cy = x + w // 2, y + h // 2; r = min(w, h) // 4
+            d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=ink, width=3); d.ellipse([cx - 2 * r, cy - r // 3, cx + 2 * r, cy + r // 3], outline=ink, width=2)
+        else:                                                                       # lines of writing
+            for ly in range(y + 18, y + h - 10, 16): d.line([x + 12, ly, x + w - int(rng.integers(12, 60)), ly], fill=ink, width=2)
+        d.ellipse([x + w // 2 - 6, y - 4, x + w // 2 + 6, y + 8], fill=[(200, 30, 30), (30, 90, 200), (230, 200, 40)][k % 3])
+    cb.save(f'{out}/cork_color.jpg', quality=92)
+    # the farm print over the nightstand: a field under a big sky, sepia
+    pr = Image.new('RGB', (512, 384), (200, 186, 156)); d = ImageDraw.Draw(pr)
+    for yv in range(0, 230): d.line([0, yv, 512, yv], fill=(int(210 - yv * 0.15), int(196 - yv * 0.12), int(170 - yv * 0.1)))
+    d.polygon([(0, 230), (512, 215), (512, 384), (0, 384)], fill=(150, 126, 84)); d.rectangle([300, 170, 360, 220], fill=(120, 96, 70))
+    d.polygon([(292, 172), (330, 140), (368, 172)], fill=(96, 70, 52))
+    pr.save(f'{out}/print_color.jpg', quality=92)
+    # outside the windows: the evening, grey-blue going to a band of pale light low down, the corn's dark line and a
+    # far shelter belt of trees against it (mapped 0..1 across a backdrop 2 m tall)
+    W2, H2 = 2048, 1024; yy = np.linspace(1, 0, H2, dtype=np.float32)[:, None] * np.ones((1, W2), np.float32)
+    top, low = lin((92, 104, 124)), lin((196, 190, 178))
+    sky = top[None, None] * yy[..., None] + low[None, None] * (1 - yy[..., None]) ** 1.0
+    hz = 0.34; corn = 0.24 + 0.012 * np.sin(np.linspace(0, 60, W2))[None, :] + 0.006 * rng.random((1, W2))
+    trees = hz + 0.05 * _noise(W2, 18, 9)[:1, :] + 0.02
+    ycoord = yy
+    sky = np.where((ycoord < trees)[..., None], lin((44, 48, 52))[None, None], sky)
+    sky = np.where((ycoord < corn)[..., None], lin((52, 54, 40))[None, None] * (0.8 + 0.4 * rng.random((H2, W2, 1))).astype(np.float32), sky)
+    _save(sky, f'{out}/sky_color.jpg')
+    # the tesseract's world lines: the room's things drawn out along time, streaks along u (book colours, the pale
+    # wall, the dark wood, a little cold blue), each a row of random width, faintly varying along its length
+    W3, H3 = 2048, 1024; rows = np.zeros((H3, 3), np.float32); y = 0
+    streak = [(96, 62, 40), (60, 38, 26), (150, 120, 84), (196, 186, 164), (120, 46, 34), (40, 48, 70), (210, 200, 180), (80, 90, 104), (30, 24, 20), (30, 24, 20), (52, 34, 24), (170, 150, 120), (112, 82, 56)]
+    while y < H3:
+        h = int(rng.integers(1, 12)); c = streak[int(rng.integers(len(streak)))]
+        rows[y:y + h] = lin(c) * rng.uniform(0.45, 1.05); y += h
+    along = (0.85 + 0.3 * _noise(W3, 30, 11)[:1, :])
+    st = rows[:, None, :] * along[..., None] * np.array([0.62, 0.55, 0.5], np.float32)
+    _save(np.clip(st, 0, 1), f'{out}/streak_color.jpg')
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

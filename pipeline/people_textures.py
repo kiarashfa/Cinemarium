@@ -1888,5 +1888,99 @@ def the_big_lebowski():
     save(h, 'smokey', 'm018_head_color.tga')
 
 
+def _child(tex):
+    """A child avatar's texel map (its skeleton names its bones Bip02: called Bip01 here, as the build renames them)."""
+    B = Body(tex)
+    B.J = {k.replace('Bip02', 'Bip01'): v for k, v in B.J.items()}; B.groups = [g.replace('Bip02', 'Bip01') for g in B.groups]
+    return B
+
+
+def interstellar():
+    """The farmhouse, the evening Cooper leaves (costumes by Mary Zophres). Murph (ten) out of the bath: a pale
+    blue-grey waffle thermal, long sleeved, under an oatmeal knit shawl cardigan round her shoulders (open in front,
+    its sleeves to the forearm), pale flannel pyjama trousers, grey wool socks; her hair chestnut with auburn in it (the
+    long wet hair is cards). Cooper at the door: his Carhartt duck jacket, sandy brown, open over a light blue shirt,
+    its corduroy collar dark brown; jeans, brown work boots; his hair brown, swept back, a few days' stubble. Cooper in
+    the tesseract: the Endurance suit, off-white, the lower legs and boots darker grey, grey gloves, the black neck
+    ring, the round NASA disc on the chest and his name tag beside it, the flag on the left shoulder."""
+    rng = np.random.default_rng(2014)
+    pat = _gt_pat
+    fill = lambda b, B, mask, colour, pattern=None, **kw: _gt_fill(b, B, mask, colour, pattern, **{'grow': 22, **kw})
+
+    # ---- Murph (Female_Child_01)
+    b = load('Female_Child_01', 'cf001_body_color.tga'); B = _child('cf001_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+    z = np.nan_to_num(B.z); ax = np.abs(np.nan_to_num(B.x))
+    top = (r['torso'] | r['arms']) & ~r['hands']
+    waffle = np.clip(pat(B, 'waffle_pique_cotton', 0.05, 1.2), 0.8, 1.2)
+    b = fill(b, B, top, (186, 198, 206), waffle, k=0.18, flatten=8)
+    henley = B.where((ax < 0.009) & (z < neck - 0.005) & (z > neck - 0.1) & (B.y < 0)) & top
+    b = fill(b, B, henley, (150, 164, 176), k=0.3, flatten=0, grow=1)
+    t = np.clip((neck - z) / 0.42, 0, 1)
+    opening = B.where((ax < 0.06 + 0.03 * t) & (B.y < -0.02))
+    cardigan = (top & ~opening & B.where(z > r['pel'] - 0.12)) | (r['arms'] & ~_sleeves(B, 0.78))
+    knit = np.clip(pat(B, 'knitted_fleece', 0.06, 1.4), 0.65, 1.35)
+    b = fill(b, B, cardigan, (170, 154, 128), knit, k=0.45, flatten=3)
+    edge = B.where((np.abs(ax - (0.06 + 0.03 * t)) < 0.022) & (B.y < -0.015) & (z < neck + 0.03) & (z > r['pel'] - 0.12)) & cardigan
+    b = fill(b, B, edge, (150, 134, 108), np.clip(pat(B, 'knitted_fleece', 0.03, 1.8), 0.6, 1.4), k=0.4, grow=2)
+    legs = r['thighs'] | B.where(r['calves'] & (B.z > 0.07))
+    b = fill(b, B, legs, (182, 180, 176), np.clip(pat(B, 'cotton_jersey', 0.2, 0.5), 0.85, 1.15), k=0.35, flatten=6)
+    feet = r['feet'] | B.where(r['calves'] & (B.z <= 0.07))
+    b = fill(b, B, feet, (118, 112, 106), np.clip(pat(B, 'knitted_fleece', 0.03, 1.6), 0.7, 1.3), k=0.5, flatten=2)
+    save(b, 'murph', 'cf001_body_color.tga')
+    _flat_normals('Female_Child_01', 'cf001_body_normal.tga', 'murph', B.grow((top | legs | feet).astype(np.float32), 4) * 0.8)
+    h = load('Female_Child_01', 'cf001_head_color.tga'); Hd = _child('cf001_head_color.tga')
+    H_, S_, V_ = hsv(h)
+    brow = Hd.J['Bip01 MMiddleEyebrow'][2]
+    face = Hd.where((Hd.y < -0.045) & (Hd.z < brow + 0.035) & (np.abs(Hd.x) < 0.058))
+    blonde = Hd.where((Hd.z > brow - 0.09) & ~face & (H_ > 25) & (H_ < 60) & (S_ > 0.18) & (V_ > 0.35))
+    hm = soft(Hd.grow(blonde.astype(np.float32), 3), 1.5)
+    h = recolour(h, hm, (70, 42, 28), contrast=1.1)                            # wet: dark chestnut, auburn in it
+    save(h, 'murph', 'cf001_head_color.tga')
+
+    # ---- Cooper twice (Male_Adult_08): at the door in the Carhartt over the blue shirt; in the tesseract in the suit
+    for who in ('coop', 'cooper'):
+        b = load('Male_Adult_08', 'm014_body_color.tga'); B = Body('m014_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+        z = np.nan_to_num(B.z); ax = np.abs(np.nan_to_num(B.x))
+        if who == 'coop':
+            t = np.clip((neck - z) / 0.5, 0, 1)
+            opening = B.where((ax < 0.05 + 0.04 * t) & (B.y < -0.03) & (z < neck - 0.02))
+            jacket = ((r['torso'] & B.where(z > r['pel'] - 0.16)) | r['arms']) & ~r['hands'] & ~opening
+            duck = np.clip(pat(B, 'rough_linen', 0.08, 1.0), 0.8, 1.2)
+            b = fill(b, B, jacket, (150, 110, 68), duck, k=0.6, flatten=3)
+            collar = B.where((z > neck - 0.07) & (z < neck + 0.05) & ~opening) & jacket
+            b = fill(b, B, collar, (66, 44, 30), np.clip(pat(B, 'ribbed_corduroy', 0.03, 1.4), 0.7, 1.3), k=0.4, grow=3)
+            shirt = B.where(opening & r['torso'])
+            b = fill(b, B, shirt, (138, 160, 186), np.clip(pat(B, 'cotton_jersey', 0.15, 0.4), 0.9, 1.1), k=0.5, flatten=2, grow=3)
+            legs = r['thighs'] | B.where(r['calves'] & (B.z > 0.12))
+            b = fill(b, B, legs, (52, 64, 88), np.clip(pat(B, 'denim_fabric', 0.18, 0.9), 0.75, 1.25), k=0.55, flatten=2)
+            feet = r['feet'] | B.where(r['calves'] & (B.z <= 0.12))
+            b = fill(b, B, feet, (84, 58, 38), k=0.5, flatten=1)
+            save(b, 'coop', 'm014_body_color.tga')
+            _flat_normals('Male_Adult_08', 'm014_body_normal.tga', 'coop', B.grow((jacket | legs).astype(np.float32), 4) * 0.6)
+        else:
+            suit = (r['torso'] | r['arms'] | r['thighs'] | r['calves'] | r['feet']) & ~r['hands']
+            b = fill(b, B, suit, (204, 204, 198), np.clip(pat(B, 'rough_linen', 0.12, 0.6), 0.88, 1.12), k=0.7, flatten=2)
+            low = B.where((r['calves'] | r['feet']) & (B.z < r['knee'] - 0.12))
+            b = fill(b, B, low, (92, 94, 98), k=0.5, flatten=2)
+            b = fill(b, B, B.where(r['hands']), (120, 122, 126), k=0.5, flatten=1, grow=4)
+            ring = B.where((z > neck - 0.04) & (z < neck + 0.06)) & B.part('Neck', 'Spine2', 'Clavicle')
+            b = fill(b, B, ring, (26, 26, 28), k=0.4, grow=3)
+            disc = B.where(((B.x + 0.0) ** 2 + (z - (neck - 0.17)) ** 2 < 0.045 ** 2) & (B.y < -0.05))
+            b = fill(b, B, disc, (34, 66, 140), k=0.3, flatten=0, grow=2)
+            tag = B.where((np.abs(B.x - 0.11) < 0.045) & (np.abs(z - (neck - 0.2)) < 0.012) & (B.y < -0.05))
+            b = fill(b, B, tag, (84, 70, 52), k=0.3, flatten=0, grow=1)
+            flag = B.where(B.part('L UpperArm') & (np.abs(z - (neck - 0.1)) < 0.03) & (B.y < 0.02))
+            b = fill(b, B, flag, (130, 40, 44), k=0.3, flatten=0, grow=1)
+            straps = B.where((np.abs(ax - 0.1) < 0.02) & (z > r['pel'] + 0.05) & (z < neck)) & r['torso']
+            b = fill(b, B, straps, (150, 150, 146), k=0.5, grow=2)
+            save(b, 'cooper', 'm014_body_color.tga')
+            _flat_normals('Male_Adult_08', 'm014_body_normal.tga', 'cooper', B.grow(suit.astype(np.float32), 4) * 0.5)
+        h = load('Male_Adult_08', 'm014_head_color.tga'); Hd = Body('m014_head_color.tga')
+        h, hm, brow = _gt_head_hair(h, Hd, (78, 58, 42), front=0.06, contrast=0.95)
+        h = _gt_beard(h, Hd, _beard_mask(Hd, moustache=True, cheeks=0.7), rng, (70, 52, 38), n=7000, length=4, base=0.35, grey=0.04)
+        save(h, who, 'm014_head_color.tga')
+        _hair_recolour('Male_Adult_08', 'm014_opacity_color.tga', who, 'm014_opacity_color.tga', (84, 62, 44), contrast=1.0, shine=0.9)
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()

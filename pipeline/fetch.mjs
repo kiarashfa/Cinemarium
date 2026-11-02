@@ -313,6 +313,32 @@ ROOMS['the-big-lebowski'] = async () => {
   sketchfab('bridges/scene.gltf', 'https://sketchfab.com/3d-models/jeff-bridges-751203ca076f4709912c201a8b20391e (by Roberto Domínguez, vmmaniac)', 'CC BY 4.0');
 };
 
+ROOMS.interstellar = async () => {
+  // Murph (Female_Child_01), Cooper twice (Male_Adult_08: in the room, and in the tesseract)
+  for (const a of ['Children/Female_Child_01', 'Adults/Male_Adult_08']) await avatar(a);
+  const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+  // Murph on the bed's side, combing; up, to the shelf with her notebook; down by the books; back to the bed
+  for (const c of ['breathe_01', 'idle_neutral_01', 'idle_touch_hair', 'idle_look_around', 'gestic_thoughtful', 'idle_touch_face']) await clip(S, `f_sit_chair_${c}`);
+  for (const c of ['f_idle_neutral_01', 'f_idle_breathe_01', 'f_idle_look_around_01', 'f_documents_note', 'f_crouch_idle', 'f_crouch_gestic',
+    'f_crouch_in', 'f_crouch_out', 'f_gestic_listen_sad_01', 'f_gestic_talk_sad_01', 'f_idle_touch_hair_01']) await clip(S, c);
+  for (const c of ['f_walk_slow_01', 'f_walk_neutral_01']) await clip(XY, c);
+  for (const c of ['f_sit_stand_up_chair_01', 'f_sit_down_chair_01', 'f_turn_left_180', 'f_turn_right_180']) await clip(XYZ, c);
+  // Cooper: the door, a look round, down by the books, a word with her on the bed, out; in the tesseract, at the shelf's back
+  for (const c of ['m_try_door_inwards', 'm_idle_neutral_01', 'm_idle_breathe_01', 'm_idle_look_around_01', 'm_crouch_idle', 'm_crouch_gestic',
+    'm_gestic_talk_sad_01', 'm_gestic_listen_sad_01', 'm_gestic_talk_neutral_01', 'm_idle_angry_01', 'm_idle_angry_02', 'm_sit_chair_breathe_01',
+    'm_sit_chair_idle_neutral_01']) await clip(S, c);
+  for (const c of ['m_walk_slow_01', 'm_walk_neutral_01', 'm_crouch_in', 'm_crouch_out']) await clip(XY, c);
+  for (const c of ['m_sit_down_chair_01', 'm_sit_stand_up_chair_01', 'm_turn_left_180', 'm_turn_right_180', 'm_turn_left_90', 'm_turn_right_90',
+    'm_gestic_talk_angry_01']) await clip(XYZ, c);
+  // the farmhouse bedroom: worn pine boards, painted plaster, stained wood; the people's cloth
+  for (const t of ['wood_floor_worn', 'plastered_wall_04', 'dark_wood', 'old_wood_floor', 'rough_linen', 'waffle_pique_cotton', 'knitted_fleece',
+    'denim_fabric', 'cotton_jersey', 'ribbed_corduroy', 'crepe_satin']) await polyhaven(t, '2k', 'tex');
+  for (const m of ['Rockingchair_01', 'alarm_clock_01', 'painted_wooden_nightstand']) await polyhaven(m, '1k', 'gltf');
+  // the lunar lander model on the shelf
+  await objaverse('c495d75f2a89496a89d92e92e42a4694', '000-048', 'apollo_lunar_module_onebillionth.glb',
+    'https://sketchfab.com/3d-models/apollo-lunar-module-c495d75f2a89496a89d92e92e42a4694 (by onebillionth)', 'CC BY 4.0');
+};
+
 const room = process.argv[2];
 if (!ROOMS[room]) { console.error('usage: node pipeline/fetch.mjs <' + Object.keys(ROOMS).join('|') + '>'); process.exit(1); }
 await ROOMS[room]();

@@ -1,0 +1,159 @@
+{
+ "module": [
+  9.6,
+  7.6,
+  3.0
+ ],
+ "wallHeight": 2.7,
+ "lightmaps": {
+  "arch": "lm_arch.webp",
+  "furn": "lm_furn.webp"
+ },
+ "lightMapIntensity": 3.141592653589793,
+ "capture": {
+  "ceiling": [
+   0.3,
+   0.3,
+   0.32
+  ],
+  "walls": [
+   0.34,
+   0.34,
+   0.36
+  ],
+  "emitters": [
+   {
+    "x": -2.52,
+    "y": 1.0,
+    "z": 3.22,
+    "r": 0.04,
+    "L": 49.74,
+    "color": [
+     1.0,
+     0.68,
+     0.38
+    ]
+   },
+   {
+    "x": -4.26,
+    "y": 2.45,
+    "z": -0.6,
+    "r": 0.04,
+    "L": 18.24,
+    "color": [
+     1.0,
+     0.74,
+     0.46
+    ]
+   }
+  ],
+  "windows": [],
+  "at": [
+   [
+    -1.2,
+    1.1,
+    1.5
+   ],
+   [
+    -1.0,
+    1.2,
+    -1.6
+   ],
+   [
+    2.0,
+    1.3,
+    -2.2
+   ]
+  ]
+ },
+ "people": [
+  {
+   "who": "murph",
+   "file": "murph.glb",
+   "acts": [
+    {
+     "name": "comb",
+     "loop": true,
+     "min": 6,
+     "max": 14
+    },
+    {
+     "name": "scene",
+     "w": 1.0,
+     "cue": {
+      "coop": "scene",
+      "cooper": "scene",
+      "room": "scene"
+     },
+     "first": true,
+     "at": 0.0
+    }
+   ]
+  },
+  {
+   "who": "coop",
+   "file": "coop.glb",
+   "acts": [
+    {
+     "name": "wait",
+     "loop": true,
+     "min": 20,
+     "max": 40
+    },
+    {
+     "name": "scene",
+     "w": 0.0
+    }
+   ]
+  },
+  {
+   "who": "cooper",
+   "file": "cooper.glb",
+   "acts": [
+    {
+     "name": "float",
+     "loop": true,
+     "min": 20,
+     "max": 40
+    },
+    {
+     "name": "scene",
+     "w": 0.0
+    }
+   ]
+  },
+  {
+   "who": "room",
+   "file": "room.glb",
+   "acts": [
+    {
+     "name": "rest",
+     "loop": true,
+     "min": 20,
+     "max": 40
+    },
+    {
+     "name": "scene",
+     "w": 0.0
+    }
+   ]
+  }
+ ],
+ "live": {
+  "held": [
+   {
+    "who": "murph",
+    "act": "scene",
+    "prop": "notebook",
+    "hand": "L",
+    "grab": 4.6,
+    "release": 48.9
+   }
+  ]
+ },
+ "lightmapEncoding": "sqrt",
+ "lightmapScale": {
+  "arch": 3.056640625,
+  "furn": 9.109375
+ }
+}
