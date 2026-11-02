@@ -1667,5 +1667,226 @@ def succession():
     _hair_recolour('Business_Male_01', 'm005_opacity_color.tga', 'waiter', 'm005_opacity_color.tga', (34, 28, 25), contrast=1.0, shine=1.2)
 
 
+def _cowichan(B, r, rng):
+    """The Dude's Pendleton cardigan as a pattern (mean about 1) and its colour: tan lambswool knit with bands of
+    geometric motifs in two browns (a zigzag at the chest, stepped diamonds at the waist, a band round each upper arm),
+    thin dark rules either side of every band."""
+    X, Y, Z = np.nan_to_num(B.x), np.nan_to_num(B.y), np.nan_to_num(B.z)
+    neck, pel = r['neck'], r['pel']
+    u = (X + 0.55 * Y)                                                    # round the body
+    col = np.ones(B.x.shape + (3,), np.float32) * np.array([200, 174, 132], np.float32)[None, None] / 255
+    dark, mid = np.array([62, 42, 28], np.float32) / 255, np.array([128, 92, 60], np.float32) / 255
+    def band(z0, h, kind, along=u):
+        t = (Z - z0) / h; inside = (t > 0) & (t < 1)
+        f = (along / (h * 1.2)) % 1.0
+        if kind == 'zig': m = inside & (np.abs(t - (0.25 + 0.5 * np.abs(f - 0.5) * 2 * 0.9)) < 0.18)
+        else: m = inside & ((np.abs(f - 0.5) * 2 + np.abs(t - 0.5) * 2) < 0.62) & ~((np.abs(f - 0.5) * 2 + np.abs(t - 0.5) * 2) < 0.3)
+        rule = (np.abs(t) < 0.06) | (np.abs(t - 1) < 0.06)
+        return m, rule
+    out = col.copy()
+    for z0, h, kind, c in ((neck - 0.24, 0.1, 'zig', dark), (pel + 0.04, 0.1, 'dia', dark), (neck - 0.36, 0.06, 'zig', mid)):
+        m, rule = band(z0, h, kind)
+        m &= (r['torso'] | r['arms']); rule &= (r['torso'] | r['arms'])
+        out[m] = c; out[rule] = dark
+    # the sleeves: a band round each upper arm, its pattern along the arm's girth
+    sh = B.J['Bip01 L UpperArm']; el = B.J['Bip01 L Forearm']
+    ax = np.abs(X); mid_arm = (sh[0] + el[0]) / 2
+    arm_band = r['arms'] & (np.abs(ax - mid_arm) < 0.04)
+    out[arm_band & ((((Z + Y) / 0.04) % 1.0) < 0.5)] = dark; out[arm_band & (np.abs(np.abs(ax - mid_arm) - 0.04) < 0.006)] = dark
+    return out
+
+
+def the_big_lebowski():
+    """Hollywood Star Lanes, the night of the sarsaparilla (1998; costumes by Mary Zophres): the Dude in his Pendleton
+    Cowichan cardigan, open over a dirty white V-neck tee, pale green trousers and jelly sandals (his head is the
+    sculpt's: only his body is painted); Walter in a black shirt with short sleeves under a khaki fishing vest, khaki
+    shorts, white socks, black sneakers, his beard dark and greying, his buzz cut dark; Donny in a purple bowling shirt
+    and khakis; the Stranger in a grey-blue chambray western shirt under a dark brown leather vest, jeans and brown
+    boots, his hair grey; Jesus in his skin-tight purple jumpsuit with a darker stripe down each side, a black belt,
+    a black glove on his bowling hand, purple shoes, his hair black and slicked under the net, a goatee; Liam in a
+    purple polo and black trousers, balding; Smokey in a maroon bowling shirt with a tan collar and jeans (his long
+    grey hair is cards)."""
+    rng = np.random.default_rng(1998)
+    pat = _gt_pat
+    fill = lambda b, B, mask, colour, pattern=None, **kw: _gt_fill(b, B, mask, colour, pattern, **{'grow': 22, **kw})
+
+    def legs_shoes(b, B, r, trousers, shoes, pattern=None, sock=None, hem=None):
+        """Trousers (or shorts to `hem` metres above the knee joint, the shins bare; socks to mid-calf), shoes."""
+        knee = r['knee']
+        if hem is None: legs = r['thighs'] | B.where(r['calves'] & (B.z > 0.09))
+        else: legs = B.where((r['thighs'] | r['calves']) & (B.z > knee + hem))
+        b = fill(b, B, legs, trousers, pattern)
+        if hem is not None:
+            bare = B.where((r['thighs'] | r['calves']) & (B.z <= knee + hem) & (B.z > (0.26 if sock else 0.09)))
+            b = _skin_paint(b, B, bare, rng)
+            if sock: b = fill(b, B, B.where(r['calves'] & (B.z <= 0.26) & (B.z > 0.09)), sock, k=0.4, grow=4)
+        feet = r['feet'] | B.where(r['calves'] & (B.z <= 0.09))
+        return fill(b, B, feet, shoes, k=0.5, flatten=1), legs, feet
+
+    def head_hair(av, tex, who, colour, front=0.06, contrast=1.0, skin=None):
+        h = load(av, tex); Hd = Body(tex)
+        h, hm, brow = _gt_head_hair(h, Hd, colour, front=front, contrast=contrast)
+        if skin: h = skin_tone(h, soft(Hd.where(Hd.ok).astype(np.float32), 1) * (1 - hm), skin)
+        return h, Hd, hm, brow
+
+    # ---- the Dude (Male_Adult_06; his head is the sculpt): the Cowichan cardigan open down the front over the tee,
+    # the sleeves to the wrist with ribbed cuffs; pale green trousers; jelly sandals (bare feet, clear straps)
+    b = load('Male_Adult_06', 'm011_body_color.tga'); B = Body('m011_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+    card = (r['torso'] | r['arms']) & ~r['hands']
+    z = np.nan_to_num(B.z); t = np.clip((neck - z) / 0.5, 0, 1)
+    opening = B.where((np.abs(B.x) < 0.045 + 0.025 * t) & (B.y < -0.03) & (z < neck + 0.01) & (z > r['pel'] - 0.06)) & card
+    knit = np.clip(pat(B, 'knitted_fleece', 0.07, 1.3), 0.7, 1.3)
+    cw = _cowichan(B, r, rng)
+    b = _paint(b, B.grow((card & ~opening).astype(np.float32), 22), cw, k=0.45, flatten=3)
+    b = b * (1 - B.grow((card & ~opening).astype(np.float32), 22)[..., None]) + b * B.grow((card & ~opening).astype(np.float32), 22)[..., None] * knit[..., None]
+    shawl = B.where((np.abs(np.abs(B.x) - (0.045 + 0.025 * t)) < 0.03) & (B.y < -0.02) & (z < neck + 0.04) & (z > r['pel'] - 0.06)) & card & ~opening
+    b = fill(b, B, shawl, (104, 76, 52), np.clip(pat(B, 'knitted_fleece', 0.04, 1.6), 0.6, 1.4), k=0.4, grow=2)
+    vee = B.where((np.abs(B.x) < 0.04 * np.clip((z - (neck - 0.16)) / 0.16, 0, 1)) & (z > neck - 0.16) & (B.y < -0.02)) & opening
+    b = fill(b, B, opening & ~vee, (206, 198, 180), k=0.5, flatten=2, grow=2)
+    b = _skin_paint(b, B, vee, rng)
+    cuff = B.where(r['arms'] & (np.abs(B.x) > B.J['Bip01 L Hand'][0] - 0.05))
+    b = fill(b, B, cuff, (112, 84, 58), np.clip(pat(B, 'knitted_fleece', 0.03, 1.8), 0.6, 1.4), k=0.4, grow=4)
+    b, legs, feet = legs_shoes(b, B, r, (150, 152, 120), (196, 170, 150))
+    b = _skin_paint(b, B, B.where(feet), rng)
+    straps = B.where(feet & ((((np.nan_to_num(B.y) + 0.3) / 0.035) % 1.0) < 0.3) & (B.z > 0.02))
+    b = recolour(b, soft(straps.astype(np.float32), 0.6) * 0.5, (230, 226, 214), contrast=0.4)
+    save(b, 'dude', 'm011_body_color.tga')
+    _flat_normals('Male_Adult_06', 'm011_body_normal.tga', 'dude', B.grow((card | legs | feet).astype(np.float32), 4) * 0.7)
+
+    # ---- Walter (Male_Adult_05): a black shirt, its short sleeves to above the elbow, the forearms bare and hairy;
+    # the khaki fishing vest open over it, its patch pockets; khaki shorts, white socks, black sneakers; the dark
+    # buzz cut, the beard dark brown going grey
+    b = load('Male_Adult_05', 'm009_body_color.tga'); B = Body('m009_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+    shirt = (r['torso'] | r['arms']) & ~r['hands']
+    bare = _sleeves(B, 0.42)
+    b = fill(b, B, shirt & ~bare, (30, 32, 30), np.clip(pat(B, 'cotton_jersey', 0.18, 0.4), 0.85, 1.15), k=0.6, flatten=3)
+    b = _skin_paint(b, B, bare, rng, warm=(1.04, 0.98, 0.94))
+    b = _hair_on(b, B.grow(bare.astype(np.float32), 2) * 0.5, rng, (40, 30, 24), 0.35)
+    z = np.nan_to_num(B.z)
+    vest = r['torso'] & B.where(~((np.abs(B.x) < 0.07) & (B.y < -0.03)) & (z < neck - 0.0) & (z > r['pel'] - 0.12))
+    b = fill(b, B, vest, (168, 150, 108), np.clip(pat(B, 'rough_linen', 0.12, 0.8), 0.85, 1.15), k=0.5, flatten=3)
+    pk = np.zeros(B.x.shape, bool)
+    for cx in (-0.12, 0.12):
+        for z0, h in ((neck - 0.2, 0.1), (r['pel'] - 0.02, 0.13)):
+            box_ = B.where((np.abs(B.x - cx) < 0.06) & (z > z0) & (z < z0 + h) & (B.y < -0.03)) & vest
+            edge = box_ & ~B.where((np.abs(B.x - cx) < 0.052) & (z > z0 + 0.008) & (z < z0 + h - 0.008))
+            pk |= edge
+            b = recolour(b, soft(box_.astype(np.float32), 0.5) * 0.35, (150, 132, 92), contrast=0.6)
+    b = recolour(b, soft(pk.astype(np.float32), 0.4) * 0.8, (108, 94, 64), contrast=0.4)
+    b, legs, feet = legs_shoes(b, B, r, (156, 140, 104), (24, 24, 26), sock=(222, 220, 212), hem=0.04)
+    save(b, 'walter', 'm009_body_color.tga')
+    _flat_normals('Male_Adult_05', 'm009_body_normal.tga', 'walter', B.grow((shirt | legs).astype(np.float32), 4) * 0.7)
+    h, Hd, hm, brow = head_hair('Male_Adult_05', 'm009_head_color.tga', 'walter', (52, 44, 38), front=0.05, contrast=0.9)
+    temple = soft(Hd.where((np.abs(Hd.x) > 0.05) & (Hd.z > brow - 0.025) & (Hd.y > -0.06) & (Hd.y < 0.05)).astype(np.float32), 3)   # the buzz cut down the temples
+    h = recolour(h, np.maximum(temple * 0.9 - hm, 0), (58, 50, 44), contrast=0.6)
+    h = _gt_beard(h, Hd, _beard_mask(Hd, moustache=True, cheeks=0.75), rng, (64, 50, 40), n=12000, length=6, base=0.7, grey=0.22)
+    save(h, 'walter', 'm009_head_color.tga')
+    _hair_recolour('Male_Adult_05', 'm009_opacity_color.tga', 'walter', 'm009_opacity_color.tga', (56, 48, 42), contrast=1.0, shine=0.8)
+
+    # ---- Donny (Male_Adult_02): a purple bowling shirt with short sleeves and a camp collar, khakis, brown shoes;
+    # his own shaggy brown hair
+    b = load('Male_Adult_02', 'm003_body_color.tga'); B = Body('m003_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+    shirt = (r['torso'] | r['arms']) & ~r['hands']
+    bare = _sleeves(B, 0.45)
+    b = fill(b, B, shirt & ~bare, (104, 80, 158), np.clip(pat(B, 'cotton_jersey', 0.2, 0.3), 0.9, 1.1), k=0.55, flatten=3)
+    b = _skin_paint(b, B, bare, rng)
+    vee = _shirt_front(B, neck, -0.01, 0.1, 0.05, 0.004)
+    b = _skin_paint(b, B, vee, rng)
+    placket = B.where((np.abs(B.x) < 0.005) & (B.z < neck - 0.1) & (B.z > r['pel'] - 0.08) & (B.y < 0)) & shirt
+    b = fill(b, B, placket, (80, 60, 128), k=0.3, flatten=0, grow=1)
+    b, legs, feet = legs_shoes(b, B, r, (174, 156, 120), (80, 54, 36))
+    save(b, 'donny', 'm003_body_color.tga')
+    _flat_normals('Male_Adult_02', 'm003_body_normal.tga', 'donny', B.grow((shirt | legs).astype(np.float32), 4) * 0.7)
+    h, Hd, hm, brow = head_hair('Male_Adult_02', 'm003_head_color.tga', 'donny', (78, 60, 44), front=0.07)
+    save(h, 'donny', 'm003_head_color.tga')
+    _hair_recolour('Male_Adult_02', 'm003_opacity_color.tga', 'donny', 'm003_opacity_color.tga', (84, 64, 46), contrast=1.0)
+
+    # ---- the Stranger (Male_Adult_03): the chambray western shirt (a yoke across the chest, pearl snaps), the dark
+    # brown leather vest, jeans, brown boots; his hair grey (the hat and the moustache are modelled)
+    b = load('Male_Adult_03', 'm004_body_color.tga'); B = Body('m004_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+    shirt = (r['torso'] | r['arms']) & ~r['hands']
+    weave = np.clip(pat(B, 'rough_linen', 0.08, 1.0), 0.8, 1.2)
+    b = fill(b, B, shirt, (112, 132, 150), weave, k=0.5, flatten=3)
+    z = np.nan_to_num(B.z)
+    yoke = B.where(r['torso'] & (z > neck - 0.11) & (z < neck - 0.1 + 0.006 * np.cos(np.nan_to_num(B.x) * 20)))
+    b = recolour(b, soft(yoke.astype(np.float32), 0.5) * 0.7, (82, 98, 114), contrast=0.4)
+    vest = r['torso'] & B.where(~((np.abs(B.x) < 0.06 + 0.04 * np.clip((neck - z) / 0.3, 0, 1)) & (B.y < -0.03)) & (z < neck - 0.03) & (z > r['pel'] - 0.06))
+    b = fill(b, B, vest, (50, 32, 22), np.clip(pat(B, 'leather_red_02', 0.25, 0.6), 0.8, 1.2), k=0.45, flatten=2)
+    snaps = _specks(B, B.where((np.abs(B.x) < 0.004) & (B.y < -0.04) & (z < neck - 0.05) & (z > r['pel']) & ~vest), rng, 7, 2, None)
+    b = recolour(b, soft(snaps, 0.4) * 0.8, (220, 214, 200), contrast=0.2)
+    b, legs, feet = legs_shoes(b, B, r, (58, 70, 96), (72, 44, 26), pattern=np.clip(pat(B, 'cotton_jersey', 0.1, 0.8), 0.8, 1.2))
+    save(b, 'stranger', 'm004_body_color.tga')
+    _flat_normals('Male_Adult_03', 'm004_body_normal.tga', 'stranger', B.grow((shirt | legs).astype(np.float32), 4) * 0.7)
+    h, Hd, hm, brow = head_hair('Male_Adult_03', 'm004_head_color.tga', 'stranger', (150, 144, 136), front=0.04, contrast=1.1, skin=(1.03, 0.92, 0.84))
+    h = _hair_on(h, _beard_mask(Hd, moustache=False, cheeks=0.3), rng, (150, 144, 138), 0.18)
+    save(h, 'stranger', 'm004_head_color.tga')
+    _hair_recolour('Male_Adult_03', 'm004_opacity_color.tga', 'stranger', 'm004_opacity_color.tga', (168, 162, 154), contrast=1.4, shine=0.8)
+
+    # ---- Jesus (Male_Adult_07): the purple polyester jumpsuit, short sleeves, a darker stripe down the outside of
+    # each arm and leg, a black belt with a silver buckle; the black glove on his right hand; purple shoes; his hair
+    # black and slicked down (the net and the pony tail modelled), the goatee and moustache
+    b = load('Male_Adult_07', 'm013_body_color.tga'); B = Body('m013_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+    suit = (r['torso'] | r['arms'] | r['thighs'] | r['calves']) & ~r['hands'] & B.where(B.z > 0.09)
+    bare = _sleeves(B, 0.46)
+    b = fill(b, B, suit & ~bare, (118, 62, 150), np.clip(pat(B, 'cotton_jersey', 0.15, 0.3), 0.9, 1.1), k=0.6, flatten=3)
+    b = _skin_paint(b, B, bare, rng, warm=(0.98, 0.94, 0.88))
+    vee = _shirt_front(B, neck, -0.01, 0.12, 0.05, 0.004)
+    b = _skin_paint(b, B, vee, rng, warm=(0.98, 0.94, 0.88))
+    J = B.J; X = np.nan_to_num(B.x); Y = np.nan_to_num(B.y)
+    side = B.where(((r['thighs'] | r['calves']) & (np.abs(Y) < 0.018) & (np.abs(X) > 0.06)) | (r['arms'] & ~bare & (np.abs(Y) < 0.016) & (B.nor[..., 2] > 0.2)))
+    b = fill(b, B, side, (66, 24, 84), k=0.4, flatten=1, grow=2)
+    belt = B.where(r['torso'] & (np.abs(np.nan_to_num(B.z) - (r['pel'] + 0.1)) < 0.022))
+    b = fill(b, B, belt, (18, 16, 18), k=0.4, grow=2)
+    buckle = B.where(belt & (np.abs(X) < 0.03) & (Y < -0.05))
+    b = fill(b, B, buckle, (200, 200, 204), k=0.3, grow=1)
+    glove = B.where(B.part('R Hand', 'R Finger') | (B.part('R Forearm') & (np.abs(X) > J['Bip01 R Hand'][0] * -1 - 0.06) & (X < 0)))
+    b = fill(b, B, B.where(B.part('R Hand', 'R Finger')), (20, 18, 20), k=0.5, grow=2)
+    b, legs, feet = legs_shoes(b, B, r, (118, 62, 150), (100, 52, 128))
+    save(b, 'jesus', 'm013_body_color.tga')
+    _flat_normals('Male_Adult_07', 'm013_body_normal.tga', 'jesus', B.grow((suit | legs).astype(np.float32), 4) * 0.8)
+    h, Hd, hm, brow = head_hair('Male_Adult_07', 'm013_head_color.tga', 'jesus', (18, 16, 16), front=0.06, contrast=0.8)
+    goatee = np.maximum(_moustache(Hd, width=0.028), _beard_mask(Hd, moustache=False, cheeks=0.0) * smooth(0.04, 0.02, np.abs(np.nan_to_num(Hd.x))))
+    h = _gt_beard(h, Hd, goatee * 0.8, rng, (40, 32, 28), n=4000, length=4, base=0.55)
+    save(h, 'jesus', 'm013_head_color.tga')
+    _hair_recolour('Male_Adult_07', 'm013_opacity_color.tga', 'jesus', 'm013_opacity_color.tga', (16, 14, 14), contrast=0.8, shine=1.5)
+
+    # ---- Liam (Male_Adult_13): a purple polo, black trousers and shoes; balding, a grey-brown fringe
+    b = load('Male_Adult_13', 'm010_body_color.tga'); B = Body('m010_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+    shirt = (r['torso'] | r['arms']) & ~r['hands']
+    bare = _sleeves(B, 0.4)
+    b = fill(b, B, shirt & ~bare, (112, 74, 164), np.clip(pat(B, 'cotton_jersey', 0.15, 0.5), 0.85, 1.15), k=0.55, flatten=3)
+    b = _skin_paint(b, B, bare, rng)
+    b, legs, feet = legs_shoes(b, B, r, (26, 26, 28), (14, 13, 13))
+    save(b, 'liam', 'm010_body_color.tga')
+    _flat_normals('Male_Adult_13', 'm010_body_normal.tga', 'liam', B.grow((shirt | legs).astype(np.float32), 4) * 0.7)
+    h = load('Male_Adult_13', 'm010_head_color.tga'); Hd = Body('m010_head_color.tga')
+    h = _bald(h, Hd, shine=0.25)
+    brow, line, ear = _hairline(Hd, front=0.03); ax = np.abs(Hd.x)
+    fringe = Hd.where(((ax > 0.058) | (Hd.y > 0.03)) & (Hd.z > brow - 0.08) & (Hd.z < brow + 0.02 + 0.02 * smooth(0.0, 0.06, Hd.y)) & ~ear & ~(Hd.y < -0.05))
+    fm = soft(fringe.astype(np.float32), 8) * smooth(brow - 0.085, brow - 0.06, np.nan_to_num(Hd.z))
+    h = _hair_on(h, fm, rng, (92, 80, 70), 0.7)
+    save(h, 'liam', 'm010_head_color.tga')
+
+    # ---- Smokey (Business_Male_07): a maroon bowling shirt with a tan collar, jeans, brown shoes (his long grey
+    # hair is cards over a head painted bald)
+    b = load('Business_Male_07', 'm018_body_color.tga'); B = Body('m018_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+    shirt = (r['torso'] | r['arms']) & ~r['hands']
+    bare = _sleeves(B, 0.45)
+    b = fill(b, B, shirt & ~bare, (78, 22, 30), np.clip(pat(B, 'cotton_jersey', 0.2, 0.3), 0.9, 1.1), k=0.3, flatten=8)   # the tie under it flattened away
+    b = _skin_paint(b, B, bare, rng)
+    b = fill(b, B, B.where(r['torso'] & (np.abs(B.x) < 0.06) & (B.y < 0) & (B.z > r['pel'])), (78, 22, 30), k=0.15, flatten=6, grow=3)   # the tie under the shirt
+    b = leftover_black(b, (60, 18, 24), keep=B.grow(r['hands'].astype(np.float32), 2))
+    b, legs, feet = legs_shoes(b, B, r, (66, 84, 112), (70, 48, 32), pattern=np.clip(pat(B, 'cotton_jersey', 0.1, 0.8), 0.8, 1.2))
+    save(b, 'smokey', 'm018_body_color.tga')
+    _flat_normals('Business_Male_07', 'm018_body_normal.tga', 'smokey', B.grow((shirt | legs).astype(np.float32), 4) * 0.7)
+    h = load('Business_Male_07', 'm018_head_color.tga'); Hd = Body('m018_head_color.tga')
+    h = _bald(h, Hd, shine=0.05)
+    brow, line, ear = _hairline(Hd, front=0.045)                                 # the scalp under the cards the hair's grey, streaked
+    hm = soft(Hd.grow(Hd.where((Hd.z > line - 0.01) & ~ear).astype(np.float32), 3), 1.5)
+    h = recolour(h, hm, (62, 60, 58), contrast=0.3)
+    h = _hair_on(h, hm, rng, (112, 108, 102), 0.6)
+    save(h, 'smokey', 'm018_head_color.tga')
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()

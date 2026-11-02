@@ -95,6 +95,13 @@ Licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and obtained 
 - ["Candelabra"](https://sketchfab.com/3d-models/candelabra-f00558f1fba44a9698a2df0d9feb0d59) by
   [AndreiVNK](https://sketchfab.com/AndreiVNK). Changes: made black iron.
 
+## The Dude's head: CC BY 4.0
+
+- The Dude's head in The Big Lebowski room is ["Jeff Bridges"](https://sketchfab.com/3d-models/jeff-bridges-751203ca076f4709912c201a8b20391e)
+  by [Roberto Domínguez (vmmaniac)](https://sketchfab.com/vmmaniac), licensed
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Changes: simplified and its colour re-projected onto the
+  simpler mesh, its hair and beard recoloured, cut at the neck and set on a Rocketbox body (see above).
+
 ## Public domain
 
 - The Constitution of the United States (1787), page one: the U.S. National Archives' scan, via

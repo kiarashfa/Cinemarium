@@ -289,6 +289,30 @@ const ROOMS = {
   },
 };
 
+ROOMS['the-big-lebowski'] = async () => {
+  // the Dude (a body for the sculpted head), Walter, Donny, the Stranger, Jesus, Liam, Smokey
+  for (const a of ['Adults/Male_Adult_06', 'Adults/Male_Adult_05', 'Adults/Male_Adult_02', 'Adults/Male_Adult_03', 'Adults/Male_Adult_07',
+    'Adults/Male_Adult_13', 'Professions/Business_Male_07']) await avatar(a);
+  const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+  // on the bar stools: a seated base and its idles; talk and drink layered over it
+  for (const c of ['breathe_01', 'idle_neutral_01', 'idle_neutral_02', 'idle_relaxed_01', 'idle_look_around', 'gestic_thoughtful', 'gestic_shrug_01',
+    'idle_touch_face', 'idle_scratch_head']) await clip(S, `m_sit_chair_${c}`);
+  for (const c of ['m_gestic_talk_neutral_01', 'm_gestic_talk_relaxed_01', 'm_gestic_talk_relaxed_02', 'm_gestic_talk_cool',
+    'm_gestic_talk_excited_01', 'm_gestic_listen_neutral_01', 'm_gestic_laugh_low', 'm_gestic_laugh_loud', 'm_gestic_shrug_01', 'm_drink_drinking',
+    'm_drink_idle', 'm_idle_breathe_01', 'm_idle_breathe_02', 'm_idle_neutral_01', 'm_idle_look_around_01', 'm_idle_waiting_01', 'm_cheer_01',
+    'm_cheer_03', 'm_claphands_01', 'm_documents_note', 'm_documents_check']) await clip(S, c);
+  // up to the lane and back; the walk-up; Jesus's swagger and his hips
+  for (const c of ['m_walk_neutral_01', 'm_walk_neutral_02', 'm_walk_slow_01', 'm_walk_cool_01', 'm_walk_start', 'm_walk_stop', 'm_crouch_in', 'm_crouch_out', 'm_cheer_02']) await clip(XY, c);
+  for (const c of ['m_sit_stand_up_chair_01', 'm_sit_down_chair_01', 'm_turn_left_90', 'm_turn_right_90', 'm_turn_left_180', 'm_turn_right_180',
+    'm_dancing_sexy', 'm_gestic_talk_angry_02']) await clip(XYZ, c);
+  await clip(S, 'm_dancing_cool');
+  // the alley: maple lanes, cream and blue tile, the bar's wood, the stools' vinyl, plaster; the people's cloth
+  for (const t of ['oak_veneer_01', 'american_walnut_veneer', 'white_plaster_02', 'leather_red_02', 'cotton_jersey', 'knitted_fleece',
+    'poly_wool_herringbone', 'rough_linen', 'wool_boucle']) await polyhaven(t, '2k', 'tex');
+  // the Dude's head: a sculpt of Jeff Bridges (downloaded signed in, glTF archive unzipped into cache/sketchfab/bridges/)
+  sketchfab('bridges/scene.gltf', 'https://sketchfab.com/3d-models/jeff-bridges-751203ca076f4709912c201a8b20391e (by Roberto Domínguez, vmmaniac)', 'CC BY 4.0');
+};
+
 const room = process.argv[2];
 if (!ROOMS[room]) { console.error('usage: node pipeline/fetch.mjs <' + Object.keys(ROOMS).join('|') + '>'); process.exit(1); }
 await ROOMS[room]();

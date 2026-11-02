@@ -890,6 +890,108 @@ def succession(out):
     _save(warm, f'{out}/painting_color.jpg')
 
 
+def the_big_lebowski(out):
+    """Hollywood Star Lanes (1960, Brunswick): honey maple lanes and approaches in narrow boards, the concourse's cream
+    tile scattered with royal-blue squares, peach plaster, the bar's varnished wood, the stools' red vinyl; the masking
+    band over the pin decks (peach, an oval window per lane with a blue crown in it, a salmon diamond between lanes,
+    the lane numbers over it), the banners on the fascia above it, the Brunswick crown, the sign over the ball racks."""
+    from PIL import ImageDraw, ImageFont
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    rng = np.random.default_rng(1998)
+    F = lambda name, size: ImageFont.truetype(os.path.join('C:/Windows/Fonts', name), size)
+    # the lanes: 39 maple boards to the lane's 41.5 inches (one tile is the lane's width, square), the grain along
+    # them, each board a little lighter or darker, hairline joins; the boards run along u
+    S = 2048; g = _lum(ph('oak_veneer_01', 'Diffuse'), S); g = g / g.mean()
+    L = np.zeros((S, S), np.float32); n = 39; edges = np.linspace(0, S, n + 1).astype(int)
+    for i in range(n):
+        a, b = edges[i], edges[i + 1]
+        src = np.roll(g, int(rng.integers(0, S)), axis=1)[(a + int(rng.integers(0, S))) % S:][:b - a]
+        if src.shape[0] < b - a: src = np.vstack([src, g[:b - a - src.shape[0]]])
+        L[a:b] = (1 + 0.45 * (src - 1)) * rng.uniform(0.9, 1.1)
+        L[a:a + 2] *= 0.72
+    _save(lin((214, 166, 112))[None, None] * np.clip(L, 0.5, 1.5)[..., None], f'{out}/lane_color.jpg')
+    copy(ph('oak_veneer_01', 'nor_gl'), f'{out}/lane_normal.jpg', size=1024)
+    # the concourse and the settee floor: 12-inch tiles, cream and beige, a royal-blue one here and there in a loose
+    # diagonal lattice; one tile of texture is 8 x 8 tiles (2.44 m)
+    T_ = 1024; c = T_ // 8; I = Image.new('RGB', (T_, T_), (196, 186, 162)); d = ImageDraw.Draw(I)
+    for j in range(8):
+        for i in range(8):
+            blue = (i * 3 + j * 5) % 8 == 0
+            base = np.array((42, 70, 168) if blue else (226, 214, 186) if (i + j) % 2 else (212, 198, 168), np.float32) * rng.uniform(0.95, 1.04)
+            d.rectangle([i * c + 1, j * c + 1, (i + 1) * c - 2, (j + 1) * c - 2], fill=tuple(int(v) for v in base))
+    M = srgb_to_lin(np.asarray(I, np.float32) / 255) * (0.94 + 0.12 * _noise(T_, 6, 3))[..., None]
+    _save(M, f'{out}/tile_color.jpg')
+    # the plaster: peach paint; the bar and the partition's caps: varnished mid-brown wood; the stools: red vinyl
+    tint(ph('white_plaster_02', 'Diffuse'), f'{out}/peach_color.jpg', (232, 172, 136), size=1024, contrast=0.2)
+    copy(ph('white_plaster_02', 'nor_gl'), f'{out}/plaster_normal.jpg', size=1024)
+    tint(ph('american_walnut_veneer', 'Diffuse'), f'{out}/bar_wood_color.jpg', (118, 70, 38), size=1024, contrast=1.3)
+    copy(ph('american_walnut_veneer', 'nor_gl'), f'{out}/bar_wood_normal.jpg', size=1024)
+    tint(ph('leather_red_02', 'Diffuse'), f'{out}/vinyl_color.jpg', (150, 34, 28), size=512, contrast=0.6)
+    copy(ph('leather_red_02', 'nor_gl'), f'{out}/vinyl_normal.jpg', size=512)
+    # the masking band: six lanes (17 to 22, back to front), each a panel PW wide, 1 m tall (texels per metre: 400)
+    PW, k = 1.734, 400; Wp, Hp = int(6 * PW * k), int(1.0 * k)
+    I = Image.new('RGB', (Wp, Hp), (238, 186, 154)); d = ImageDraw.Draw(I)
+    crown = lambda cx, cy, s: [(cx - s, cy + 0.45 * s), (cx - s * 1.05, cy - 0.5 * s), (cx - s * 0.5, cy - 0.05 * s), (cx, cy - 0.75 * s),
+                               (cx + s * 0.5, cy - 0.05 * s), (cx + s * 1.05, cy - 0.5 * s), (cx + s, cy + 0.45 * s)]
+    d.rectangle([0, int(0.86 * Hp), Wp, Hp], fill=(214, 128, 96))                 # the lip along the bottom
+    d.rectangle([0, 0, Wp, int(0.07 * Hp)], fill=(226, 150, 116))
+    for i in range(6):
+        x0 = i * PW * k; cx, cy = x0 + PW * k / 2, 0.5 * Hp
+        rx, ry = PW * k * 0.36, 0.22 * Hp
+        d.ellipse([cx - rx - 10, cy - ry - 10, cx + rx + 10, cy + ry + 10], fill=(200, 126, 98))
+        d.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], fill=(214, 210, 198))
+        for yy in range(int(cy - ry), int(cy + ry), 7):                              # the perforated screen
+            for xx in range(int(cx - rx), int(cx + rx), 7):
+                if ((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2 < 0.97: d.point((xx, yy), fill=(160, 156, 148))
+        s = 0.12 * Hp; d.polygon(crown(cx, cy + 0.02 * Hp, s), fill=(36, 62, 170))
+        for q in (-1, 0, 1): d.ellipse([cx + q * s - 9, cy + 0.02 * Hp - (0.75 if q == 0 else 0.5) * s - 9, cx + q * s + 9, cy + 0.02 * Hp - (0.75 if q == 0 else 0.5) * s + 9], fill=(36, 62, 170))
+        d.rectangle([cx - s, cy + 0.02 * Hp + 0.45 * s, cx + s, cy + 0.02 * Hp + 0.62 * s], fill=(36, 62, 170))
+        for e in (x0, x0 + PW * k):                                                  # a salmon diamond on every join
+            d.polygon([(e, 0.1 * Hp), (e + 0.17 * PW * k, 0.5 * Hp), (e, 0.9 * Hp), (e - 0.17 * PW * k, 0.5 * Hp)], fill=(222, 120, 92))
+        num = str(17 + (5 - i)); f = F('GILB____.TTF', int(0.075 * Hp))             # the lane's number at its top corner
+        d.text((x0 + PW * k * 0.16, 0.012 * Hp), num, fill=(150, 66, 44), font=f)
+    I.filter(ImageFilter.GaussianBlur(0.8)).save(f'{out}/masking_color.jpg', quality=92)
+    # the banners on the fascia over the band
+    def banner(name, w, h, bg, lines, star=False):
+        im = Image.new('RGB', (w, h), bg); dd = ImageDraw.Draw(im)
+        dd.rectangle([6, 6, w - 7, h - 7], outline=tuple(min(255, int(v * 0.6 + 100)) for v in bg), width=5)
+        y = h * 0.18
+        for txt, font, size, col in lines:
+            f = F(font, int(size * h)); tw = dd.textlength(txt, font=f)
+            dd.text(((w - tw) / 2 + (h * 0.25 if star else 0), y), txt, fill=col, font=f); y += size * h * 1.12
+        if star:
+            cx, cy, R = h * 0.42, h * 0.5, h * 0.36
+            pts = [(cx + (R if k % 2 == 0 else R * 0.38) * math.cos(math.pi * k / 8), cy + (R if k % 2 == 0 else R * 0.38) * math.sin(math.pi * k / 8)) for k in range(16)]
+            dd.polygon(pts, fill=(255, 236, 160))
+        im.save(f'{out}/{name}.jpg', quality=92)
+    import math
+    banner('banner_division', 1200, 300, (96, 52, 30), [('HOLLYWOOD STAR LANES', 'GILB____.TTF', 0.16, (240, 214, 160)), ('DIVISION CHAMPIONSHIP', 'BRITANIC.TTF', 0.3, (250, 232, 190))])
+    banner('banner_stars', 1200, 300, (226, 92, 34), [('STARS AND STRIKES', 'BRITANIC.TTF', 0.3, (255, 246, 220)), ('FOREVER', 'BRITANIC.TTF', 0.28, (255, 246, 220))], star=True)
+    banner('banner_open', 1000, 300, (244, 236, 214), [('OPEN', 'GILSANUB.TTF', 0.3, (200, 40, 30)), ('BOWLING', 'GILSANUB.TTF', 0.3, (200, 40, 30))])
+    banner('banner_fall', 1000, 300, (40, 52, 140), [('FALL LEAGUES', 'BRITANIC.TTF', 0.34, (255, 214, 80)), ('NOW FORMING', 'GILB____.TTF', 0.2, (240, 240, 240))])
+    # the Brunswick crown (ball returns, consoles): a blue crown on cream; the script sign over the racks
+    im = Image.new('RGB', (512, 512), (232, 222, 196)); dd = ImageDraw.Draw(im); s = 150
+    dd.polygon(crown(256, 270, s), fill=(36, 62, 170))
+    for q in (-1, 0, 1): dd.ellipse([256 + q * s - 22, 270 - (0.75 if q == 0 else 0.5) * s - 22, 256 + q * s + 22, 270 - (0.75 if q == 0 else 0.5) * s + 22], fill=(36, 62, 170))
+    dd.rectangle([256 - s, 270 + 0.45 * s, 256 + s, 270 + 0.66 * s], fill=(36, 62, 170))
+    im.save(f'{out}/crown_color.jpg', quality=92)
+    im = Image.new('RGB', (1024, 256), (24, 52, 150)); dd = ImageDraw.Draw(im)
+    f = F('BRUSHSCI.TTF', 190); tw = dd.textlength('Brunswick', font=f); dd.text(((1024 - tw) / 2, 0), 'Brunswick', fill=(250, 250, 250), font=f)
+    im.save(f'{out}/brunswick_color.jpg', quality=92)
+    # the lanes' numbers over the consoles' projectors, the score sheet's grid, a beer sign
+    for num in ('17', '18', '19', '20', '21', '22'):
+        im = Image.new('RGB', (256, 160), (236, 228, 204)); dd = ImageDraw.Draw(im); f = F('ariblk.ttf', 120)
+        tw = dd.textlength(num, font=f); dd.text(((256 - tw) / 2, 4), num, fill=(30, 28, 26), font=f); im.save(f'{out}/num_{num}.jpg', quality=92)
+    im = Image.new('RGB', (512, 640), (244, 242, 232)); dd = ImageDraw.Draw(im)
+    for r in range(7): dd.line([(20, 80 + r * 80), (492, 80 + r * 80)], fill=(120, 140, 170), width=3)
+    for cc in range(11): dd.line([(20 + cc * 47, 80), (20 + cc * 47, 560)], fill=(120, 140, 170), width=3)
+    for r in range(6):
+        for cc in range(10):
+            if rng.random() < 0.7: dd.text((30 + cc * 47, 95 + r * 80), 'X' if rng.random() < 0.4 else str(int(rng.integers(1, 10))), fill=(30, 30, 40), font=F('arialbd.ttf', 34))
+    im.save(f'{out}/score_color.jpg', quality=92)
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

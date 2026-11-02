@@ -47,7 +47,7 @@ const LIST: Title[] = [
   { slug: 'the-godfather', kind: 'film', rank: 4, title: 'The Godfather', year: 1972, imdb: { id: 'tt0068646' }, scene: "Don Corleone's study", room: 'the-godfather' },
   { slug: 'mulholland-drive', kind: 'film', rank: 5, title: 'Mulholland Drive', year: 2001, imdb: { id: 'tt0166924' } },
   { slug: 'vertigo', kind: 'film', rank: 6, title: 'Vertigo', year: 1958, imdb: { id: 'tt0052357' } },
-  { slug: 'the-florida-project', kind: 'film', rank: 7, title: 'The Florida Project', year: 2017, imdb: { id: 'tt5649144' } },
+  { slug: 'the-florida-project', kind: 'film', rank: 15, title: 'The Florida Project', year: 2017, imdb: { id: 'tt5649144' } },
   { slug: 'shutter-island', kind: 'film', rank: 8, title: 'Shutter Island', year: 2010, imdb: { id: 'tt1130884' } },
   { slug: 'about-time', kind: 'film', rank: 9, title: 'About Time', year: 2013, imdb: { id: 'tt2194499' } },
   { slug: 'the-green-mile', kind: 'film', rank: 10, title: 'The Green Mile', year: 1999, imdb: { id: 'tt0120689' } },
@@ -55,7 +55,7 @@ const LIST: Title[] = [
   { slug: '2001-a-space-odyssey', kind: 'film', rank: 12, title: '2001: A Space Odyssey', year: 1968, imdb: { id: 'tt0062622' } },
   { slug: 'the-intouchables', kind: 'film', rank: 13, title: 'The Intouchables', year: 2011, imdb: { id: 'tt1675434' } },
   { slug: 'terminator-2', kind: 'film', rank: 14, title: 'Terminator 2: Judgment Day', year: 1991, imdb: { id: 'tt0103064' } },
-  { slug: 'the-big-lebowski', kind: 'film', rank: 15, title: 'The Big Lebowski', year: 1998, imdb: { id: 'tt0118715' } },
+  { slug: 'the-big-lebowski', kind: 'film', rank: 7, title: 'The Big Lebowski', year: 1998, imdb: { id: 'tt0118715' }, scene: 'Hollywood Star Lanes', room: 'the-big-lebowski' },
 ];
 
 /** Addresses the club itself uses. */

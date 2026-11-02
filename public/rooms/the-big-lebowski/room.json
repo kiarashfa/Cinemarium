@@ -1,0 +1,380 @@
+{
+ "module": [
+  9.6,
+  7.6,
+  3.0
+ ],
+ "wallHeight": 1.8,
+ "lightmaps": {
+  "arch": "lm_arch.webp",
+  "furn": "lm_furn.webp"
+ },
+ "lightMapIntensity": 3.141592653589793,
+ "capture": {
+  "ceiling": [
+   0.62,
+   0.56,
+   0.46
+  ],
+  "walls": [
+   0.5,
+   0.36,
+   0.28
+  ],
+  "emitters": [
+   {
+    "x": -3.3,
+    "y": 1.175,
+    "z": -3.51,
+    "r": 0.05,
+    "L": 1.86,
+    "color": [
+     0.45,
+     0.62,
+     1.0
+    ]
+   },
+   {
+    "x": -1.3,
+    "y": 1.3,
+    "z": -3.51,
+    "r": 0.05,
+    "L": 1.86,
+    "color": [
+     0.45,
+     0.62,
+     1.0
+    ]
+   },
+   {
+    "x": 0.7,
+    "y": 1.175,
+    "z": -3.51,
+    "r": 0.05,
+    "L": 1.86,
+    "color": [
+     0.45,
+     0.62,
+     1.0
+    ]
+   },
+   {
+    "x": 2.5,
+    "y": 1.3,
+    "z": -3.51,
+    "r": 0.05,
+    "L": 1.86,
+    "color": [
+     0.45,
+     0.62,
+     1.0
+    ]
+   },
+   {
+    "x": -4.51,
+    "y": 1.2,
+    "z": 2.95,
+    "r": 0.05,
+    "L": 1.86,
+    "color": [
+     0.45,
+     0.62,
+     1.0
+    ]
+   },
+   {
+    "x": -4.51,
+    "y": 1.3,
+    "z": 0.9,
+    "r": 0.05,
+    "L": 1.86,
+    "color": [
+     0.45,
+     0.62,
+     1.0
+    ]
+   },
+   {
+    "x": -4.635,
+    "y": 1.2,
+    "z": -1.175,
+    "r": 0.05,
+    "L": 1.86,
+    "color": [
+     0.45,
+     0.62,
+     1.0
+    ]
+   },
+   {
+    "x": 3.15,
+    "y": 0.6,
+    "z": 3.15,
+    "r": 0.05,
+    "L": 2.65,
+    "color": [
+     1.0,
+     0.6,
+     0.3
+    ]
+   }
+  ],
+  "windows": [],
+  "at": [
+   [
+    0.0,
+    0.65,
+    2.575
+   ],
+   [
+    -3.25,
+    0.6,
+    -0.25
+   ],
+   [
+    1.0,
+    0.5,
+    -1.0
+   ]
+  ]
+ },
+ "people": [
+  {
+   "who": "dude",
+   "file": "dude.glb",
+   "acts": [
+    {
+     "name": "sit",
+     "loop": true,
+     "min": 14,
+     "max": 30
+    },
+    {
+     "name": "sip",
+     "w": 0.6
+    },
+    {
+     "name": "talk",
+     "w": 0.6
+    },
+    {
+     "name": "laugh",
+     "w": 0.3
+    }
+   ]
+  },
+  {
+   "who": "walter",
+   "file": "walter.glb",
+   "acts": [
+    {
+     "name": "sit",
+     "loop": true,
+     "min": 10,
+     "max": 22
+    },
+    {
+     "name": "talk",
+     "w": 0.7
+    },
+    {
+     "name": "look",
+     "w": 0.4
+    },
+    {
+     "name": "bowl",
+     "w": 0
+    }
+   ]
+  },
+  {
+   "who": "donny",
+   "file": "donny.glb",
+   "acts": [
+    {
+     "name": "sit",
+     "loop": true,
+     "min": 10,
+     "max": 22
+    },
+    {
+     "name": "nuts",
+     "w": 0.6
+    },
+    {
+     "name": "look",
+     "w": 0.4
+    },
+    {
+     "name": "bowl",
+     "w": 0
+    }
+   ]
+  },
+  {
+   "who": "stranger",
+   "file": "stranger.glb",
+   "acts": [
+    {
+     "name": "sit",
+     "loop": true,
+     "min": 14,
+     "max": 30
+    },
+    {
+     "name": "talk",
+     "w": 0.6
+    },
+    {
+     "name": "hat",
+     "w": 0.5
+    },
+    {
+     "name": "sip",
+     "w": 0.4
+    }
+   ]
+  },
+  {
+   "who": "jesus",
+   "file": "jesus.glb",
+   "acts": [
+    {
+     "name": "stand",
+     "loop": true,
+     "min": 10,
+     "max": 22
+    },
+    {
+     "name": "dance",
+     "w": 0.5
+    },
+    {
+     "name": "look",
+     "w": 0.5
+    },
+    {
+     "name": "bowl",
+     "w": 0
+    }
+   ]
+  },
+  {
+   "who": "liam",
+   "file": "liam.glb",
+   "acts": [
+    {
+     "name": "sit",
+     "loop": true,
+     "min": 12,
+     "max": 26
+    },
+    {
+     "name": "point",
+     "w": 0.5
+    },
+    {
+     "name": "look",
+     "w": 0.4
+    }
+   ]
+  },
+  {
+   "who": "smokey",
+   "file": "smokey.glb",
+   "acts": [
+    {
+     "name": "sit",
+     "loop": true,
+     "min": 12,
+     "max": 26
+    },
+    {
+     "name": "look",
+     "w": 0.5
+    },
+    {
+     "name": "shrug",
+     "w": 0.3
+    },
+    {
+     "name": "bowl",
+     "w": 0
+    }
+   ]
+  },
+  {
+   "who": "lane22",
+   "file": "lane22.glb",
+   "acts": [
+    {
+     "name": "rest",
+     "loop": true,
+     "min": 14,
+     "max": 34
+    },
+    {
+     "name": "walter",
+     "w": 1.0,
+     "cue": {
+      "walter": "bowl"
+     },
+     "first": true,
+     "at": 10.69
+    },
+    {
+     "name": "donny",
+     "w": 0.8,
+     "cue": {
+      "donny": "bowl"
+     }
+    }
+   ]
+  },
+  {
+   "who": "lane20",
+   "file": "lane20.glb",
+   "acts": [
+    {
+     "name": "rest",
+     "loop": true,
+     "min": 22,
+     "max": 44
+    },
+    {
+     "name": "jesus",
+     "w": 1.0,
+     "cue": {
+      "jesus": "bowl"
+     },
+     "first": true,
+     "at": 2.11
+    }
+   ]
+  },
+  {
+   "who": "lane18",
+   "file": "lane18.glb",
+   "acts": [
+    {
+     "name": "rest",
+     "loop": true,
+     "min": 30,
+     "max": 60
+    },
+    {
+     "name": "smokey",
+     "w": 1.0,
+     "cue": {
+      "smokey": "bowl"
+     }
+    }
+   ]
+  }
+ ],
+ "lightmapEncoding": "sqrt",
+ "lightmapScale": {
+  "arch": 7.420654296875,
+  "furn": 11.71875
+ }
+}
