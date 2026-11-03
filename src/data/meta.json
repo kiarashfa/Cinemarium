@@ -1,5 +1,5 @@
 {
-  "asOf": "2026-10-07",
+  "asOf": "2026-11-02",
   "titles": {
     "breaking-bad": {
       "imdb": {
@@ -10,7 +10,7 @@
       "tmdb": {
         "id": 1396,
         "rating": 9,
-        "votes": 18771
+        "votes": 19016
       },
       "year": 2008,
       "runtime": "49 min",
@@ -25,12 +25,12 @@
       "imdb": {
         "id": "tt2699128",
         "rating": 8.3,
-        "votes": 128900
+        "votes": 134944
       },
       "tmdb": {
         "id": 54344,
         "rating": 7.7,
-        "votes": 1300
+        "votes": 1317
       },
       "year": 2014,
       "runtime": "1 min",
@@ -44,13 +44,13 @@
     "seinfeld": {
       "imdb": {
         "id": "tt0098904",
-        "rating": 8.9,
-        "votes": 382252
+        "rating": 8.8,
+        "votes": 389448
       },
       "tmdb": {
         "id": 1400,
         "rating": 8.2,
-        "votes": 2469
+        "votes": 2499
       },
       "year": 1989,
       "runtime": "22 min",
@@ -68,7 +68,7 @@
       "tmdb": {
         "id": 1408,
         "rating": 8.6,
-        "votes": 7932
+        "votes": 7998
       },
       "year": 2004,
       "runtime": "44 min",
@@ -86,7 +86,7 @@
       "tmdb": {
         "id": 46533,
         "rating": 7.9,
-        "votes": 1119
+        "votes": 1135
       },
       "year": 2013,
       "runtime": "44 min",
@@ -101,12 +101,12 @@
       "imdb": {
         "id": "tt4158110",
         "rating": 8.5,
-        "votes": 462430
+        "votes": 475884
       },
       "tmdb": {
         "id": 62560,
         "rating": 8.3,
-        "votes": 5615
+        "votes": 5677
       },
       "year": 2015,
       "runtime": "49 min",
@@ -126,7 +126,7 @@
       "tmdb": {
         "id": 4607,
         "rating": 8,
-        "votes": 5376
+        "votes": 5441
       },
       "year": 2004,
       "runtime": "44 min",
@@ -141,12 +141,12 @@
       "imdb": {
         "id": "tt0141842",
         "rating": 9.2,
-        "votes": 582424
+        "votes": 600509
       },
       "tmdb": {
         "id": 1398,
         "rating": 8.7,
-        "votes": 3715
+        "votes": 3769
       },
       "year": 1999,
       "runtime": "55 min",
@@ -165,7 +165,7 @@
       "tmdb": {
         "id": 76331,
         "rating": 8.3,
-        "votes": 1797
+        "votes": 1838
       },
       "year": 2018,
       "runtime": "60 min",
@@ -179,12 +179,12 @@
       "imdb": {
         "id": "tt11280740",
         "rating": 8.6,
-        "votes": 385489
+        "votes": 410618
       },
       "tmdb": {
         "id": 95396,
         "rating": 8.4,
-        "votes": 3007
+        "votes": 3089
       },
       "year": 2022,
       "genres": [
@@ -198,19 +198,18 @@
       "imdb": {
         "id": "tt0944947",
         "rating": 9.2,
-        "votes": 2606100
+        "votes": 2671155
       },
       "tmdb": {
         "id": 1399,
         "rating": 8.5,
-        "votes": 27888
+        "votes": 28093
       },
       "year": 2011,
       "runtime": "57 min",
       "genres": [
-        "Action",
-        "Adventure",
-        "Drama"
+        "Drama",
+        "Fantasy"
       ],
       "seasons": 8
     },
@@ -218,12 +217,12 @@
       "imdb": {
         "id": "tt0098936",
         "rating": 8.7,
-        "votes": 243494
+        "votes": 251516
       },
       "tmdb": {
         "id": 1920,
         "rating": 8.3,
-        "votes": 2727
+        "votes": 2753
       },
       "year": 1990,
       "runtime": "1 min",
@@ -238,12 +237,12 @@
       "imdb": {
         "id": "tt1124373",
         "rating": 8.5,
-        "votes": 352705
+        "votes": 361100
       },
       "tmdb": {
         "id": 1409,
         "rating": 8.4,
-        "votes": 3408
+        "votes": 3449
       },
       "year": 2008,
       "runtime": "45 min",
@@ -263,7 +262,7 @@
       "tmdb": {
         "id": 60622,
         "rating": 8.3,
-        "votes": 3454
+        "votes": 3504
       },
       "year": 2014,
       "runtime": "53 min",
@@ -278,12 +277,12 @@
       "imdb": {
         "id": "tt6468322",
         "rating": 8.2,
-        "votes": 604616
+        "votes": 621045
       },
       "tmdb": {
         "id": 71446,
         "rating": 8.2,
-        "votes": 19716
+        "votes": 19777
       },
       "year": 2017,
       "runtime": "70 min",
@@ -298,12 +297,12 @@
       "imdb": {
         "id": "tt0133093",
         "rating": 8.7,
-        "votes": 2243093
+        "votes": 2284373
       },
       "tmdb": {
         "id": 603,
         "rating": 8.3,
-        "votes": 28893
+        "votes": 29135
       },
       "year": 1999,
       "runtime": "136 min",
@@ -316,12 +315,12 @@
       "imdb": {
         "id": "tt3783958",
         "rating": 8,
-        "votes": 759966
+        "votes": 780882
       },
       "tmdb": {
         "id": 313369,
         "rating": 7.9,
-        "votes": 18564
+        "votes": 18688
       },
       "year": 2016,
       "runtime": "128 min",
@@ -335,31 +334,31 @@
       "imdb": {
         "id": "tt1375666",
         "rating": 8.8,
-        "votes": 2811614
+        "votes": 2877173
       },
       "tmdb": {
         "id": 27205,
         "rating": 8.4,
-        "votes": 40354
+        "votes": 40621
       },
       "year": 2010,
       "runtime": "148 min",
       "genres": [
-        "Action",
         "Adventure",
-        "Sci-Fi"
+        "Sci-Fi",
+        "Thriller"
       ]
     },
     "the-godfather": {
       "imdb": {
         "id": "tt0068646",
         "rating": 9.2,
-        "votes": 2222804
+        "votes": 2262742
       },
       "tmdb": {
         "id": 238,
         "rating": 8.7,
-        "votes": 23700
+        "votes": 23891
       },
       "year": 1972,
       "runtime": "175 min",
@@ -377,7 +376,7 @@
       "tmdb": {
         "id": 1018,
         "rating": 7.8,
-        "votes": 7332
+        "votes": 7396
       },
       "year": 2001,
       "runtime": "147 min",
@@ -391,12 +390,12 @@
       "imdb": {
         "id": "tt0052357",
         "rating": 8.2,
-        "votes": 458761
+        "votes": 463709
       },
       "tmdb": {
         "id": 426,
         "rating": 8.1,
-        "votes": 6536
+        "votes": 6594
       },
       "year": 1958,
       "runtime": "128 min",
@@ -415,7 +414,7 @@
       "tmdb": {
         "id": 394117,
         "rating": 7.4,
-        "votes": 3208
+        "votes": 3226
       },
       "year": 2017,
       "runtime": "111 min",
@@ -427,50 +426,48 @@
       "imdb": {
         "id": "tt1130884",
         "rating": 8.2,
-        "votes": 1644111
+        "votes": 1689261
       },
       "tmdb": {
         "id": 11324,
         "rating": 8.2,
-        "votes": 26538
+        "votes": 26732
       },
       "year": 2010,
       "runtime": "138 min",
       "genres": [
-        "Drama",
         "Mystery",
         "Thriller"
       ]
     },
-    "about-time": {
+    "pulp-fiction": {
       "imdb": {
-        "id": "tt2194499",
-        "rating": 7.8,
-        "votes": 443834
+        "id": "tt0110912",
+        "rating": 8.8,
+        "votes": 2473737
       },
       "tmdb": {
-        "id": 122906,
-        "rating": 7.9,
-        "votes": 9553
+        "id": 680,
+        "rating": 8.5,
+        "votes": 31231
       },
-      "year": 2013,
-      "runtime": "123 min",
+      "year": 1994,
+      "runtime": "154 min",
       "genres": [
-        "Comedy",
-        "Drama",
-        "Fantasy"
+        "Crime",
+        "Drama"
       ]
     },
     "the-green-mile": {
       "imdb": {
         "id": "tt0120689",
         "rating": 8.6,
-        "votes": 1557536
+        "votes": 1590001
       },
       "tmdb": {
         "id": 497,
         "rating": 8.5,
-        "votes": 19914
+        "votes": 20067
       },
       "year": 1999,
       "runtime": "189 min",
@@ -484,18 +481,17 @@
       "imdb": {
         "id": "tt0816692",
         "rating": 8.7,
-        "votes": 2516752
+        "votes": 2617722
       },
       "tmdb": {
         "id": 157336,
         "rating": 8.5,
-        "votes": 41397
+        "votes": 41744
       },
       "year": 2014,
       "runtime": "169 min",
       "genres": [
         "Adventure",
-        "Drama",
         "Sci-Fi"
       ]
     },
@@ -508,7 +504,7 @@
       "tmdb": {
         "id": 62,
         "rating": 8,
-        "votes": 13014
+        "votes": 13099
       },
       "year": 1968,
       "runtime": "149 min",
@@ -521,12 +517,12 @@
       "imdb": {
         "id": "tt1675434",
         "rating": 8.5,
-        "votes": 1024790
+        "votes": 1044758
       },
       "tmdb": {
         "id": 77338,
         "rating": 8.3,
-        "votes": 18899
+        "votes": 19016
       },
       "year": 2011,
       "runtime": "112 min",
@@ -535,23 +531,23 @@
         "Drama"
       ]
     },
-    "terminator-2": {
+    "about-time": {
       "imdb": {
-        "id": "tt0103064",
-        "rating": 8.6,
-        "votes": 1282391
+        "id": "tt2194499",
+        "rating": 7.8,
+        "votes": 443834
       },
       "tmdb": {
-        "id": 280,
-        "rating": 8.2,
-        "votes": 14966
+        "id": 122906,
+        "rating": 7.9,
+        "votes": 9622
       },
-      "year": 1991,
-      "runtime": "137 min",
+      "year": 2013,
+      "runtime": "123 min",
       "genres": [
-        "Action",
-        "Adventure",
-        "Sci-Fi"
+        "Comedy",
+        "Drama",
+        "Fantasy"
       ]
     },
     "the-big-lebowski": {
@@ -562,8 +558,8 @@
       },
       "tmdb": {
         "id": 115,
-        "rating": 7.8,
-        "votes": 12541
+        "rating": 7.9,
+        "votes": 12759
       },
       "year": 1998,
       "runtime": "117 min",

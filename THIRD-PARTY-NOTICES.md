@@ -44,7 +44,7 @@ Released into the public domain under [CC0 1.0](https://creativecommons.org/publ
   *rosewood_veneer1*, *velour_velvet*, *brown_leather*, *waffle_pique_cotton*, *large_floor_tiles_02*, *wooden_floor_02*,
   *lacquered_cherry_wood*, *leather_white*, *stone_block_wall*, *sandstone_blocks_08*, *slate_floor*, *medieval_blocks_03*,
   *marble_01*, *crepe_satin*, *quatrefoil_jacquard_fabric*, *oak_veneer_01*, *dark_wood*, *american_walnut_veneer*,
-  *red_brick_03*, *wool_boucle*, *ribbed_corduroy*, *knitted_fleece*, *wood_floor_worn*, *plastered_wall_04*, *denim_fabric*; models *wall_clock*, *office_notepads*, *stationery_supplies*,
+  *red_brick_03*, *wool_boucle*, *ribbed_corduroy*, *knitted_fleece*, *wood_floor_worn*, *plastered_wall_04*, *denim_fabric*, *dirty_carpet*, *old_linoleum_flooring_01*, *denim_fabric_04*; models *wall_clock*, *office_notepads*, *stationery_supplies*,
   *vintage_stapler*, *binder_notebook*, *fire_alarm*, *mantel_clock_01*, *ornate_mirror_01*, *desk_lamp_arm_01*,
   *wooden_cutting_board*, *bananas*, *food_apple_01*, *potted_plant_02*, *fancy_picture_frame_01*, *vintage_cabinet_01*,
   *standing_picture_frame_01*, *standing_picture_frame_02*, *antique_ceramic_vase_01*, *ClassicConsole_01*,
@@ -110,6 +110,15 @@ Licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and obtained 
   by [Roberto Domínguez (vmmaniac)](https://sketchfab.com/vmmaniac), licensed
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Changes: simplified and its colour re-projected onto the
   simpler mesh, its hair and beard recoloured, cut at the neck and set on a Rocketbox body (see above).
+
+## Vincent's and Jules's heads
+
+- Vincent's head in the Pulp Fiction room is ["Vincent Vega - Pulp Fiction"](https://sketchfab.com/3d-models/vincent-vega-pulp-fiction-d95ef568294f407cb814186a087c0ef0)
+  by [Roberto Domínguez (vmmaniac)](https://sketchfab.com/vmmaniac), licensed
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Changes: simplified and its colour re-projected onto the
+  simpler mesh, cut at the neck (its collar and lapels removed) and set on a Rocketbox body (see above).
+- Jules's head was made with [Tripo Studio](https://studio.tripo3d.ai) from a still of the film, then simplified the
+  same way and set on a Rocketbox body.
 
 ## Public domain
 

@@ -339,6 +339,28 @@ ROOMS.interstellar = async () => {
     'https://sketchfab.com/3d-models/apollo-lunar-module-c495d75f2a89496a89d92e92e42a4694 (by onebillionth)', 'CC BY 4.0');
 };
 
+ROOMS['pulp-fiction'] = async () => {
+  // Jules and Vincent (suited bodies under sculpted heads), Brett, Roger, Marvin, the man in the bathroom
+  for (const a of ['Professions/Business_Male_01', 'Adults/Male_Adult_04', 'Professions/Business_Male_06', 'Adults/Male_Adult_16',
+    'Adults/Male_Adult_12', 'Adults/Male_Adult_07']) await avatar(a);
+  const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+  // Brett at the table; the two at the counter; Marvin against the wall
+  for (const c of ['breathe_01', 'idle_neutral_01', 'idle_nervous_01', 'idle_look_around', 'idle_touch_face']) await clip(S, `m_sit_chair_${c}`);
+  for (const c of ['m_gestic_talk_neutral_01', 'm_gestic_talk_neutral_02', 'm_gestic_talk_cool', 'm_gestic_talk_nervous_01', 'm_gestic_listen_nervous_01',
+    'm_gestic_listen_neutral_01', 'm_idle_neutral_01', 'm_idle_neutral_02', 'm_idle_breathe_01', 'm_idle_nervous_01', 'm_idle_look_around_01',
+    'm_idle_waiting_01', 'm_idle_angry_01', 'm_drink_drinking', 'm_drink_idle', 'm_try_door_inwards', 'm_crouch_idle', 'm_documents_check']) await clip(S, c);
+  // in from the lift and the door, out again; the dash from the bathroom and back
+  for (const c of ['m_walk_neutral_01', 'm_walk_slow_01', 'm_walk_cool_01', 'm_walk_start', 'm_walk_stop', 'm_crouch_in', 'm_crouch_out',
+    'm_run_fast_01', 'm_run_neutral', 'm_run_stop', 'm_walk_to_run']) await clip(XY, c);
+  for (const c of ['m_sit_stand_up_chair_01', 'm_sit_down_chair_01', 'm_turn_left_90', 'm_turn_right_90', 'm_turn_left_180', 'm_turn_right_180',
+    'm_gestic_talk_angry_01', 'm_gestic_talk_angry_02']) await clip(XYZ, c);
+  // the apartment: worn carpet, painted plaster, kitchen linoleum, bathroom tile, the dinette's wood; the people's cloth
+  for (const t of ['dirty_carpet', 'painted_plaster_wall', 'old_linoleum_flooring_01', 'worn_tile_floor', 'oak_veneer_01', 'quatrefoil_jacquard_fabric',
+    'leather_white', 'denim_fabric_04', 'cotton_jersey', 'jersey_melange', 'rough_linen', 'knitted_fleece']) await polyhaven(t, '2k', 'tex');
+  // Vincent's head: a sculpt of John Travolta in the part (downloaded signed in, glTF archive unzipped into cache/sketchfab/vincent/)
+  sketchfab('vincent/scene.gltf', 'https://sketchfab.com/3d-models/vincent-vega-pulp-fiction-d95ef568294f407cb814186a087c0ef0 (by Roberto Domínguez, vmmaniac)', 'CC BY 4.0');
+};
+
 const room = process.argv[2];
 if (!ROOMS[room]) { console.error('usage: node pipeline/fetch.mjs <' + Object.keys(ROOMS).join('|') + '>'); process.exit(1); }
 await ROOMS[room]();

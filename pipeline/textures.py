@@ -1101,6 +1101,92 @@ def interstellar(out):
     _save(np.clip(st, 0, 1), f'{out}/streak_color.jpg')
 
 
+def pulp_fiction(out):
+    """Brett's apartment in Hollywood: worn mauve-brown carpet, walls painted a dark sage grey-green, the kitchen's
+    warm beige and its cream-and-green linoleum, the bathroom's tile, cream trim and doors; the hallway's tan walls
+    and its red runner; the sofa's patchwork tweed (rust, brown, orange, cream, black squares), Brett's mustard
+    brocade chair, the dinette's wood-grain laminate, the tartan blanket and the sleeping bags on the floor; the Big
+    Kahuna Burger bag and cup; the morning outside the windows."""
+    from PIL import ImageDraw, ImageFont
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    rng = np.random.default_rng(1994)
+    # the carpet: a worn, flat pile, mauve-brown
+    tint(ph('dirty_carpet', 'Diffuse'), f'{out}/carpet_color.jpg', (104, 80, 78), size=1024, contrast=0.7)
+    copy(ph('dirty_carpet', 'nor_gl'), f'{out}/carpet_normal.jpg', size=1024)
+    # the walls: old plaster painted; the living room's sage grey-green, the kitchen's warm beige, the hall's tan
+    tint(ph('painted_plaster_wall', 'Diffuse'), f'{out}/sage_color.jpg', (104, 118, 100), size=1024, contrast=0.35)
+    tint(ph('painted_plaster_wall', 'Diffuse'), f'{out}/beige_color.jpg', (206, 186, 150), size=1024, contrast=0.3)
+    tint(ph('painted_plaster_wall', 'Diffuse'), f'{out}/tan_color.jpg', (176, 150, 116), size=1024, contrast=0.3)
+    copy(ph('painted_plaster_wall', 'nor_gl'), f'{out}/wall_normal.jpg', size=1024)
+    # the kitchen's linoleum and the bathroom's tile
+    tint(ph('old_linoleum_flooring_01', 'Diffuse'), f'{out}/lino_color.jpg', (176, 168, 140), size=1024, contrast=1.0)
+    copy(ph('old_linoleum_flooring_01', 'nor_gl'), f'{out}/lino_normal.jpg', size=1024)
+    tint(ph('worn_tile_floor', 'Diffuse'), f'{out}/tile_color.jpg', (214, 206, 188), size=1024, contrast=0.9)
+    copy(ph('worn_tile_floor', 'nor_gl'), f'{out}/tile_normal.jpg', size=1024)
+    # the dinette's top: a honey wood-grain laminate
+    tint(ph('oak_veneer_01', 'Diffuse'), f'{out}/laminate_color.jpg', (176, 128, 76), size=1024, contrast=0.8)
+    # Brett's chair: a mustard-gold brocade; the cream vinyl of the stools and the side chair
+    tint(ph('quatrefoil_jacquard_fabric', 'Diffuse'), f'{out}/mustard_color.jpg', (176, 136, 52), size=1024, contrast=1.2)
+    copy(ph('quatrefoil_jacquard_fabric', 'nor_gl'), f'{out}/mustard_normal.jpg', size=1024)
+    tint(ph('leather_white', 'Diffuse'), f'{out}/vinyl_color.jpg', (222, 210, 182), size=1024, contrast=0.5)
+    copy(ph('leather_white', 'nor_gl'), f'{out}/vinyl_normal.jpg', size=1024)
+    # the sofa: a patchwork tweed of 12 cm squares in rust, brown, orange, cream and black, each square flecked
+    S = 2048; I = Image.new('RGB', (S, S)); d = ImageDraw.Draw(I)
+    pal = [(118, 52, 30), (78, 48, 32), (168, 92, 42), (196, 176, 140), (36, 30, 26), (140, 72, 40), (98, 70, 46), (180, 132, 70), (60, 42, 34)]
+    n = 16; c_ = S // n
+    for j in range(n):
+        for i in range(n):
+            d.rectangle([i * c_, j * c_, i * c_ + c_ - 1, j * c_ + c_ - 1], fill=pal[int(rng.integers(len(pal)))])
+    a = np.asarray(I, np.float32) / 255
+    fleck = (0.78 + 0.4 * rng.random((S, S))).astype(np.float32)
+    weave = 0.9 + 0.1 * np.sin(np.arange(S)[None, :] * 1.9) * np.sin(np.arange(S)[:, None] * 1.9)
+    _save(srgb_to_lin(np.clip(a * (fleck * weave)[..., None], 0, 1)), f'{out}/patch_color.jpg')
+    # the tartan blanket: red with dark green and navy bands, a yellow line
+    S2 = 1024; t = np.arange(S2)
+    def sett(x):
+        x = x % 256
+        return np.select([x < 90, x < 130, x < 150, x < 158, x < 200, x < 216], [0, 1, 0, 3, 2, 0], 0)
+    cols = np.array([lin((150, 26, 30)), lin((26, 54, 36)), lin((24, 30, 60)), lin((200, 170, 60))], np.float32)
+    h, v = cols[sett(t)][None, :, :], cols[sett(t)][:, None, :]
+    twill = ((t[None, :] + t[:, None]) % 4 < 2)[..., None]
+    _save(np.where(twill, h, v) * (0.9 + 0.15 * rng.random((S2, S2, 1))).astype(np.float32), f'{out}/tartan_color.jpg')
+    # the Big Kahuna Burger: the bag's face (white paper, the arched sign in blue and red, the burger), the cup (white,
+    # pink and violet bands, the same sign)
+    def sign(d, cx, cy, s):
+        d.pieslice([cx - s, cy - s, cx + s, cy + s], 180, 360, fill=(30, 70, 150))
+        d.rectangle([cx - s, cy, cx + s, cy + s * 0.9], fill=(30, 70, 150))
+        d.pieslice([cx - s * 0.84, cy - s * 0.84, cx + s * 0.84, cy + s * 0.84], 180, 360, fill=(240, 236, 226))
+        d.rectangle([cx - s * 0.84, cy, cx + s * 0.84, cy + s * 0.78], fill=(240, 236, 226))
+        for k, col in enumerate(((196, 140, 60), (60, 140, 50), (200, 60, 40), (240, 200, 60), (110, 60, 36), (196, 140, 60))):
+            y0 = cy - s * 0.25 + k * s * 0.13
+            d.rounded_rectangle([cx - s * 0.6, y0, cx + s * 0.6, y0 + s * 0.12], radius=int(s * 0.05), fill=col)
+        d.arc([cx - s * 0.92, cy - s * 0.92, cx + s * 0.92, cy + s * 0.92], 200, 340, fill=(200, 40, 40), width=int(s * 0.12))
+        d.rectangle([cx - s * 0.7, cy + s * 0.55, cx + s * 0.7, cy + s * 0.72], fill=(200, 40, 40))
+    bag = Image.new('RGB', (512, 768), (236, 232, 222)); d = ImageDraw.Draw(bag)
+    sign(d, 256, 360, 170)
+    a = np.asarray(bag, np.float32) / 255 * (0.94 + 0.08 * _noise(768, 3, 5)[:, :512, None])
+    _save(srgb_to_lin(np.clip(a, 0, 1)), f'{out}/bag_color.jpg')
+    cup = Image.new('RGB', (1024, 512), (240, 236, 230)); d = ImageDraw.Draw(cup)
+    for k in range(0, 1024, 128):
+        d.rectangle([k, 0, k + 40, 512], fill=(226, 120, 170)); d.rectangle([k + 52, 0, k + 64, 512], fill=(110, 70, 160))
+    sign(d, 256, 250, 110); sign(d, 768, 250, 110)
+    cup.save(f'{out}/cup_color.jpg', quality=92)
+    # the sleeping bags: faded olive nylon, quilted; and the yellow blanket on the sofa
+    tint(ph('cotton_jersey', 'Diffuse'), f'{out}/bag_nylon_color.jpg', (86, 92, 60), size=512, contrast=0.8)
+    tint(ph('cotton_jersey', 'Diffuse'), f'{out}/yellow_color.jpg', (196, 156, 52), size=512, contrast=0.8)
+    # the hallway's runner: a worn red with a darker border
+    S3 = 512; r = np.ones((S3, S3, 3), np.float32) * lin((120, 34, 30))
+    r[:, :40] = lin((60, 26, 22)); r[:, -40:] = lin((60, 26, 22))
+    _save(r * (0.8 + 0.3 * _noise(S3, 2, 8))[..., None], f'{out}/runner_color.jpg')
+    # outside the windows: a hazy morning, a pale sky over a stucco wall across the court and a palm's fronds
+    W2, H2 = 1024, 1024; yy = np.linspace(1, 0, H2, dtype=np.float32)[:, None] * np.ones((1, W2), np.float32)
+    sky = lin((176, 196, 214))[None, None] * yy[..., None] + lin((236, 232, 220))[None, None] * (1 - yy[..., None])
+    wall = (yy < 0.42)[..., None]
+    sky = np.where(wall, lin((214, 196, 168))[None, None] * (0.9 + 0.12 * _noise(W2, 4, 3))[..., None], sky)
+    _save(np.clip(sky, 0, 1), f'{out}/outside_color.jpg')
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

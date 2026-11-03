@@ -1982,5 +1982,112 @@ def interstellar():
         _hair_recolour('Male_Adult_08', 'm014_opacity_color.tga', who, 'm014_opacity_color.tga', (84, 62, 44), contrast=1.0, shine=0.9)
 
 
+def pulp_fiction():
+    """Apartment 49 (1994; costumes by Betsy Heimann): Jules and Vincent in their black suits, white shirts and narrow
+    black ties (Jules's hands his own dark skin, a gold bracelet; their heads are the sculpts'); Brett in a washed-blue
+    denim button-down, its sleeves rolled, a white tee at the neck, khakis, brown shoes, his dark hair side-parted;
+    Roger in a heather-grey tee, blue-grey shorts, white socks and sneakers, his hair blond; Marvin in a purple polo,
+    dark trousers, white sneakers; the man in the bathroom in a faded salmon sweatshirt and jeans, dark curly hair."""
+    rng = np.random.default_rng(1994)
+    pat = _gt_pat
+    fill = lambda b, B, mask, colour, pattern=None, **kw: _gt_fill(b, B, mask, colour, pattern, **{'grow': 22, **kw})
+
+    def legs_shoes(b, B, r, trousers, shoes, pattern=None, sock=None, hem=None):
+        """Trousers (or shorts to `hem` metres above the knee joint, the shins bare; socks to mid-calf), shoes."""
+        knee = r['knee']
+        if hem is None: legs = r['thighs'] | B.where(r['calves'] & (B.z > 0.09))
+        else: legs = B.where((r['thighs'] | r['calves']) & (B.z > knee + hem))
+        b = fill(b, B, legs, trousers, pattern)
+        if hem is not None:
+            bare = B.where((r['thighs'] | r['calves']) & (B.z <= knee + hem) & (B.z > (0.22 if sock else 0.09)))
+            b = _skin_paint(b, B, bare, rng)
+            if sock: b = fill(b, B, B.where(r['calves'] & (B.z <= 0.22) & (B.z > 0.09)), sock, k=0.4, grow=4)
+        feet = r['feet'] | B.where(r['calves'] & (B.z <= 0.09))
+        return fill(b, B, feet, shoes, k=0.5, flatten=1), legs, feet
+
+    def head_hair(av, tex, who, colour, front=0.06, contrast=1.0):
+        h = load(av, tex); Hd = Body(tex)
+        h, hm, brow = _gt_head_hair(h, Hd, colour, front=front, contrast=contrast)
+        return h, Hd, hm, brow
+
+    # ---- Jules and Vincent (Business_Male_01): the suit's red tie made black and narrow; the shirt left white;
+    # Jules's hands his dark brown skin, a gold bracelet on his left wrist, a gold ring
+    for who in ('jules', 'vincent'):
+        b = load('Business_Male_01', 'm005_body_color.tga'); B = Body('m005_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+        H, S, V = hsv(b)
+        red = (S > 0.4) & ((H < 25) | (H > 330)) & (V > 0.12)                   # the tie's island has no place on the body: by colour
+        b = recolour(b, soft(red.astype(np.float32), 1.2), (16, 16, 18), contrast=0.6)
+        b = tie(B, b, (14, 14, 16), neck - 0.035, r['pel'] + 0.05, w_knot=0.022, w_blade=0.058)
+        suit = (r['torso'] | r['arms'] | r['thighs'] | r['calves']) & ~r['hands'] & ~B.where((V > 0.55) & (S < 0.15))
+        b = recolour(b, B.grow(suit.astype(np.float32), 4) * 0.5, (20, 20, 22), contrast=0.8)
+        if who == 'jules':
+            hands = B.grow(B.where(r['hands']).astype(np.float32), 6)
+            b = skin_tone(b, hands, (0.36, 0.27, 0.23))
+            ax = np.abs(np.nan_to_num(B.x)); wr = B.J['Bip01 L Hand'][0]
+            band = B.where(r['arms'] & (B.x > 0) & (np.abs(ax - (wr - 0.035)) < 0.012))
+            b = fill(b, B, band, (196, 156, 70), k=0.3, flatten=0, grow=2)
+        save(b, who, 'm005_body_color.tga')
+
+    # ---- Brett (Business_Male_06): the washed-blue denim shirt, sleeves rolled to the forearm, a white tee showing
+    # at the open collar; khaki chinos, brown shoes; a black watch; his hair dark brown
+    b = load('Business_Male_06', 'm025_body_color.tga'); B = Body('m025_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+    belt = r['pel'] + 0.05                                                   # the shirt tucked in at the belt: the khakis from there down
+    r['thighs'] = r['thighs'] | B.where(r['torso'] & (B.z <= belt)); r['torso'] = B.where(r['torso'] & (B.z > belt))
+    shirt = (r['torso'] | r['arms']) & ~r['hands']
+    bare = _sleeves(B, 0.72)
+    b = fill(b, B, shirt & ~bare, (88, 116, 146), np.clip(pat(B, 'denim_fabric_04', 0.12, 1.0), 0.75, 1.25), k=0.55, flatten=2)
+    roll = B.where(B.part('Forearm') & ~bare) & B.where(np.abs(np.abs(np.nan_to_num(B.x)) - (B.J['Bip01 L UpperArm'][0] + (B.J['Bip01 L Hand'][0] - B.J['Bip01 L UpperArm'][0]) * 0.72)) < 0.035)
+    b = fill(b, B, roll, (118, 144, 170), k=0.5, grow=2)
+    b = _skin_paint(b, B, bare, rng)
+    z = np.nan_to_num(B.z)
+    vee = B.where((np.abs(B.x) < 0.03 * np.clip((z - (neck - 0.09)) / 0.09, 0, 1)) & (z > neck - 0.09) & (B.y < -0.02)) & r['torso']
+    b = fill(b, B, vee, (226, 224, 216), k=0.4, grow=2)
+    ax = np.abs(np.nan_to_num(B.x)); wr = B.J['Bip01 L Hand'][0]
+    b = fill(b, B, B.where(r['arms'] & (B.x > 0) & (np.abs(ax - (wr - 0.03)) < 0.013)), (18, 18, 20), k=0.3, flatten=0, grow=2)
+    b, legs, feet = legs_shoes(b, B, r, (178, 160, 122), (70, 46, 30), pattern=np.clip(pat(B, 'rough_linen', 0.14, 0.6), 0.88, 1.12))
+    near = B.grow(legs.astype(np.float32), 40) > 0.5
+    dark = near & (lum(b) < 0.16) & ~B.where(r['feet'] | r['hands'] | r['torso'])
+    b = recolour(b, soft(dark.astype(np.float32), 1.0), (170, 152, 116), contrast=0.4)
+    save(b, 'brett', 'm025_body_color.tga')
+    _flat_normals('Business_Male_06', 'm025_body_normal.tga', 'brett', B.grow((shirt | legs).astype(np.float32), 4) * 0.6)
+    h, Hd, hm, brow = head_hair('Business_Male_06', 'm025_head_color.tga', 'brett', (46, 34, 26), front=0.07, contrast=0.9)
+    save(h, 'brett', 'm025_head_color.tga')
+
+    # ---- Roger (Male_Adult_16): a heather-grey tee, short sleeves; blue-grey shorts to above the knee; white socks,
+    # white sneakers; blond hair (the fringe is cards)
+    b = load('Male_Adult_16', 'm019_body_color.tga'); B = Body('m019_body_color.tga'); r = _gt_regions(B)
+    shirt = (r['torso'] | r['arms']) & ~r['hands']
+    bare = _sleeves(B, 0.34)
+    b = fill(b, B, shirt & ~bare, (150, 150, 148), np.clip(pat(B, 'jersey_melange', 0.14, 1.0), 0.8, 1.2), k=0.55, flatten=3)
+    b = _skin_paint(b, B, bare, rng)
+    b, legs, feet = legs_shoes(b, B, r, (76, 92, 112), (224, 222, 216), sock=(232, 230, 224), hem=0.07)
+    save(b, 'roger', 'm019_body_color.tga')
+    _flat_normals('Male_Adult_16', 'm019_body_normal.tga', 'roger', B.grow((shirt | legs).astype(np.float32), 4) * 0.7)
+    h, Hd, hm, brow = head_hair('Male_Adult_16', 'm019_head_color.tga', 'roger', (168, 132, 82), front=0.07, contrast=0.9)
+    save(h, 'roger', 'm019_head_color.tga')
+
+    # ---- Marvin (Male_Adult_12): a purple polo, short sleeves, the collar; dark grey trousers; white sneakers
+    b = load('Male_Adult_12', 'm007_body_color.tga'); B = Body('m007_body_color.tga'); r = _gt_regions(B)
+    shirt = (r['torso'] | r['arms']) & ~r['hands']
+    bare = _sleeves(B, 0.4)
+    b = fill(b, B, shirt & ~bare, (78, 60, 150), np.clip(pat(B, 'cotton_jersey', 0.12, 0.6), 0.85, 1.15), k=0.55, flatten=3)
+    b = _skin_paint(b, B, bare, rng)
+    b, legs, feet = legs_shoes(b, B, r, (44, 44, 48), (226, 224, 218))
+    save(b, 'marvin', 'm007_body_color.tga')
+    _flat_normals('Male_Adult_12', 'm007_body_normal.tga', 'marvin', B.grow((shirt | legs).astype(np.float32), 4) * 0.7)
+
+    # ---- the man in the bathroom (Male_Adult_07): a faded salmon-pink sweatshirt, its cuffs pushed up; jeans; dark
+    # curly hair
+    b = load('Male_Adult_07', 'm013_body_color.tga'); B = Body('m013_body_color.tga'); r = _gt_regions(B)
+    shirt = (r['torso'] | r['arms']) & ~r['hands']
+    b = fill(b, B, shirt, (196, 120, 106), np.clip(pat(B, 'knitted_fleece', 0.1, 0.8), 0.85, 1.15), k=0.5, flatten=3)
+    b, legs, feet = legs_shoes(b, B, r, (70, 92, 126), (40, 34, 30), pattern=np.clip(pat(B, 'denim_fabric_04', 0.12, 1.0), 0.75, 1.25))
+    save(b, 'fourth', 'm013_body_color.tga')
+    _flat_normals('Male_Adult_07', 'm013_body_normal.tga', 'fourth', B.grow((shirt | legs).astype(np.float32), 4) * 0.7)
+    h, Hd, hm, brow = head_hair('Male_Adult_07', 'm013_head_color.tga', 'fourth', (32, 24, 20), front=0.06, contrast=0.9)
+    save(h, 'fourth', 'm013_head_color.tga')
+    _hair_recolour('Male_Adult_07', 'm013_opacity_color.tga', 'fourth', 'm013_opacity_color.tga', (34, 26, 22), contrast=1.0, shine=0.9)
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()
