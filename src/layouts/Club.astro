@@ -14,6 +14,7 @@ const base = import.meta.env.BASE_URL;
 const t = route.view === 'case' ? titleOf(route.slug) : undefined;
 const first = sorted('series').find(x => x.room) ?? sorted('series')[0] ?? CLUB[0];
 const list = sorted('series');
+const also = honourable('series');
 ---
 <!doctype html>
 <html lang="en">
@@ -72,19 +73,24 @@ const list = sorted('series');
       <div class="switch" role="group" aria-label="Which list"><button data-kind="series" aria-pressed="true">Series</button><button data-kind="film" aria-pressed="false">Films</button></div>
       <div class="order" role="group" aria-label="Order"><span>Order</span><button data-sort="rank" aria-pressed="true">Mine</button><button data-sort="year" aria-pressed="false">Year</button><button data-sort="imdb" aria-pressed="false">IMDb</button></div>
     </div>
-    <ol class="list" id="list">
-      {Array.from({ length: TOP }, (_, i) => list[i]).map((x, i) => x
-        ? <li class={x.room ? undefined : 'unbuilt'}><span class="n">{String(i + 1).padStart(2, '0')}</span><a href={path({ view: 'case', slug: x.slug })}>{x.title} <em>{x.year}</em></a></li>
-        : <li class="empty"><span class="n">{String(i + 1).padStart(2, '0')}</span><span>To come</span></li>)}
-    </ol>
-    <p class="also" id="also">Honourable mentions: {honourable('series').map(x => x.title).join(' · ')}</p>
+    <div class="lists" id="lists">
+      <ol class="list" id="list" aria-label="The ten">
+        {Array.from({ length: TOP }, (_, i) => list[i]).map((x, i) => x
+          ? <li class={x.room ? undefined : 'unbuilt'}><span class="n">{String(i + 1).padStart(2, '0')}</span><a href={path({ view: 'case', slug: x.slug })}>{x.title} <em>{x.year}</em></a></li>
+          : <li class="empty"><span class="n">{String(i + 1).padStart(2, '0')}</span><span>To come</span></li>)}
+      </ol>
+      <h2 class="k sub">Honourable mentions</h2>
+      <ol class="list honour" id="also" aria-label="Honourable mentions">
+        {also.map((x, i) => <li><span class="n">{String(i + 1).padStart(2, '0')}</span><span class="t">{x.title} <em>{x.year}</em></span></li>)}
+      </ol>
+    </div>
   </section>
 
   <section class="panel about" data-for="about" aria-label="About">
     <div class="k">About</div>
     <h1 class="brand">Cinem<i>arium</i></h1>
     <p>A small museum of favourite series and films. Each title becomes a real room from one early, iconic scene, built to scale and kept under glass, with its people still going about their day.</p>
-    <p>Ten series and ten films from a personal list. The first rooms are open; the rest are being built.</p>
+    <p>Ten series and ten films from a personal list, each with ten honourable mentions beside it. The first rooms are open; the rest are being built.</p>
     <p>Cinemarium is free and open source, with no ads, no accounts and nothing to join. If a room made you smile, you can help build the next one.</p>
     <div class="give">
       <a href={SUPPORT.paypal} target="_blank" rel="noopener"><PayPal /><span>Donate · PayPal</span></a>
@@ -161,14 +167,18 @@ const list = sorted('series');
     .zoom{position:fixed;right:var(--gut);bottom:calc(76px + env(safe-area-inset-bottom,0px));z-index:3;border:1px solid var(--hair);background:var(--chip);color:var(--fg);border-radius:22px;padding:10px 18px;font:11px var(--sans);letter-spacing:.18em;text-transform:uppercase;cursor:pointer;backdrop-filter:blur(6px)}
     .hint{position:fixed;right:var(--gut);bottom:calc(130px + env(safe-area-inset-bottom,0px));z-index:3;font-family:var(--italic);font-style:italic;font-size:16px;color:var(--dim)}
 
-    .list{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:2px;max-height:46vh;overflow-y:auto;scrollbar-width:thin}
+    .lists{margin-top:22px;max-height:46vh;overflow-y:auto;scrollbar-width:thin;padding-bottom:22px;mask-image:linear-gradient(to bottom,#000 calc(100% - 22px),transparent)}
+    .list{list-style:none;margin:0;padding:0;display:grid;gap:2px}
     .list li{display:flex;gap:16px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--hair);font-size:14px}
     .list .n{font-variant-numeric:tabular-nums;font-size:11px;letter-spacing:.18em;color:var(--brass);width:22px}
     .list a{text-decoration:none;font-family:var(--display);font-size:19px}
     .list a em{font-family:var(--italic);color:var(--dim);font-size:16px}
     .list .empty{color:var(--dim);font-family:var(--italic);font-style:italic}
     .list li.unbuilt a{color:var(--dim)}
-    .also{margin:14px 0 0;font-size:12px;line-height:1.6;color:var(--dim)}
+    .sub{margin:26px 0 6px;font-weight:400;color:var(--dim)}
+    .honour li{padding:5px 0;font-size:13px}
+    .honour .t{font-family:var(--display);font-size:16px;color:var(--dim)}
+    .honour .t em{font-family:var(--italic);font-size:14px;color:var(--dim);opacity:.7}
     .about p{color:var(--dim);line-height:1.6;font-size:14px;margin:12px 0 0}
     .about p.fine{font-size:12px;line-height:1.55}
     .about p a{color:var(--fg);text-decoration-color:var(--hair)}
@@ -193,7 +203,7 @@ const list = sorted('series');
       .deck .switch button{padding:7px 12px}
       .panel h1,.cap h1{font-size:36px}
       .sc{font-size:18px}
-      .list{max-height:34vh}
+      .lists{max-height:34vh}
       .about{max-height:calc(100dvh - 140px - env(safe-area-inset-top,0px));overflow-y:auto;scrollbar-width:none;mask-image:linear-gradient(to bottom,#000 calc(100% - 18px),transparent)}
       .give{gap:8px} .give a{padding:9px 12px;letter-spacing:.1em}
       .hint{display:none}

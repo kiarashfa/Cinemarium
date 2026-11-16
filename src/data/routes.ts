@@ -32,7 +32,7 @@ const caseHead = (t: Title) => ({ title: `${label(t)} · ${SITE}`, description: 
 /** The page's title and description. */
 export function head(r: Route): { title: string; description: string } {
   if (r.view === 'case') { const t = titleOf(r.slug); if (t) return caseHead(t); }
-  if (r.view === 'board') return { title: `The Board · ${SITE}`, description: 'Ten series and ten films, in order: by personal rank, by year or by IMDb rating.' };
+  if (r.view === 'board') return { title: `The Board · ${SITE}`, description: 'Ten series and ten films, each with ten honourable mentions, in order: by personal rank, by year or by IMDb rating.' };
   if (r.view === 'about') return { title: `About · ${SITE}`, description: 'What Cinemarium is, and where its pieces come from.' };
   return { title: SITE, description: 'A circular video club of favourite series and films, each one a small living room under glass.' };
 }

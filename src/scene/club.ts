@@ -91,11 +91,12 @@ export async function startClub(canvas: HTMLCanvasElement) {
     const list = listOf(), t = caseTitle();
     $('pills').innerHTML = list.map(x => `<button data-slug="${x.slug}" class="${x === wanted ? 'on' : ''}">${x.title}</button>`).join('');
     $('bk').textContent = KIND_NAME[kind];
-    $('list').innerHTML = Array.from({ length: TOP },(_, i) => list[i]).map((x, i) => {
-      const n = `<span class="n">${String(i + 1).padStart(2, '0')}</span>`;
-      return x ? `<li class="${x.room ? '' : 'unbuilt'}">${n}<a href="${path({ view: 'case', slug: x.slug })}">${x.title} <em>${x.year}</em></a></li>` : `<li class="empty">${n}<span>To come</span></li>`;
-    }).join('');
-    const also = honourable(kind); $('also').textContent = also.length ? `Honourable mentions: ${also.map(x => x.title).join(' · ')}` : '';
+    const num = (i: number) => `<span class="n">${String(i + 1).padStart(2, '0')}</span>`;
+    $('list').innerHTML = Array.from({ length: TOP },(_, i) => list[i]).map((x, i) => x
+      ? `<li class="${x.room ? '' : 'unbuilt'}">${num(i)}<a href="${path({ view: 'case', slug: x.slug })}">${x.title} <em>${x.year}</em></a></li>`
+      : `<li class="empty">${num(i)}<span>To come</span></li>`).join('');
+    // the honourable mentions follow the same order, and are named only: no room, no address, no link
+    $('also').innerHTML = honourable(kind, by).map((x, i) => `<li>${num(i)}<span class="t">${x.title} <em>${x.year}</em></span></li>`).join('');
     const enter = $<HTMLAnchorElement>('enter');
     if (t) { enter.href = path({ view: 'case', slug: t.slug }); enter.hidden = false; } else enter.hidden = true;
     $<HTMLAnchorElement>('to-board').href = path({ view: 'board' }) + query('board');
@@ -181,7 +182,7 @@ export async function startClub(canvas: HTMLCanvasElement) {
   $('zoom').addEventListener('click', () => setZoom(zoom ? 0 : 1));
   let wheelLock = 0;
   addEventListener('wheel', e => {
-    if (Math.abs(e.deltaY) < 8 || performance.now() < wheelLock || (e.target as HTMLElement).closest('.list,.pills')) return;
+    if (Math.abs(e.deltaY) < 8 || performance.now() < wheelLock || (e.target as HTMLElement).closest('.lists,.pills')) return;
     wheelLock = performance.now() + 650;
     const inward = e.deltaY < 0;
     if (route.view === 'home') { if (inward) enterCase(); }
