@@ -54,7 +54,7 @@ const LIST: Title[] = [
   { slug: '2001-a-space-odyssey', kind: 'film', rank: 4, title: '2001: A Space Odyssey', year: 1968, imdb: { id: 'tt0062622' } },
   { slug: 'rear-window', kind: 'film', rank: 5, title: 'Rear Window', year: 1954, imdb: { id: 'tt0047396' } },
   { slug: 'pulp-fiction', kind: 'film', rank: 6, title: 'Pulp Fiction', year: 1994, imdb: { id: 'tt0110912' }, scene: "Brett's apartment", room: 'pulp-fiction' },
-  { slug: 'the-green-mile', kind: 'film', rank: 7, title: 'The Green Mile', year: 1999, imdb: { id: 'tt0120689' } },
+  { slug: 'the-green-mile', kind: 'film', rank: 7, title: 'The Green Mile', year: 1999, imdb: { id: 'tt0120689' }, scene: 'E Block', room: 'the-green-mile' },
   { slug: 'shutter-island', kind: 'film', rank: 8, title: 'Shutter Island', year: 2010, imdb: { id: 'tt1130884' } },
   { slug: 'the-big-lebowski', kind: 'film', rank: 9, title: 'The Big Lebowski', year: 1998, imdb: { id: 'tt0118715' }, scene: 'Hollywood Star Lanes', room: 'the-big-lebowski' },
   { slug: 'uncut-gems', kind: 'film', rank: 10, title: 'Uncut Gems', year: 2019, imdb: { id: 'tt5727208' } },

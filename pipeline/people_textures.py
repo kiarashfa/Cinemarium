@@ -2089,5 +2089,130 @@ def pulp_fiction():
     _hair_recolour('Male_Adult_07', 'm013_opacity_color.tga', 'fourth', 'm013_opacity_color.tga', (34, 26, 22), contrast=1.0, shine=0.9)
 
 
+def the_green_mile():
+    """E Block, 1935 (costumes by Karyn Wagner, the guards' uniforms invented for the film): the guards in navy-black
+    single-breasted tunics and trousers, brass buttons (four down the front, one on each breast pocket), a brown Sam
+    Browne belt with its strap from the right shoulder, white shirts, narrow black ties, black shoes (their caps are
+    modelled); Brutal's hair cropped fair, Dean's light brown, Percy's dark and slicked, Harry's grey. John Coffey in a
+    faded tan henley, its sleeves torn off at the shoulder, and blue bib overalls too short for him (ending at
+    mid-calf), barefoot. Delacroix in a white sleeveless vest and khaki trousers, thin grey-brown hair; Bitterbuck in
+    a faded chambray shirt and dark trousers, black hair."""
+    rng = np.random.default_rng(1935)
+    pat = _gt_pat
+    fill = lambda b, B, mask, colour, pattern=None, **kw: _gt_fill(b, B, mask, colour, pattern, **{'grow': 22, **kw})
+    NAVY = (17, 19, 30); LEATHER = (52, 34, 22); BRASS = (190, 150, 72)
+
+    def guard(avatar, prefix, who, hair, shave=False, cut_hair=True):
+        tex = f'{prefix}_body_color.tga'
+        b = load(avatar, tex); B = Body(tex); r = _gt_regions(B); neck, pel = r['neck'], r['pel']
+        H, S, V = hsv(b)
+        white = B.where((V > 0.55) & (S < 0.16)) & (r['torso'] | r['arms'])
+        red = (S > 0.35) & ((H < 30) | (H > 320)) & (V > 0.1)                     # any coloured tie: black first
+        b = recolour(b, soft(red.astype(np.float32), 1.2), (16, 16, 18), contrast=0.6)
+        purple = B.where((S > 0.18) & (H > 230) & (H < 320) & (V > 0.2))          # a coloured shirt (Brutal's body's): white
+        if purple.any(): b = recolour(b, B.grow(purple.astype(np.float32), 2), (222, 220, 210), contrast=0.5); H, S, V = hsv(b)
+        cloth = (r['torso'] | r['arms'] | r['thighs'] | r['calves']) & ~r['hands'] & ~white
+        b = fill(b, B, cloth, NAVY, np.clip(pat(B, 'caban', 0.16, 0.8), 0.85, 1.15), k=0.55, flatten=2)
+        b = fill(b, B, white, (222, 220, 210), k=0.5, grow=3)
+        b = tie(B, b, (12, 12, 14), neck - 0.035, pel + 0.12, w_knot=0.02, w_blade=0.05, within=white.astype(np.float32))
+        x, z, y = np.nan_to_num(B.x), np.nan_to_num(B.z), np.nan_to_num(B.y)
+        belt = B.where((r['torso'] | r['thighs']) & (np.abs(z - (pel + 0.075)) < 0.026))
+        a0, a1 = np.array([-0.13, neck - 0.04]), np.array([0.14, pel + 0.09])      # the cross strap: right shoulder to left hip
+        d = a1 - a0; t = np.clip(((x - a0[0]) * d[0] + (z - a0[1]) * d[1]) / (d @ d), 0, 1)
+        dist = np.hypot(x - (a0[0] + t * d[0]), z - (a0[1] + t * d[1]))
+        strap = B.where(r['torso'] & (dist < 0.019) & (z > pel + 0.09))
+        b = fill(b, B, belt | strap, LEATHER, k=0.45, grow=3, flatten=1)
+        buckle = B.where((np.abs(x) < 0.022) & (np.abs(z - (pel + 0.075)) < 0.02) & (y < 0) & r['torso'])
+        b = fill(b, B, buckle, BRASS, k=0.3, grow=1, flatten=0)
+        b = _gt_clasps(b, B, [0.0], [pel + 0.16, pel + 0.24, pel + 0.32], 0.009, BRASS)
+        b = _gt_clasps(b, B, [-0.1, 0.1], [neck - 0.13], 0.008, BRASS)
+        b = fill(b, B, r['feet'] | B.where(r['calves'] & (z <= 0.09)), (14, 14, 16), k=0.5, flatten=1, grow=6)
+        save(b, who, tex)
+        _flat_normals(avatar, f'{prefix}_body_normal.tga', who, B.grow(cloth.astype(np.float32), 4) * 0.5)
+        htex = f'{prefix}_head_color.tga'
+        h = load(avatar, htex); Hd = Body(htex)
+        if shave:                                                                 # a goatee shaved off: the cheeks' own skin
+            m = np.clip(_beard_mask(Hd, moustache=True, cheeks=1.0) * 1.4, 0, 1)
+            face = Hd.where((Hd.y < -0.05) & (Hd.z < Hd.J['Bip01 MMiddleEyebrow'][2]) & (Hd.z > Hd.J['Bip01 MUpperLip'][2] + 0.01))
+            tone = h[face].mean(0)
+            h = h * (1 - m[..., None]) + tone[None, None] * (0.94 + 0.1 * noise(h.shape, 2, 9)[..., None]) * m[..., None]
+        h, hm, brow = _gt_head_hair(h, Hd, hair, front=0.065, contrast=0.8)
+        save(h, who, htex)
+
+    guard('Business_Male_01', 'm005', 'paul', (60, 46, 34))                      # under the sculpt (its body and neck)
+    guard('Business_Male_01', 'm005', 'dean', (128, 98, 66))
+    guard('Business_Male_05', 'm016', 'brutal', (128, 106, 74), shave=True)
+    guard('Business_Male_03', 'm020', 'percy', (36, 28, 22))
+    guard('Business_Male_04', 'm015', 'harry', (150, 146, 140))
+
+    # ---- John Coffey (Male_Adult_06, a crew neck under the henley's placket): the henley, the overalls, bare shins and
+    # feet; his skin (the hands', the arms', the shins') a deep brown, as the sculpted head's
+    tex = 'm011_body_color.tga'
+    b = load('Male_Adult_06', tex); B = Body(tex); r = _gt_regions(B); neck, pel, knee = r['neck'], r['pel'], r['knee']
+    x, z, y = np.nan_to_num(B.x), np.nan_to_num(B.z), np.nan_to_num(B.y)
+    bare_arms = _sleeves(B, 0.16)
+    shirt = (r['torso'] | r['arms']) & ~r['hands'] & ~bare_arms
+    b = fill(b, B, shirt, (190, 158, 118), np.clip(pat(B, 'cotton_jersey', 0.12, 0.6), 0.85, 1.15), k=0.5, flatten=3)
+    b = _skin_paint(b, B, bare_arms, rng)
+    hem = knee - 0.17                                                        # the overalls end at mid-calf
+    legs = B.where((r['thighs'] | r['calves']) & (z > hem))
+    bib = B.where(r['torso'] & (y < 0) & (np.abs(x) < 0.135) & (z < neck - 0.13))
+    straps = B.where(r['torso'] & (np.abs(np.abs(x) - 0.095) < 0.022) & (z >= neck - 0.13))
+    back_strap = B.where(r['torso'] & (y > 0) & (np.abs(np.abs(x) - 0.06 - 0.12 * np.clip((neck - z) / 0.3, 0, 1)) < 0.02))
+    waist = B.where(r['torso'] & (z < pel + 0.1))
+    denim = legs | bib | straps | back_strap | waist
+    b = fill(b, B, denim, (92, 118, 132), np.clip(pat(B, 'denim_fabric', 0.12, 1.1), 0.72, 1.3), k=0.55, flatten=2)
+    worn = B.where(denim & (noise(b.shape, 6, 3) > 0.62))
+    b = fill(b, B, worn, (130, 156, 160), np.clip(pat(B, 'denim_fabric', 0.12, 1.1), 0.72, 1.3), k=0.5, flatten=2, grow=2)
+    b = _gt_clasps(b, B, [-0.095, 0.095], [neck - 0.13], 0.011, (176, 140, 70))
+    shins = B.where((r['calves'] | r['thighs']) & (z <= hem)) | r['feet']
+    b = _skin_paint(b, B, shins, rng)
+    skin = B.grow((bare_arms | shins | r['hands'] | B.where(r['torso'] & (z > neck - 0.04) & (np.abs(x) < 0.09))).astype(np.float32), 4)
+    b = recolour(b, skin, (66, 42, 30), contrast=0.7, flatten=5)            # flattened: Male_Adult_06's necklace goes
+    save(b, 'coffey', tex)
+    _flat_normals('Male_Adult_06', 'm011_body_normal.tga', 'coffey', B.grow((shirt | denim | shins | bare_arms).astype(np.float32), 4) * 0.7)
+    h = load('Male_Adult_06', 'm011_head_color.tga'); Hd = Body('m011_head_color.tga')
+    h = _bald(h, Hd, shine=0.25)
+    save(recolour(h, Hd.grow(Hd.ok.astype(np.float32), 6), (66, 42, 30), contrast=0.7, flatten=3), 'coffey', 'm011_head_color.tga')   # his neck
+
+    # ---- Eduard Delacroix (Male_Adult_14): the white vest, bare arms, khakis, worn brown shoes
+    tex = 'm012_body_color.tga'
+    b = load('Male_Adult_14', tex); B = Body(tex); r = _gt_regions(B); neck = r['neck']
+    x, z, y = np.nan_to_num(B.x), np.nan_to_num(B.z), np.nan_to_num(B.y)
+    arms = _sleeves(B, 0.0) | B.where(r['torso'] & (np.abs(x) > 0.13) & (z > neck - 0.17))
+    scoop = B.where(r['torso'] & (y < 0) & (z > neck - 0.11 - 0.05 * np.clip(1 - np.abs(x) / 0.1, 0, 1)))
+    vest = r['torso'] & ~arms & ~scoop
+    b = fill(b, B, vest, (224, 220, 206), np.clip(pat(B, 'cotton_jersey', 0.1, 0.5), 0.9, 1.1), k=0.55, flatten=3)
+    b = _skin_paint(b, B, (arms | scoop) & ~r['hands'], rng)
+    belt = r['pel'] + 0.05
+    legs = r['thighs'] | B.where(r['calves'] & (z > 0.09)) | B.where(r['torso'] & (z <= belt))
+    b = fill(b, B, legs, (150, 136, 106), np.clip(pat(B, 'rough_linen', 0.14, 0.6), 0.88, 1.12), k=0.55, flatten=2)
+    b = fill(b, B, r['feet'] | B.where(r['calves'] & (z <= 0.09)), (58, 40, 28), k=0.5, flatten=1, grow=6)
+    save(b, 'del', tex)
+    _flat_normals('Male_Adult_14', 'm012_body_normal.tga', 'del', B.grow((vest | arms | legs).astype(np.float32), 4) * 0.7)
+    h = load('Male_Adult_14', 'm012_head_color.tga'); Hd = Body('m012_head_color.tga')
+    h, hm, brow = _gt_head_hair(h, Hd, (84, 74, 64), front=0.06, contrast=0.9)
+    save(h, 'del', 'm012_head_color.tga')
+
+    # ---- Arlen Bitterbuck (Male_Adult_07): a faded chambray shirt, dark trousers, black hair, a weathered tone
+    tex = 'm013_body_color.tga'
+    b = load('Male_Adult_07', tex); B = Body(tex); r = _gt_regions(B)
+    z = np.nan_to_num(B.z); belt = r['pel'] + 0.05
+    shirt = (B.where(r['torso'] & (z > belt)) | r['arms']) & ~r['hands']
+    b = fill(b, B, shirt, (128, 146, 164), np.clip(pat(B, 'denim_fabric_04', 0.12, 0.8), 0.8, 1.2), k=0.55, flatten=2)
+    legs = r['thighs'] | B.where(r['calves'] & (z > 0.09)) | B.where(r['torso'] & (z <= belt))
+    b = fill(b, B, legs, (58, 60, 66), np.clip(pat(B, 'rough_linen', 0.14, 0.6), 0.88, 1.12), k=0.55, flatten=2)
+    b = fill(b, B, r['feet'] | B.where(r['calves'] & (z <= 0.09)), (40, 30, 24), k=0.5, flatten=1, grow=6)
+    b = skin_tone(b, B.grow(B.where(r['hands']).astype(np.float32), 6), (0.86, 0.76, 0.66))
+    save(b, 'chief', tex)
+    _flat_normals('Male_Adult_07', 'm013_body_normal.tga', 'chief', B.grow((shirt | legs).astype(np.float32), 4) * 0.7)
+    h = load('Male_Adult_07', 'm013_head_color.tga'); Hd = Body('m013_head_color.tga')
+    h, hm, brow = _gt_head_hair(h, Hd, (24, 20, 18), front=0.06, contrast=0.9)
+    face = Hd.grow(Hd.where(hm < 0.5).astype(np.float32), 2)
+    h = skin_tone(h, face, (0.86, 0.76, 0.66))
+    save(h, 'chief', 'm013_head_color.tga')
+    _hair_recolour('Male_Adult_07', 'm013_opacity_color.tga', 'chief', 'm013_opacity_color.tga', (22, 18, 16), contrast=1.0, shine=0.8)
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()

@@ -1187,6 +1187,94 @@ def pulp_fiction(out):
     _save(np.clip(sky, 0, 1), f'{out}/outside_color.jpg')
 
 
+def the_green_mile(out):
+    """E Block: brick painted cream, grimed low and streaked with rust; the Mile's linoleum, a faded lime green laid in
+    sheets, worn pale down the middle where the men walk; the cells' grey concrete; strap iron painted a grey green,
+    rusting; the steel doors; the desk's dark wood, the stools' oak; the W.C. door's stencil; grey wool blankets and
+    striped ticking; the notices pinned on the board."""
+    from PIL import ImageDraw, ImageFont
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    rng = np.random.default_rng(1935)
+    # the brick, painted cream; a grimier version for the passage and the module's left wall
+    tint(ph('painted_brick', 'Diffuse'), f'{out}/brick_color.jpg', (180, 160, 118), size=2048, contrast=0.85)
+    copy(ph('painted_brick', 'nor_gl'), f'{out}/brick_normal.jpg', size=2048)
+    b = np.asarray(Image.open(f'{out}/brick_color.jpg'), np.float32) / 255
+    S = b.shape[0]
+    streak = np.clip(_noise(S, 3, 11)[:, :, None] * np.linspace(0.6, 1.2, S, dtype=np.float32)[:, None, None], 0, 1)
+    rust = np.array([0.42, 0.26, 0.15], np.float32)[None, None]
+    b2 = b * (0.72 + 0.2 * _noise(S, 6, 4)[..., None]) * (1 - 0.25 * streak) + rust * 0.12 * streak
+    Image.fromarray((np.clip(b2, 0, 1) * 255).astype(np.uint8)).save(f'{out}/brick_grimy_color.jpg', quality=92)
+    # rust stains and grime down the brick (vertical streaks, darker toward the floor)
+    yy = np.linspace(0, 1, S, dtype=np.float32)[:, None]
+    run = np.clip(_noise(S, 2, 21) - 0.55, 0, 1) * 3.0
+    run = np.asarray(Image.fromarray((np.clip(run, 0, 1) * 255).astype(np.uint8)).resize((S, S // 8)).resize((S, S)), np.float32) / 255
+    b3 = b * (1 - 0.3 * run[..., None]) + rust * 0.22 * run[..., None]
+    low = np.clip((yy - 0.55) / 0.45, 0, 1)[..., None]               # grime low on the wall (the texture's lower half)
+    b3 = b3 * (1 - 0.12 * low)
+    b3 = b3 * (0.9 + 0.1 * _noise(S, 8, 31)[..., None])
+    Image.fromarray((np.clip(b3, 0, 1) * 255).astype(np.uint8)).save(f'{out}/brick_color.jpg', quality=92)
+    # the Mile: one texture over the whole floor (u along the Mile, 10.96 m; v across it, 6.83 m from the front to the
+    # cell fronts): faded lime linoleum in sheets 1.83 m wide running along the Mile, mottled, worn pale down the path
+    # the men walk (about 1.9 m out from the cells) and before the desk; scuffs
+    W_, H_ = 4096, 2560
+    base = lin((78, 108, 80))
+    tex = np.asarray(Image.open(ph('old_linoleum_flooring_01', 'Diffuse')).convert('L').resize((1024, 1024)), np.float32) / 255
+    tex = (tex - tex.mean()) * 0.35
+    tile = np.tile(tex, (H_ // 1024 + 1, W_ // 1024 + 1))[:H_, :W_]
+    mott = _noise(W_, 40, 5)[:H_, :W_] - 0.5
+    v = np.linspace(1, 0, H_, dtype=np.float32)[:, None] * 6.83     # metres from the front (row 0 = the cell side: v = 1 in UV)
+    u = np.linspace(0, 1, W_, dtype=np.float32)[None, :] * 10.96
+    dist_cells = 6.83 - v                                            # metres from the cell fronts
+    path = np.exp(-((dist_cells - 1.9) / 0.85) ** 2) * np.clip((u - 0.6) / 1.5, 0, 1)
+    desk = np.exp(-(((u - 1.6) / 1.2) ** 2 + ((v - 2.5) / 1.4) ** 2))
+    wear = np.clip(path * 0.9 + desk * 0.6, 0, 1)
+    col = base[None, None] * (1 + 0.25 * mott[..., None] + tile[..., None])
+    pale = lin((122, 142, 108))[None, None]
+    col = col * (1 - 0.55 * wear[..., None]) + pale * 0.55 * wear[..., None]
+    seam = (np.abs(((v + 0.4) % 1.83) - 0.915) > 0.905).astype(np.float32)
+    col = col * (1 - 0.35 * seam[..., None])
+    scuff = np.clip((rng.random((H_, W_)) > 0.9994).astype(np.float32), 0, 1)
+    scuff = np.asarray(Image.fromarray((scuff * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(3)).resize((W_, H_)), np.float32) / 255 * 6
+    col = col * (1 - 0.3 * np.clip(scuff, 0, 1)[..., None])
+    _save(np.clip(col, 0, 1), f'{out}/lino_color.jpg')
+    # the cells' concrete, the ledge's
+    tint(ph('concrete_floor_worn_001', 'Diffuse'), f'{out}/concrete_color.jpg', (128, 124, 114), size=1024, contrast=0.9)
+    copy(ph('concrete_floor_worn_001', 'nor_gl'), f'{out}/concrete_normal.jpg', size=1024)
+    tint(ph('concrete_floor_worn_001', 'Diffuse'), f'{out}/ledge_color.jpg', (176, 166, 140), size=1024, contrast=0.7)
+    # the strap iron (a grey green, rusting at its edges) and the steel doors (a darker, worn grey)
+    tint(ph('green_metal_rust', 'Diffuse'), f'{out}/iron_color.jpg', (84, 88, 74), size=1024, contrast=1.1)
+    copy(ph('green_metal_rust', 'nor_gl'), f'{out}/iron_normal.jpg', size=1024)
+    tint(ph('green_metal_rust', 'Diffuse'), f'{out}/door_steel_color.jpg', (92, 90, 82), size=1024, contrast=1.4)
+    # the desk's dark wood, the oak of the stools and the shelves
+    tint(ph('dark_wood', 'Diffuse'), f'{out}/wood_color.jpg', (74, 46, 30), size=1024, contrast=1.0)
+    tint(ph('dark_wood', 'Diffuse'), f'{out}/oak_color.jpg', (140, 108, 70), size=1024, contrast=0.8)
+    # the W.C. door: painted cream panels, "W.C." stencilled black
+    I = Image.new('RGB', (512, 1024), (170, 156, 120)); d = ImageDraw.Draw(I)
+    for (y0, y1) in ((60, 480), (540, 960)):
+        d.rectangle([60, y0, 452, y1], outline=(130, 118, 88), width=10)
+    try: font = ImageFont.truetype('arialbd.ttf', 120)
+    except Exception: font = ImageFont.load_default()
+    d.text((256, 300), 'W.C.', fill=(24, 22, 20), font=font, anchor='mm')
+    a = np.asarray(I, np.float32) / 255 * (0.85 + 0.2 * _noise(1024, 4, 7)[:, :512, None])
+    _save(srgb_to_lin(np.clip(a, 0, 1)), f'{out}/wc_door_color.jpg')
+    # the blankets (grey wool) and the mattresses' ticking (cream with a blue-grey stripe)
+    tint(ph('caban', 'Diffuse'), f'{out}/blanket_color.jpg', (104, 102, 96), size=512, contrast=0.9)
+    S2 = 512; t = np.arange(S2)
+    stripe = ((t % 64) < 10)[None, :].astype(np.float32) * np.ones((S2, 1), np.float32)
+    tk = lin((206, 196, 172))[None, None] * (1 - stripe[..., None]) + lin((96, 108, 120))[None, None] * stripe[..., None]
+    _save(tk * (0.85 + 0.2 * rng.random((S2, S2, 1))).astype(np.float32), f'{out}/ticking_color.jpg')
+    # the notices: sheets pinned in rows, typed lines
+    N = Image.new('RGB', (768, 544), (92, 66, 40)); d = ImageDraw.Draw(N)
+    for k in range(9):
+        x0 = 20 + (k % 4) * 186 + int(rng.integers(-10, 10)); y0 = 20 + (k // 4) * 172 + int(rng.integers(-8, 8))
+        w, h = int(rng.integers(130, 170)), int(rng.integers(150, 200))
+        d.rectangle([x0, y0, x0 + w, y0 + h], fill=tuple(int(c) for c in rng.integers(200, 236, 3)))
+        for j in range(int(h / 14) - 2):
+            d.line([x0 + 12, y0 + 18 + j * 14, x0 + 12 + int(rng.integers(40, w - 24)), y0 + 18 + j * 14], fill=(70, 66, 60), width=2)
+    N.save(f'{out}/notices_color.jpg', quality=92)
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

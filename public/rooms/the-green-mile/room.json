@@ -1,0 +1,273 @@
+{
+ "module": [
+  9.6,
+  7.6,
+  3.0
+ ],
+ "wallHeight": 2.9625000000000004,
+ "lightmaps": {
+  "arch": "lm_arch.webp",
+  "furn": "lm_furn.webp"
+ },
+ "lightMapIntensity": 3.141592653589793,
+ "capture": {
+  "ceiling": [
+   0.62,
+   0.58,
+   0.5
+  ],
+  "walls": [
+   0.52,
+   0.46,
+   0.36
+  ],
+  "emitters": [
+   {
+    "x": -1.95,
+    "y": 2.227,
+    "z": 0.262,
+    "r": 0.03,
+    "L": 62.17,
+    "color": [
+     1.0,
+     0.72,
+     0.42
+    ]
+   },
+   {
+    "x": -0.075,
+    "y": 2.227,
+    "z": 0.262,
+    "r": 0.03,
+    "L": 62.17,
+    "color": [
+     1.0,
+     0.72,
+     0.42
+    ]
+   },
+   {
+    "x": 1.8,
+    "y": 2.227,
+    "z": 0.262,
+    "r": 0.03,
+    "L": 62.17,
+    "color": [
+     1.0,
+     0.72,
+     0.42
+    ]
+   },
+   {
+    "x": 3.675,
+    "y": 2.227,
+    "z": 0.262,
+    "r": 0.03,
+    "L": 62.17,
+    "color": [
+     1.0,
+     0.72,
+     0.42
+    ]
+   },
+   {
+    "x": -2.723,
+    "y": 0.825,
+    "z": 1.463,
+    "r": 0.03,
+    "L": 8.29,
+    "color": [
+     1.0,
+     0.72,
+     0.42
+    ]
+   }
+  ],
+  "windows": [],
+  "at": [
+   [
+    -2.25,
+    0.9,
+    1.2
+   ],
+   [
+    0.45,
+    0.9,
+    -0.15
+   ],
+   [
+    3.15,
+    0.9,
+    -0.675
+   ],
+   [
+    3.945,
+    0.75,
+    -2.4
+   ]
+  ]
+ },
+ "people": [
+  {
+   "who": "brutal",
+   "file": "brutal.glb",
+   "acts": [
+    {
+     "name": "wait",
+     "loop": true,
+     "min": 6,
+     "max": 12
+    },
+    {
+     "name": "scene",
+     "w": 1.0,
+     "cue": {
+      "dean": "scene",
+      "paul": "scene",
+      "percy": "scene",
+      "coffey": "scene",
+      "harry": "scene",
+      "del": "scene",
+      "chief": "scene",
+      "room": "scene"
+     },
+     "first": true,
+     "at": 0.0
+    }
+   ]
+  },
+  {
+   "who": "paul",
+   "file": "paul.glb",
+   "acts": [
+    {
+     "name": "wait",
+     "loop": true,
+     "min": 6,
+     "max": 12
+    },
+    {
+     "name": "scene",
+     "w": 0.0
+    }
+   ]
+  },
+  {
+   "who": "dean",
+   "file": "dean.glb",
+   "acts": [
+    {
+     "name": "wait",
+     "loop": true,
+     "min": 6,
+     "max": 12
+    },
+    {
+     "name": "scene",
+     "w": 0.0
+    }
+   ]
+  },
+  {
+   "who": "harry",
+   "file": "harry.glb",
+   "acts": [
+    {
+     "name": "wait",
+     "loop": true,
+     "min": 6,
+     "max": 12
+    },
+    {
+     "name": "scene",
+     "w": 0.0
+    }
+   ]
+  },
+  {
+   "who": "percy",
+   "file": "percy.glb",
+   "acts": [
+    {
+     "name": "wait",
+     "loop": true,
+     "min": 6,
+     "max": 12
+    },
+    {
+     "name": "scene",
+     "w": 0.0
+    }
+   ]
+  },
+  {
+   "who": "coffey",
+   "file": "coffey.glb",
+   "acts": [
+    {
+     "name": "wait",
+     "loop": true,
+     "min": 6,
+     "max": 12
+    },
+    {
+     "name": "scene",
+     "w": 0.0
+    }
+   ]
+  },
+  {
+   "who": "del",
+   "file": "del.glb",
+   "acts": [
+    {
+     "name": "wait",
+     "loop": true,
+     "min": 6,
+     "max": 12
+    },
+    {
+     "name": "scene",
+     "w": 0.0
+    }
+   ]
+  },
+  {
+   "who": "chief",
+   "file": "chief.glb",
+   "acts": [
+    {
+     "name": "wait",
+     "loop": true,
+     "min": 6,
+     "max": 12
+    },
+    {
+     "name": "scene",
+     "w": 0.0
+    }
+   ]
+  },
+  {
+   "who": "room",
+   "file": "room.glb",
+   "acts": [
+    {
+     "name": "rest",
+     "loop": true,
+     "min": 6,
+     "max": 12
+    },
+    {
+     "name": "scene",
+     "w": 0.0
+    }
+   ]
+  }
+ ],
+ "lightmapEncoding": "sqrt",
+ "lightmapScale": {
+  "arch": 5.171875,
+  "furn": 38.3125
+ }
+}

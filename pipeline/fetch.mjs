@@ -361,6 +361,27 @@ ROOMS['pulp-fiction'] = async () => {
   sketchfab('vincent/scene.gltf', 'https://sketchfab.com/3d-models/vincent-vega-pulp-fiction-d95ef568294f407cb814186a087c0ef0 (by Roberto Domínguez, vmmaniac)', 'CC BY 4.0');
 };
 
+ROOMS['the-green-mile'] = async () => {
+  // Paul, Brutal, Dean, Harry, Percy (suited bodies under their uniforms), Coffey, Delacroix, Bitterbuck
+  for (const a of ['Professions/Business_Male_01', 'Professions/Business_Male_06', 'Professions/Business_Male_02', 'Professions/Business_Male_07',
+    'Professions/Business_Male_03', 'Adults/Male_Adult_12', 'Adults/Male_Adult_14', 'Adults/Male_Adult_07']) await avatar(a);
+  const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+  for (const c of ['m_idle_breathe_01', 'm_idle_breathe_02', 'm_idle_neutral_01', 'm_idle_neutral_02', 'm_idle_nervous_01', 'm_idle_waiting_01',
+    'm_idle_look_around_01', 'm_gestic_talk_neutral_01', 'm_gestic_talk_neutral_02', 'm_gestic_talk_cool', 'm_gestic_talk_angry_01',
+    'm_gestic_listen_neutral_01', 'm_gestic_listen_deny_01', 'm_gestic_laugh_low', 'm_gestic_laugh_loud', 'm_listen_door', 'm_crouch_idle',
+    'm_sit_chair_breathe_01', 'm_sit_chair_idle_nervous_01', 'm_sit_chair_idle_look_around', 'm_sit_table_breathe_01', 'm_sit_table_idle_neutral_01']) await clip(S, c);
+  for (const c of ['m_walk_slow_01', 'm_walk_slow_02', 'm_walk_neutral_01', 'm_walk_cool_01', 'm_walk_bruised', 'm_crouch_in', 'm_crouch_out']) await clip(XY, c);
+  for (const c of ['m_sit_down_chair_01', 'm_sit_stand_up_chair_01', 'm_turn_left_180', 'm_turn_right_180', 'm_turn_left_90', 'm_turn_right_90']) await clip(XYZ, c);
+  // the block: painted brick, the Mile's linoleum, the cells' concrete, painted iron, the desk's wood; the people's cloth
+  for (const t of ['painted_brick', 'old_linoleum_flooring_01', 'concrete_floor_worn_001', 'green_metal_rust', 'dark_wood',
+    'caban', 'denim_fabric', 'denim_fabric_04', 'cotton_jersey', 'rough_linen']) await polyhaven(t, '2k', 'tex');
+  // Mr. Jingles
+  await objaverse('b2737ba987794081bfb9cebc6aa6b55e', '000-129', 'house_mouse_sekinger.glb',
+    'https://sketchfab.com/3d-models/house-mouse-b2737ba987794081bfb9cebc6aa6b55e (by Jean-Christophe Sekinger)', 'CC BY 4.0');
+  // Paul's head: a scan of the Tom Hanks wax figure (downloaded signed in, glTF archive unzipped into cache/sketchfab/hanks/)
+  sketchfab('hanks/scene.gltf', 'https://sketchfab.com/3d-models/tom-hanks-8dd93f96cd2841d3bb6c0d6010d52705 (by tipatat)', 'CC BY 4.0');
+};
+
 const room = process.argv[2];
 if (!ROOMS[room]) { console.error('usage: node pipeline/fetch.mjs <' + Object.keys(ROOMS).join('|') + '>'); process.exit(1); }
 await ROOMS[room]();
