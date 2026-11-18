@@ -382,6 +382,29 @@ ROOMS['the-green-mile'] = async () => {
   sketchfab('hanks/scene.gltf', 'https://sketchfab.com/3d-models/tom-hanks-8dd93f96cd2841d3bb6c0d6010d52705 (by tipatat)', 'CC BY 4.0');
 };
 
+ROOMS['rear-window'] = async () => {
+  // Jeff (Male_Adult_08: a lean, tall body under the sculpted head) and Lisa (Female_Adult_17)
+  for (const a of ['Adults/Male_Adult_08', 'Adults/Female_Adult_17']) await avatar(a);
+  const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+  // Jeff in the wheelchair: a seated base and its idles; the camera, the glass and talk layered over it
+  for (const c of ['breathe_01', 'idle_neutral_01', 'idle_relaxed_01', 'idle_look_around', 'idle_roll_head', 'idle_scratch_head', 'idle_touch_face',
+    'idle_waiting_01', 'gestic_shrug_01', 'gestic_thoughtful']) await clip(S, `m_sit_chair_${c}`);
+  for (const c of ['m_take_picture', 'm_drink_drinking', 'm_drink_idle', 'm_gestic_talk_relaxed_01', 'm_gestic_laugh_low', 'm_gestic_listen_neutral_01',
+    'm_sit_table_idle_yawn']) await clip(S, c);
+  // Lisa: in at the door, the dress shown, the bottle, the glass, the daybed, out
+  for (const c of ['f_try_door_inwards', 'f_try_door_outwards', 'f_idle_neutral_01', 'f_idle_breathe_01', 'f_idle_look_around_01', 'f_idle_touch_hair_01',
+    'f_gestic_talk_relaxed_01', 'f_gestic_talk_excited_01', 'f_gestic_listen_neutral_01', 'f_gestic_laugh_low', 'f_gestic_presentation_left_01',
+    'f_gestic_presentation_right_01', 'f_drink_drinking', 'f_drink_idle', 'f_hold_bag_idle_01', 'f_crouch_in', 'f_crouch_out', 'f_documents_take',
+    'f_wave_01', 'f_sit_chair_breathe_01', 'f_sit_chair_idle_relaxed_01', 'f_sit_chair_idle_touch_hair']) await clip(S, c);
+  for (const c of ['f_walk_self-assured', 'f_walk_neutral_01', 'f_walk_slow_01', 'f_walk_start', 'f_walk_stop']) await clip(XY, c);
+  for (const c of ['f_turn_left_180', 'f_turn_right_180', 'f_turn_left_90', 'f_turn_right_90', 'f_sit_down_chair_01', 'f_sit_stand_up_chair_01']) await clip(XYZ, c);
+  // the studio: dark boards, painted plaster, the brick outside, mahogany, leather; the people's cloth
+  for (const t of ['wooden_floor_02', 'painted_plaster_wall', 'red_brick_03', 'sapele_veneer', 'brown_leather', 'dirty_carpet', 'floral_jacquard',
+    'stretch_poplin', 'crepe_satin', 'cotton_jersey', 'rough_linen', 'velour_velvet']) await polyhaven(t, '2k', 'tex');
+  for (const m of ['wheelchair_01', 'mantel_clock_01', 'brass_candleholders', 'brass_vase_01',
+    'brass_vase_03']) await polyhaven(m, '1k', 'gltf');
+};
+
 const room = process.argv[2];
 if (!ROOMS[room]) { console.error('usage: node pipeline/fetch.mjs <' + Object.keys(ROOMS).join('|') + '>'); process.exit(1); }
 await ROOMS[room]();

@@ -1,7 +1,7 @@
 # Prepares a room's textures from the cached CC0 sources: recolour by luminance (keeps the material's own
 # variation, sets its mean colour), resize, and write web-friendly JPEGs into pipeline/out/textures/<room>/.
 # Usage: python pipeline/textures.py severance
-import os, sys
+import os, sys, math
 import numpy as np
 from PIL import Image, ImageFilter
 
@@ -1273,6 +1273,123 @@ def the_green_mile(out):
         for j in range(int(h / 14) - 2):
             d.line([x0 + 12, y0 + 18 + j * 14, x0 + 12 + int(rng.integers(40, w - 24)), y0 + 18 + j * 14], fill=(70, 66, 60), width=2)
     N.save(f'{out}/notices_color.jpg', quality=92)
+
+
+def rear_window(out):
+    """Jefferies' studio in the Village: dark walnut boards, plaster painted a warm grey-green putty, cream-grey trim and
+    built-ins, the mahogany desk, a worn red-brown rug, the daybed's grey linen; the brick of the light well outside the
+    kitchenette window and of the building's face; bamboo roll blinds; book spines; the woven basket-shields; three
+    black-and-white photographs of his assignments (a fighter on a field, a race, a burst of smoke over a desert) and
+    the bright still life over the mantel."""
+    from PIL import ImageDraw
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    rng = np.random.default_rng(1954)
+    tint(ph('wooden_floor_02', 'Diffuse'), f'{out}/floor_color.jpg', (74, 50, 34), contrast=1.1)
+    copy(ph('wooden_floor_02', 'nor_gl'), f'{out}/floor_normal.jpg', size=1024)
+    tint(ph('painted_plaster_wall', 'Diffuse'), f'{out}/wall_color.jpg', (150, 146, 124), size=1024, contrast=0.45)
+    copy(ph('painted_plaster_wall', 'nor_gl'), f'{out}/wall_normal.jpg', size=1024)
+    tint(ph('painted_plaster_wall', 'Diffuse'), f'{out}/trim_color.jpg', (178, 172, 150), size=512, contrast=0.3)
+    tint(ph('sapele_veneer', 'Diffuse'), f'{out}/mahogany_color.jpg', (58, 28, 18), size=1024, contrast=1.1)
+    copy(ph('sapele_veneer', 'nor_gl'), f'{out}/mahogany_normal.jpg', size=512)
+    tint(ph('floral_jacquard', 'Diffuse'), f'{out}/rug_color.jpg', (108, 62, 48), size=1024, contrast=1.25)
+    tint(ph('rough_linen', 'Diffuse'), f'{out}/linen_color.jpg', (104, 98, 94), size=512, contrast=0.8)
+    tint(ph('rough_linen', 'Diffuse'), f'{out}/pillow_color.jpg', (92, 80, 94), size=512, contrast=0.8)
+    tint(ph('red_brick_03', 'Diffuse'), f'{out}/brick_color.jpg', (128, 72, 52), size=1024, contrast=1.1)
+    copy(ph('red_brick_03', 'nor_gl'), f'{out}/brick_normal.jpg', size=1024)
+    tint(ph('brown_leather', 'Diffuse'), f'{out}/leather_color.jpg', (92, 56, 34), size=512, contrast=1.0)
+    tint(ph('velour_velvet', 'Diffuse'), f'{out}/armchair_color.jpg', (104, 84, 62), size=512, contrast=0.9)
+    # bamboo roll blind: thin canes across, tied by two cords (u across the blind, v down it)
+    S = 512; I = np.zeros((S, S, 3), np.float32); cane = lin((176, 146, 98))
+    v = np.arange(S)[:, None]; cv = (np.sin(v / S * 2 * np.pi * 70) * 0.5 + 0.5) ** 0.6
+    I[:] = cane[None, None] * (0.55 + 0.45 * cv)[..., None] * (0.85 + 0.15 * rng.random((S, 1, 1))).astype(np.float32)
+    for x in (int(S * 0.2), int(S * 0.8)): I[:, x - 3:x + 3] = lin((70, 52, 34))
+    _save(I, f'{out}/blind_color.jpg')
+    # book spines (as Murph's shelf: 32 x 4 cells on the left half, page edges on the right)
+    W_, H_ = 2048, 1024; B = Image.new('RGB', (W_, H_), (230, 220, 196)); d = ImageDraw.Draw(B)
+    pal = [(112, 32, 28), (40, 52, 82), (28, 40, 58), (44, 70, 54), (30, 30, 30), (150, 120, 80), (180, 160, 120), (92, 58, 36), (190, 186, 172),
+           (168, 60, 40), (70, 86, 110), (120, 110, 90), (210, 196, 160), (60, 80, 70), (150, 40, 50), (200, 170, 70), (60, 36, 26)]
+    cw, ch = (W_ // 2) // 32, H_ // 4
+    for j in range(4):
+        for i in range(32):
+            x0, y0 = i * cw, j * ch; c = tuple(int(q * rng.uniform(0.82, 1.1)) for q in pal[int(rng.integers(len(pal)))])
+            d.rectangle([x0, y0, x0 + cw - 1, y0 + ch - 1], fill=c); g = (196, 160, 90) if sum(c) < 330 else (40, 30, 24)
+            for b in range(int(rng.integers(0, 4))):
+                yb = y0 + int(ch * rng.uniform(0.05, 0.95)); d.rectangle([x0 + 2, yb, x0 + cw - 3, yb + int(rng.integers(2, 7))], fill=g)
+            d.line([x0, y0, x0, y0 + ch], fill=tuple(int(q * 0.6) for q in c))
+    a = np.asarray(B, np.float32) / 255; a[:, W_ // 2:] = np.array([0.9, 0.86, 0.75], np.float32)
+    _save(srgb_to_lin(a), f'{out}/books_color.jpg')
+    # the woven basket-shield: rings of coiled grass, a zigzag band (mapped 0..1 across it)
+    R_ = 512; yy, xx = np.mgrid[0:R_, 0:R_].astype(np.float32) / R_ - 0.5; r = np.hypot(xx, yy) * 2; th = np.arctan2(yy, xx)
+    coil = 0.75 + 0.25 * np.sin(r * 90); zig = (np.abs(((th * 12 / np.pi) % 2) - 1) * 0.12 + 0.55 > r) & (r > 0.45)
+    bk = lin((168, 132, 84))[None, None] * coil[..., None]; bk[zig] = lin((70, 40, 26)) * coil[zig][..., None]
+    _save(bk, f'{out}/basket_color.jpg')
+
+    # three black-and-white photographs (mapped 0..1 across each print): a fighter on a field, a race car, smoke
+    def photo(name, draw):
+        P = Image.new('L', (512, 400), 0); dd = ImageDraw.Draw(P)
+        for y in range(400): dd.line([0, y, 512, y], fill=int(200 - y * 0.25))
+        draw(dd); arr = np.asarray(P.filter(ImageFilter.GaussianBlur(1.2)), np.float32) / 255
+        arr = arr * (0.9 + 0.1 * rng.random(arr.shape)).astype(np.float32)
+        frame = np.ones_like(arr); frame[18:-18, 18:-18] = arr[18:-18, 18:-18]
+        _save(srgb_to_lin(np.repeat(np.clip(frame * 0.96, 0, 1)[..., None], 3, 2)), f'{out}/{name}.jpg')
+
+    def fighter(dd):
+        dd.rectangle([0, 270, 512, 400], fill=96); dd.polygon([(120, 230), (400, 215), (410, 232), (125, 250)], fill=24)
+        dd.polygon([(180, 232), (360, 226), (330, 262), (200, 262)], fill=34); dd.ellipse([388, 205, 420, 245], fill=20)
+        dd.line([404, 190, 404, 262], fill=40, width=3); dd.polygon([(110, 228), (140, 196), (150, 232)], fill=26)
+        for x in (210, 330): dd.ellipse([x, 258, x + 26, 284], fill=14)
+        for k, x in enumerate((60, 90, 440, 470)): dd.rectangle([x, 240, x + 14, 300], fill=40 + 10 * k); dd.ellipse([x, 228, x + 14, 242], fill=50)
+
+    def race(dd):
+        dd.rectangle([0, 250, 512, 400], fill=120); dd.rectangle([0, 150, 512, 250], fill=70)
+        dd.polygon([(150, 300), (330, 280), (360, 310), (170, 330)], fill=20); dd.ellipse([150, 300, 200, 350], fill=10); dd.ellipse([300, 290, 350, 340], fill=10)
+        dd.ellipse([360, 120, 440, 200], fill=16); dd.ellipse([380, 140, 420, 180], fill=90)
+
+    def smoke(dd):
+        dd.rectangle([0, 300, 512, 400], fill=150)
+        for k in range(14):
+            x, y, s = 256 + rng.normal(0, 40), 260 - k * 16, 60 + k * 6; dd.ellipse([x - s, y - s * 0.7, x + s, y + s * 0.7], fill=int(220 - k * 3))
+        dd.rectangle([236, 220, 276, 300], fill=200)
+        for x in (90, 120, 150): dd.rectangle([x, 300, x + 10, 340], fill=20)
+    photo('photo_fighter', fighter); photo('photo_race', race); photo('photo_smoke', smoke)
+    # the still life over the mantel: a jug, fruit and a table in bright flat colour, a pale mat round it
+    P = Image.new('RGB', (600, 480), (226, 214, 180)); dd = ImageDraw.Draw(P)
+    dd.rectangle([40, 40, 560, 440], fill=(60, 120, 120)); dd.polygon([(40, 300), (560, 260), (560, 440), (40, 440)], fill=(190, 70, 40))
+    dd.rectangle([40, 40, 220, 300], fill=(220, 180, 60)); dd.ellipse([250, 120, 360, 300], fill=(40, 90, 60)); dd.rectangle([280, 80, 330, 140], fill=(40, 90, 60))
+    for k, c in enumerate(((210, 60, 40), (230, 150, 40), (200, 40, 80), (240, 200, 90))):
+        dd.ellipse([370 + k * 40, 250 - (k % 2) * 20, 420 + k * 40, 300 - (k % 2) * 20], fill=c)
+    dd.polygon([(60, 330), (240, 310), (250, 420), (70, 430)], fill=(236, 230, 210))
+    for k in range(6): dd.line([90 + k * 25, 320, 100 + k * 25, 420], fill=(60, 60, 140), width=4)
+    _save(srgb_to_lin(np.asarray(P, np.float32) / 255), f'{out}/still_life.jpg')
+    # the brick of the light well, seen close through the kitchenette window, a little greyed
+    tint(ph('red_brick_03', 'Diffuse'), f'{out}/lightwell_color.jpg', (96, 62, 50), size=512, contrast=1.0)
+    # Lisa's skirt: layered white tulle (u round the skirt, v down from the waist), soft folds, the black vine sprays
+    # falling from the belt over its upper half
+    TW, TH = 2048, 1024; Tl = Image.new('L', (TW, TH), 0); dt = ImageDraw.Draw(Tl)
+    for k in range(9):
+        x0 = (k + rng.uniform(-0.2, 0.2)) * TW / 9; x = x0; y = 0.0; ang = rng.uniform(-0.15, 0.15)
+        for s in range(60):
+            x2, y2 = x + math.sin(ang) * 9, y + 9
+            dt.line([x, y, x2, y2], fill=255, width=max(2, int(7 - s * 0.1)))
+            if s % 6 == 3:
+                for side in (-1, 1):
+                    lx, ly = x2 + side * rng.uniform(18, 34), y2 + rng.uniform(10, 26)
+                    dt.ellipse([lx - 9, ly - 4, lx + 9, ly + 4], fill=255); dt.line([x2, y2, lx, ly], fill=255, width=2)
+            x, y = x2, y2; ang += rng.uniform(-0.12, 0.12)
+            if y > TH * 0.46: break
+    spray = np.asarray(Tl.filter(ImageFilter.GaussianBlur(1.0)), np.float32) / 255
+    u = np.arange(TW)[None, :] / TW; fold = 0.9 + 0.1 * np.sin(u * 2 * np.pi * 26)
+    tulle = lin((232, 230, 226))[None, None] * fold[..., None] * np.ones((TH, 1, 1), np.float32)
+    tulle = tulle * (1 - spray[..., None]) + lin((22, 22, 26))[None, None] * spray[..., None]
+    _save(tulle, f'{out}/tulle_color.jpg')
+    # the wheelchair's colour map: its teal leather made a worn brown (the chrome and the tyres kept)
+    im = np.asarray(Image.open(os.path.join(CACHE, 'polyhaven', 'wheelchair_01', 'textures', 'wheelchair_01_diff_1k.jpg')).convert('RGB'), np.float32) / 255
+    mx, mn = im.max(-1), im.min(-1); sat = (mx - mn) / np.maximum(mx, 1e-4)
+    teal = (sat > 0.25) & (im[..., 1] + im[..., 2] > 1.6 * im[..., 0]); lum = im @ np.array([0.3, 0.59, 0.11], np.float32)
+    k = lum / max(float(lum[teal].mean()), 1e-3); im = im.copy()
+    im[teal] = np.clip(np.array([0.42, 0.25, 0.15], np.float32)[None, :] * k[teal][:, None] * 0.55, 0, 1)
+    Image.fromarray((im * 255).astype(np.uint8)).save(f'{out}/wheelchair_diff.jpg', quality=92)
 
 
 if __name__ == '__main__':

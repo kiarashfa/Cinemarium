@@ -1,9 +1,10 @@
 // A baked room: static geometry lit by Cycles light maps (direct and bounce light, baked in Blender), and the
 // living parts on top: motion-captured people lit by the room's own light, screens, a clock, a walker, and where a
-// room has them, weather at the windows (rain on the glass, lightning baked as a second light the web flashes).
+// room has them, weather at the windows (rain on the glass, lightning baked as a second light the web flashes), and
+// lamps someone switches on during an act (each lamp's light baked on its own, added as it comes on).
 // Built by pipeline/blender; files in public/rooms/<id>/.
 import * as THREE from 'three/webgpu';
-import { color, float, lights, texture, uv, vec3, vec4 } from 'three/tsl';
+import { color, float, lights, texture, uniform, uv, vec3, vec4 } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { EXRLoader } from 'three/addons/loaders/EXRLoader.js';
 import type { Room } from './types';
@@ -72,11 +73,13 @@ interface Meta {
   lightmapEncoding?: 'sqrt';
   /** a second set of light maps, lightning alone: the web adds it in flashes */
   flashmaps?: Record<string, string>; flashScale?: Record<string, number>;
+  /** lamps switched on during an act: each lamp's light alone, per atlas (lamp -> atlas -> file), added by its level */
+  lampmaps?: Record<string, Record<string, string>>; lampScale?: Record<string, Record<string, number>>;
   /** how to light the people as the bake lit the room (Severance's older files list its troffers instead) */
   /** `at`: where to capture from; several points: each surface and person takes the nearest (a room of two lights) */
   capture?: { ceiling: Vec3; walls: Vec3; emitters: Emitter[]; windows: Window_[]; at?: Vec3 | Vec3[] };
   troffers?: { x: number; y: number; z: number; w: number; d: number; watts: number }[];
-  live?: { flash?: { from: Vec3; color: Vec3 }; pills?: { who: string; act: string }; held?: Held[]; [k: string]: unknown };
+  live?: { flash?: { from: Vec3; color: Vec3 }; pills?: { who: string; act: string }; held?: Held[]; lamps?: Lamp[]; [k: string]: unknown };
   people: PersonMeta[];
 }
 
@@ -86,6 +89,8 @@ interface Meta {
 export type Screen = (q: number) => { canvas: HTMLCanvasElement; draw(t: number): boolean | void; gain?: number; every?: number; bind?(cast: Cast, live: Meta['live']): void };
 /** A prop carried in a hand during an act, between two moments of it (a mug picked up for a sip), at rest otherwise. */
 interface Held { who: string; act: string; prop: string; hand: 'L' | 'R'; grab: number; release: number }
+/** A lamp switched on `on` seconds into someone's act and off at `off` (its light maps `lamp<q>`, its shade role 'lamp'). */
+interface Lamp { q: number; who: string; act: string; on: number; off: number; at: Vec3; color: Vec3 }
 
 const loadMap = (id: string, f: string, scale: number) => (f.endsWith('.exr') ? exr : image).loadAsync(asset(id, f)).then(t => {
   // light maps: 8-bit sRGB WebP of E / scale for the web (EXR masters also work); UVs follow glTF, so no flip
@@ -97,18 +102,22 @@ const loadMap = (id: string, f: string, scale: number) => (f.endsWith('.exr') ? 
 export async function bakedRoom(id: string, screen?: Screen): Promise<Room> {
   const meta: Meta = await (await fetch(asset(id, 'room.json'))).json();
   const groups = Object.keys(meta.lightmaps), flashGroups = Object.keys(meta.flashmaps ?? {});
-  const [scene, maps, flashes] = await Promise.all([
+  const lampDefs = meta.live?.lamps ?? [], lampKeys = lampDefs.map(l => `lamp${l.q}`).filter(k => meta.lampmaps?.[k]);
+  const [scene, maps, flashes, lampMaps] = await Promise.all([
     gltf.loadAsync(asset(id, 'room.glb')).then(g => g.scene),
     Promise.all(groups.map(g => loadMap(id, meta.lightmaps[g], meta.lightMapIntensity * (meta.lightmapScale?.[g] ?? 1)))),
     Promise.all(flashGroups.map(g => loadMap(id, meta.flashmaps![g], meta.flashScale?.[g] ?? 1))),
+    Promise.all(lampKeys.map(k => Promise.all(Object.entries(meta.lampmaps![k]).map(([g, f]) => loadMap(id, f, meta.lampScale?.[k]?.[g] ?? 1).then(m => [g, m] as const))))),
   ]);
   const atlas = Object.fromEntries(groups.map((g, i) => [g, maps[i]]));
   const flashAtlas = Object.fromEntries(flashGroups.map((g, i) => [g, flashes[i]]));
   const storm = flashGroups.length ? lightning() : null;
+  // each lamp: its light maps by atlas, and its level (0 off, 1 on), eased as it is switched
+  const lamps = lampKeys.map((k, i) => ({ def: lampDefs.find(l => `lamp${l.q}` === k)!, maps: Object.fromEntries(lampMaps[i]), level: uniform(0) }));
 
   const group = new THREE.Group(); group.add(scene);
   const none = lights([]), cache = new Map<string, THREE.Material>(), screens: { s: ReturnType<Screen>; tex: THREE.CanvasTexture; last: number }[] = [];
-  const centres = new Map<string, THREE.Vector3>(), mugs: THREE.Mesh[] = [];
+  const centres = new Map<string, THREE.Vector3>(), mugs: THREE.Mesh[] = [], shades: THREE.Mesh[] = [];
   let sectionFace: THREE.MeshBasicNodeMaterial | null = null;
   const hands: { pivot: THREE.Mesh; kind: string }[] = [];
   const lace: THREE.MeshBasicNodeMaterial[] = [];
@@ -127,6 +136,7 @@ export async function bakedRoom(id: string, screen?: Screen): Promise<Room> {
       m.material = mat; screens.push({ s, tex, last: -1 }); return;
     }
     if (ud.role === 'mug') { m.userData.who = ud.who; mugs.push(m); return; }   // lit like the people, once the room is captured
+    if (ud.role === 'lamp') { m.userData.q = ud.q; shades.push(m); return; }     // a lamp's shade or bulb: glows as it is switched on
     // where the module's top cuts through walls and concrete: a flat dark cut face, as on an architect's model, which
     // neither the club's lights nor its reflections may lighten
     if (src?.name === 'section') { m.material = sectionFace ??= new THREE.MeshBasicNodeMaterial({ color: 0x141312 }); return; }
@@ -157,12 +167,16 @@ export async function bakedRoom(id: string, screen?: Screen): Promise<Room> {
         // the walking people's contact shadows come from screen-space AO on the floors they walk (live depth, so every step)
         if (/carpet|terrazzo/.test(src.name)) mat.keepAO = true;
         // lightning: its own light map, added as light reflected by the surface's colour, as strong as the strike
-        const fl = flashAtlas[ud.lm];
-        if (fl && storm) {
+        // and each lamp's light map, by how far it is switched on
+        const fl = flashAtlas[ud.lm], lit = lamps.filter(l => l.maps[ud.lm!]);
+        if ((fl && storm) || lit.length) {
           const albedo = src.map ? texture(src.map, uv()).rgb.mul(color(src.color)) : color(src.color);
           const own = src.emissiveMap ? texture(src.emissiveMap, uv()).rgb.mul(color(src.emissive)).mul(src.emissiveIntensity) : color(src.emissive).mul(src.emissiveIntensity);
-          const ft = texture(fl.t, uv(1)).rgb, flashLight = meta.lightmapEncoding === 'sqrt' ? ft.mul(ft) : ft;
-          mat.emissiveNode = (own as any).add((albedo as any).mul(flashLight).mul(fl.scale).mul(storm.flash));
+          const light = (lm: { t: THREE.Texture; scale: number }) => { const ft = texture(lm.t, uv(1)).rgb; return (meta.lightmapEncoding === 'sqrt' ? ft.mul(ft) : ft).mul(lm.scale); };
+          let extra: any = vec3(0);
+          if (fl && storm) extra = extra.add(light(fl).mul(storm.flash));
+          for (const l of lit) extra = extra.add(light(l.maps[ud.lm!]).mul(l.level));
+          mat.emissiveNode = (own as any).add((albedo as any).mul(extra));
         }
         cache.set(key, mat);
       }
@@ -187,11 +201,15 @@ export async function bakedRoom(id: string, screen?: Screen): Promise<Room> {
   const envAt = (p: THREE.Vector3) => captures[nearest(meta, p)]?.texture ?? null;
   for (const [key, m] of cache) { const e = envAt(centres.get(key) ?? new THREE.Vector3()); if (e) (m as RoomMaterial).envMap = e; }
   let peopleLights = none, strike: THREE.DirectionalLight | null = null;
+  const live: THREE.Light[] = [];
   if (storm && meta.live?.flash) {
     const f = meta.live.flash; strike = new THREE.DirectionalLight(new THREE.Color(...f.color), 0);
     strike.position.set(f.from[0] * 10, f.from[1] * 10, f.from[2] * 10); group.add(strike, strike.target);
-    peopleLights = lights([strike]);
+    live.push(strike);
   }
+  // the lamps reach the people (and what they hold) as small warm lights, as bright as the lamp is on
+  const lampLights = lamps.map(l => { const p = new THREE.PointLight(new THREE.Color(...l.def.color), 0, 6, 2); p.position.set(...l.def.at); group.add(p); live.push(p); return p; });
+  if (live.length) peopleLights = lights(live);
   const bodies = await Promise.all(meta.people.map(async p => {
     const g = await gltf.loadAsync(asset(id, `people/${p.file}`));
     const body = g.scene;
@@ -226,6 +244,16 @@ export async function bakedRoom(id: string, screen?: Screen): Promise<Room> {
     const body = bodies.find(b => b.meta.who === h.who)?.body, parts = mugs.filter(m => m.name.startsWith(h.prop));
     return body && parts.length ? [carried(group, body, parts, h, cast)] : [];
   });
+  for (const m of shades) {            // a shade glows with its lamp: lit like the people, plus its own light
+    const src = m.material as THREE.MeshStandardMaterial, mat = new THREE.MeshPhysicalNodeMaterial();
+    for (const k of COPY) { const v = (src as any)[k]; if (v === undefined) continue; const cur = (mat as any)[k]; if (cur?.copy && (v?.isColor || v?.isVector2)) cur.copy(v); else (mat as any)[k] = v; }
+    const c = (m.geometry.computeBoundingSphere(), m.geometry.boundingSphere!.center), e = envAt(c);
+    if (e) { mat.envMap = e; mat.envMapIntensity = 1; }
+    const l = lamps.find(x => x.def.q === m.userData.q);
+    if (l) mat.emissiveNode = color(new THREE.Color(...l.def.color)).mul(l.level).mul(/bulb/.test(m.name) ? 6.0 : 1.6);
+    mat.lightsNode = peopleLights; m.material = mat;
+  }
+  if (QUERY.has('debug')) (window as any).__lamps = lamps.map(l => l.level);
   for (const sc of screens) sc.s.bind?.(cast, meta.live);
 
   return {
@@ -237,6 +265,11 @@ export async function bakedRoom(id: string, screen?: Screen): Promise<Room> {
         if (strike) strike.intensity = storm.flash.value * 2.6;
       }
       pills?.update();
+      lamps.forEach((l, i) => {            // on as the act reaches its switch (quickly), off slowly at its end
+        const cur = cast.current(l.def.who), on = !!cur && cur.getClip().name === l.def.act && cur.time >= l.def.on && cur.time < l.def.off && cur.getEffectiveWeight() > 0.5;
+        const v = l.level.value, k = Math.min(1, dt / (on ? 0.25 : 2.2));
+        l.level.value = v + ((on ? 1 : 0) - v) * k; lampLights[i].intensity = l.level.value * 0.9;
+      });
       for (const h of held) h.update();
       for (const sc of screens) if (t - sc.last >= (sc.s.every ?? 0.12)) { sc.last = t; if (sc.s.draw(t) !== false) sc.tex.needsUpdate = true; }
       const now = new Date(), sec = now.getSeconds() + now.getMilliseconds() / 1000, min = now.getMinutes() + sec / 60, hr = (now.getHours() % 12) + min / 60;

@@ -16,7 +16,8 @@ sc = bpy.context.scene
 sc.view_settings.view_transform = 'Standard'; sc.view_settings.look = 'None'; sc.view_settings.exposure = 0; sc.view_settings.gamma = 1
 sc.display_settings.display_device = 'sRGB'
 scales = {}
-for group in ('arch', 'furn', 'arch_flash', 'furn_flash'):   # the room's light, and (where a room has one) the lightning's
+LAMPS = ('lamp1', 'lamp2', 'lamp3')                          # a room's lamps switched on during an act (Rear Window)
+for group in ('arch', 'furn', 'arch_flash', 'furn_flash') + tuple(f'{g}_{l}' for l in LAMPS for g in ('arch', 'furn')):   # the room's light, and (where a room has them) the lightning's, each lamp's
     src = os.path.join(ROOT, 'pipeline', 'out', room, f'lm_{group}.exr')
     if not os.path.exists(src): src = os.path.join(web, f'lm_{group}.exr')
     if not os.path.exists(src): continue
@@ -38,8 +39,13 @@ for group in ('arch', 'furn', 'arch_flash', 'furn_flash'):   # the room's light,
     print(f'[lm] {group}: scale {scale:.3f}, {os.path.getsize(dst) / 1e6:.2f} MB')
 if meta:
     meta['lightmapEncoding'] = 'sqrt'
-    meta['lightmaps'] = {g: f'lm_{g}.webp' for g in scales if not g.endswith('_flash')}
-    meta['lightmapScale'] = {g: v for g, v in scales.items() if not g.endswith('_flash')}
+    extra = lambda g: g.endswith('_flash') or any(g.endswith('_' + l) for l in LAMPS)
+    meta['lightmaps'] = {g: f'lm_{g}.webp' for g in scales if not extra(g)}
+    meta['lightmapScale'] = {g: v for g, v in scales.items() if not extra(g)}
+    lamps = {l: {g[:-len(l) - 1]: f'lm_{g}.webp' for g in scales if g.endswith('_' + l)} for l in LAMPS}
+    if any(lamps.values()):
+        meta['lampmaps'] = {l: v for l, v in lamps.items() if v}
+        meta['lampScale'] = {l: {g[:-len(l) - 1]: scales[g] for g in scales if g.endswith('_' + l)} for l in LAMPS if lamps[l]}
     if any(g.endswith('_flash') for g in scales):
         meta['flashmaps'] = {g[:-6]: f'lm_{g}.webp' for g in scales if g.endswith('_flash')}
         meta['flashScale'] = {g[:-6]: v for g, v in scales.items() if g.endswith('_flash')}

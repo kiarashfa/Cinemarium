@@ -2214,5 +2214,81 @@ def the_green_mile():
     _hair_recolour('Male_Adult_07', 'm013_opacity_color.tga', 'chief', 'm013_opacity_color.tga', (22, 18, 16), contrast=1.0, shine=0.8)
 
 
+def rear_window():
+    """Lisa's first evening (costumes by Edith Head). Jeff (Male_Adult_08) in light blue cotton pyjamas, the jacket open
+    at the neck (a notched collar), the trousers the same blue; a brown leather moccasin on his right foot (the left leg
+    is in plaster, modelled); his hair brown going grey at the sides, combed back; clean shaven. Lisa (Female_Adult_17)
+    in the "Paris" dress: a fitted black bodice, off the shoulders, a deep V in front and behind, short cap sleeves; a
+    narrow black belt; the full white tulle skirt (modelled) to mid-calf; sheer stockings; black strappy sandals; her
+    hair a honey blonde, her lips red."""
+    rng = np.random.default_rng(1954)
+    pat = _gt_pat
+    fill = lambda b, B, mask, colour, pattern=None, **kw: _gt_fill(b, B, mask, colour, pattern, **{'grow': 22, **kw})
+
+    # ---- Jeff
+    b = load('Male_Adult_08', 'm014_body_color.tga'); B = Body('m014_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+    z = np.nan_to_num(B.z); ax = np.abs(np.nan_to_num(B.x))
+    poplin = np.clip(pat(B, 'stretch_poplin', 0.12, 0.5), 0.88, 1.12)
+    t = np.clip((neck - z) / 0.22, 0, 1)
+    vee = B.where((ax < 0.004 + 0.06 * (1 - t)) & (B.y < -0.02) & (z < neck + 0.01) & (z > neck - 0.22))
+    jacket = ((r['torso'] & B.where(z > r['pel'] - 0.2)) | r['arms']) & ~r['hands'] & ~vee
+    b = fill(b, B, jacket, (122, 154, 196), poplin, k=0.55, flatten=3)
+    collar = B.where((np.abs(ax - (0.035 + 0.06 * (1 - t))) < 0.022) & (B.y < -0.01) & (z < neck + 0.03) & (z > neck - 0.2)) & jacket
+    b = fill(b, B, collar, (112, 144, 186), poplin, k=0.45, flatten=0, grow=2)
+    skin = B.where(vee & r['torso'])
+    b = fill(b, B, skin, (196, 150, 122), k=0.6, flatten=0, grow=2)
+    legs = r['thighs'] | B.where(r['calves'] & (B.z > 0.06))
+    b = fill(b, B, legs, (122, 154, 196), poplin, k=0.55, flatten=3)
+    feet = r['feet'] | B.where(r['calves'] & (B.z <= 0.06))
+    b = fill(b, B, B.where(feet & (np.nan_to_num(B.x) > 0)), (200, 156, 128), k=0.6, flatten=2)      # his left foot bare (the plaster leaves the toes)
+    b = fill(b, B, B.where(feet & (np.nan_to_num(B.x) <= 0)), (92, 58, 34), np.clip(pat(B, 'brown_leather', 0.08, 1.0), 0.8, 1.2), k=0.5, flatten=1)
+    save(b, 'jeff', 'm014_body_color.tga')
+    _flat_normals('Male_Adult_08', 'm014_body_normal.tga', 'jeff', B.grow((jacket | legs).astype(np.float32), 4) * 0.7)
+    h = load('Male_Adult_08', 'm014_head_color.tga'); Hd = Body('m014_head_color.tga')
+    h, hm, brow = _gt_head_hair(h, Hd, (66, 54, 44), front=0.06, contrast=0.9)
+    save(h, 'jeff', 'm014_head_color.tga')
+    _hair_recolour('Male_Adult_08', 'm014_opacity_color.tga', 'jeff', 'm014_opacity_color.tga', (72, 60, 48), contrast=1.0, shine=0.7)
+
+    # ---- Lisa
+    b = load('Female_Adult_17', 'f006_body_color.tga'); B = Body('f006_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+    z = np.nan_to_num(B.z); ax = np.abs(np.nan_to_num(B.x))
+    skin_c = (226, 184, 160)
+    # her skin everywhere it shows first (the arms, the shoulders, the throat; the legs under the stockings)
+    bare = (r['torso'] | r['arms'] | B.part('Neck')) & ~r['hands']
+    b = fill(b, B, bare, skin_c, k=0.04, flatten=8)                           # (k low: the avatar's own necklace painted out)
+    # the bodice: from the waist up to a neckline off the shoulders, a deep V in front (to ~19 cm under the neck joint)
+    # and a V behind; short cap sleeves over the tops of the arms
+    front = B.y < 0
+    t_f = np.clip((neck - z) / 0.19, 0, 1)
+    v_front = B.where(front & (ax < 0.12 * (1 - t_f) ** 1.3 + 0.004) & (z > neck - 0.19))
+    t_b = np.clip((neck - z) / 0.24, 0, 1)
+    v_back = B.where(~front & (ax < 0.08 * (1 - t_b) + 0.004) & (z > neck - 0.24))
+    line = z < neck - 0.045 + 0.02 * np.clip(ax / 0.16, 0, 1)
+    bodice = B.where(r['torso'] & line & ~v_front & ~v_back & (z > r['pel'] + 0.02))
+    sleeve = B.where(B.part('UpperArm') & (z > neck - 0.17)) & B.where(line | B.part('UpperArm'))
+    jersey = np.clip(pat(B, 'crepe_satin', 0.1, 0.6), 0.85, 1.15)
+    b = fill(b, B, bodice | sleeve, (16, 16, 20), jersey, k=0.5, flatten=4)
+    belt = B.where((z < r['pel'] + 0.1) & (z > r['pel'] + 0.06)) & r['torso']
+    b = fill(b, B, belt, (8, 8, 10), k=0.3, flatten=0, grow=2)
+    # under the skirt: white (it shows only where the tulle parts); sheer stockings over the legs; sandals
+    under = B.where((r['torso'] & (z <= r['pel'] + 0.06)) | r['thighs'])
+    b = fill(b, B, under, (226, 224, 218), k=0.4, flatten=3)
+    stock = B.where(r['calves'] & (B.z > 0.07))
+    b = fill(b, B, stock, (206, 166, 140), k=0.7, flatten=6)
+    feet = r['feet'] | B.where(r['calves'] & (B.z <= 0.07))
+    b = fill(b, B, feet, (202, 160, 134), k=0.7, flatten=4)
+    straps = B.where(feet & (((np.nan_to_num(B.y) * 40) % 1.0) < 0.35))
+    b = fill(b, B, straps, (14, 14, 14), k=0.3, flatten=0, grow=1)
+    save(b, 'lisa', 'f006_body_color.tga')
+    _flat_normals('Female_Adult_17', 'f006_body_normal.tga', 'lisa', B.grow((bodice | sleeve | under | stock | bare).astype(np.float32), 4))
+    h = load('Female_Adult_17', 'f006_head_color.tga'); Hd = Body('f006_head_color.tga')
+    h, hm, brow = _gt_head_hair(h, Hd, (176, 140, 92), front=0.06, contrast=0.9)
+    lips = Hd.where((np.abs(Hd.x) < 0.026) & (Hd.y < -0.07) & (np.abs(Hd.z - (Hd.J['Bip01 Head'][2] + 0.0)) < 0.05))
+    H_, S_, V_ = hsv(h)
+    lm_ = lips & (S_ > 0.22) & (H_ < 20)
+    h = recolour(h, soft(Hd.grow(lm_.astype(np.float32), 1), 0.8), (150, 26, 30), contrast=1.0)
+    save(h, 'lisa', 'f006_head_color.tga')
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()

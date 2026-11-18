@@ -52,7 +52,7 @@ const LIST: Title[] = [
   { slug: 'the-godfather', kind: 'film', rank: 2, title: 'The Godfather', year: 1972, imdb: { id: 'tt0068646' }, scene: "Don Corleone's study", room: 'the-godfather' },
   { slug: 'interstellar', kind: 'film', rank: 3, title: 'Interstellar', year: 2014, imdb: { id: 'tt0816692' }, scene: "Murph's room", room: 'interstellar' },
   { slug: '2001-a-space-odyssey', kind: 'film', rank: 4, title: '2001: A Space Odyssey', year: 1968, imdb: { id: 'tt0062622' } },
-  { slug: 'rear-window', kind: 'film', rank: 5, title: 'Rear Window', year: 1954, imdb: { id: 'tt0047396' } },
+  { slug: 'rear-window', kind: 'film', rank: 5, title: 'Rear Window', year: 1954, imdb: { id: 'tt0047396' }, scene: "Jeff's apartment", room: 'rear-window' },
   { slug: 'pulp-fiction', kind: 'film', rank: 6, title: 'Pulp Fiction', year: 1994, imdb: { id: 'tt0110912' }, scene: "Brett's apartment", room: 'pulp-fiction' },
   { slug: 'the-green-mile', kind: 'film', rank: 7, title: 'The Green Mile', year: 1999, imdb: { id: 'tt0120689' }, scene: 'E Block', room: 'the-green-mile' },
   { slug: 'shutter-island', kind: 'film', rank: 8, title: 'Shutter Island', year: 2010, imdb: { id: 'tt1130884' } },

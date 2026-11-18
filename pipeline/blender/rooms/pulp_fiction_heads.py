@@ -1,4 +1,4 @@
-# Sculpted heads, made once (Jules's and Vincent's; Paul's and Coffey's for The Green Mile): each sculpt (one to two million triangles) decimated to a light mesh,
+# Sculpted heads, made once (Jules's and Vincent's; Paul's and Coffey's for The Green Mile; Jeff's and Lisa's for Rear Window): each sculpt (one to two million triangles) decimated to a light mesh,
 # unwrapped afresh, and its colour baked across from the full sculpt (as the_big_lebowski_head.py does for the Dude).
 # Writes pipeline/out/people/<who>/<who>_head.glb and a front and side look at it (with a 2 cm grid) to place the eyes.
 # Usage: blender -b --factory-startup -P pipeline/blender/rooms/pulp_fiction_heads.py -- jules|vincent
@@ -13,6 +13,8 @@ HEADS = {
     'jules': dict(src=os.path.join(cine.CACHE, 'tripo', 'jules.glb'), ratio=0.03, turn=-90),   # its face looks along +x: turned to -y
     'paul': dict(src=os.path.join(cine.CACHE, 'sketchfab', 'hanks', 'scene.gltf'), ratio=0.5, turn=15),           # The Green Mile: the wax-figure scan
     'coffey': dict(src=os.path.join(cine.CACHE, 'tripo', 'coffey_meshopt.glb'), ratio=0.03, turn=-90, tilt=12, tame=True),   # from a film still, made in Tripo Studio
+    'jeff': dict(src=os.path.join(cine.CACHE, 'tripo', 'jeff_stewart_meshopt.glb'), ratio=0.03, turn=-90, roll=20.7),      # Rear Window: from film stills, made in Tripo Studio
+    'lisa': dict(src=os.path.join(cine.CACHE, 'tripo', 'lisa_kelly_meshopt.glb'), ratio=0.03, turn=-90, roll=5.1),
 }
 SIZE = 2048
 
@@ -41,6 +43,8 @@ def main(who):
     if h.get('turn'): hi.rotation_mode = 'XYZ'; hi.rotation_euler.z += math.radians(h['turn'])   # glTF imports in quaternions
     if h.get('tilt'):                                                     # a face photographed from below, looking up: brought level
         bpy.context.view_layer.update(); hi.matrix_world = Matrix.Rotation(math.radians(h['tilt']), 4, 'X') @ hi.matrix_world
+    if h.get('roll'):                                                     # a head tilted to one side in its still: its eyes brought level
+        bpy.context.view_layer.update(); hi.matrix_world = Matrix.Rotation(math.radians(h['roll']), 4, 'Y') @ hi.matrix_world
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     lo = hi.copy(); lo.data = hi.data.copy(); lo.name = f'{who}_head'; sc.collection.objects.link(lo)
     bpy.context.view_layer.objects.active = lo
