@@ -405,6 +405,26 @@ ROOMS['rear-window'] = async () => {
     'brass_vase_03']) await polyhaven(m, '1k', 'gltf');
 };
 
+ROOMS['uncut-gems'] = async () => {
+  // Howard (Male_Adult_06: the zipped jacket), Arno (Male_Adult_08: a long-sleeved shirt), Phil (Business_Male_06), Nico
+  // (Male_Adult_14), each under a sculpted head
+  for (const a of ['Adults/Male_Adult_06', 'Adults/Male_Adult_08', 'Professions/Business_Male_06', 'Adults/Male_Adult_14']) await avatar(a);
+  const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+  // the game on the TV (Howard: the stool, up and down, pacing, pointing, cheering, the phone); the three in the vestibule
+  for (const c of ['m_idle_neutral_01', 'm_idle_neutral_02', 'm_idle_breathe_01', 'm_idle_nervous_01', 'm_idle_angry_01', 'm_idle_angry_02',
+    'm_idle_waiting_01', 'm_idle_look_around_01', 'm_gestic_talk_angry_01', 'm_gestic_talk_angry_02', 'm_gestic_talk_excited_01',
+    'm_gestic_talk_neutral_01', 'm_gestic_talk_nervous_01', 'm_gestic_listen_angry_01', 'm_gestic_listen_neutral_01', 'm_cheer_01', 'm_cheer_02',
+    'm_cheer_03', 'm_cheer_04', 'm_cheer_05', 'm_claphands_01', 'm_claphands_02', 'm_cell_phone_talk_01', 'm_cell_phone_listen_01', 'm_knock_door',
+    'm_try_door_inwards', 'm_crouch_idle', 'm_sit_chair_breathe_01', 'm_sit_chair_idle_nervous_01', 'm_sit_chair_idle_look_around']) await clip(S, c);
+  for (const c of ['m_walk_neutral_01', 'm_walk_slow_01', 'm_walk_fast_01', 'm_walk_cool_01', 'm_crouch_in', 'm_crouch_out']) await clip(XY, c);
+  for (const c of ['m_sit_down_chair_01', 'm_sit_stand_up_chair_01', 'm_turn_left_90', 'm_turn_right_90', 'm_turn_left_180', 'm_turn_right_180',
+    'm_cell_phone_talk_02']) await clip(XYZ, c);
+  // the showroom: granite tiles, oak panelling, painted plaster, leather; the people's cloth
+  for (const t of ['granite_tile', 'oak_veneer_01', 'painted_plaster_wall', 'brown_leather', 'velour_velvet', 'stretch_poplin', 'cotton_jersey',
+    'denim_fabric_04', 'rough_linen', 'crepe_satin']) await polyhaven(t, '2k', 'tex');
+  for (const m of ['potted_plant_02', 'wall_clock', 'security_camera_01']) await polyhaven(m, '1k', 'gltf');
+};
+
 const room = process.argv[2];
 if (!ROOMS[room]) { console.error('usage: node pipeline/fetch.mjs <' + Object.keys(ROOMS).join('|') + '>'); process.exit(1); }
 await ROOMS[room]();

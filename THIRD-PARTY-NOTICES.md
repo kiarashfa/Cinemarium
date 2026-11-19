@@ -45,13 +45,13 @@ Released into the public domain under [CC0 1.0](https://creativecommons.org/publ
   *lacquered_cherry_wood*, *leather_white*, *stone_block_wall*, *sandstone_blocks_08*, *slate_floor*, *medieval_blocks_03*,
   *marble_01*, *crepe_satin*, *quatrefoil_jacquard_fabric*, *oak_veneer_01*, *dark_wood*, *american_walnut_veneer*,
   *red_brick_03*, *wool_boucle*, *ribbed_corduroy*, *knitted_fleece*, *wood_floor_worn*, *plastered_wall_04*, *denim_fabric*, *dirty_carpet*, *old_linoleum_flooring_01*, *denim_fabric_04*, *painted_brick*, *concrete_floor_worn_001*,
-  *green_metal_rust*, *caban*, *stretch_poplin*; models *wheelchair_01* (its leather recoloured), *brass_candleholders*,
+  *green_metal_rust*, *caban*, *stretch_poplin*, *granite_tile*; models *wheelchair_01* (its leather recoloured), *brass_candleholders*,
   *brass_vase_01*, *brass_vase_03*, *wall_clock*, *office_notepads*, *stationery_supplies*,
   *vintage_stapler*, *binder_notebook*, *fire_alarm*, *mantel_clock_01*, *ornate_mirror_01*, *desk_lamp_arm_01*,
   *wooden_cutting_board*, *bananas*, *food_apple_01*, *potted_plant_02*, *fancy_picture_frame_01*, *vintage_cabinet_01*,
   *standing_picture_frame_01*, *standing_picture_frame_02*, *antique_ceramic_vase_01*, *ClassicConsole_01*,
   *pachira_aquatica_01*, *horse_statue_01*, *wine_bottles_01*, *Rockingchair_01*, *alarm_clock_01*,
-  *painted_wooden_nightstand*.
+  *painted_wooden_nightstand*, *security_camera_01*.
 - [ambientCG](https://ambientcg.com): *Carpet012*, *Carpet013*.
 
 ## The cat: CC BY 4.0
@@ -145,6 +145,12 @@ Licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and obtained 
 - L.B. Jefferies's and Lisa Fremont's heads in the Rear Window room were made with
   [Tripo Studio](https://studio.tripo3d.ai) from stills of the film, then simplified, levelled, cut below the neck
   and set on Rocketbox bodies; Lisa's hair recoloured.
+
+## Howard's, Arno's and Phil's heads
+
+- Howard Ratner's, Arno's and Phil's heads in the Uncut Gems room were made with
+  [Tripo Studio](https://studio.tripo3d.ai) from stills of the film, then simplified, cut to the head and neck, their
+  crowns closed where the stills cut them off, and set on Rocketbox bodies. Nico wears his Rocketbox avatar's own head.
 
 ## Public domain
 

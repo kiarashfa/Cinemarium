@@ -1392,6 +1392,84 @@ def rear_window(out):
     Image.fromarray((im * 255).astype(np.uint8)).save(f'{out}/wheelchair_diff.jpg', quality=92)
 
 
+def uncut_gems(out):
+    """Howard's showroom on 47th Street: dark speckled granite tiles, honey oak panelling, the vestibule's pale mint
+    paint, black leather, blue velvet for the busts and trays; the photo wall's snapshots (the store's famous
+    customers, posing with the owner), the hanging chains behind the cases, the 'KMH' letters, the vestibule door's
+    'WILL RETURN' clock sign."""
+    from PIL import ImageDraw, ImageFont
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    rng = np.random.default_rng(2012)
+    # the floor: polished dark grey granite, a fine salt-and-pepper speck over the tile's own grain
+    S = 2048; L = _lum(ph('granite_tile', 'Diffuse'), S); rel = (L / max(L.mean(), 1e-4)) ** 1.1
+    sp = rng.random((S, S)).astype(np.float32); speck = np.where(sp > 0.985, 1.9, np.where(sp < 0.02, 0.45, 1.0)).astype(np.float32)
+    speck = np.asarray(Image.fromarray((np.clip(speck / 2, 0, 1) * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.7)), np.float32) / 255 * 2
+    _save(lin((58, 58, 62))[None, None] * (rel * speck)[..., None], f'{out}/floor_color.jpg')
+    copy(ph('granite_tile', 'nor_gl'), f'{out}/floor_normal.jpg', size=1024)
+    copy(ph('granite_tile', 'Rough'), f'{out}/floor_rough.jpg', size=1024, mode='L')
+    # the panelling: a warm honey oak (the film's wall reads orange-gold under the LEDs)
+    tint(ph('oak_veneer_01', 'Diffuse'), f'{out}/oak_color.jpg', (170, 104, 50), size=2048, contrast=1.15)
+    copy(ph('oak_veneer_01', 'nor_gl'), f'{out}/oak_normal.jpg', size=1024)
+    # the vestibule's walls: a pale mint paint; the showroom's other plaster a warm white
+    tint(ph('painted_plaster_wall', 'Diffuse'), f'{out}/mint_color.jpg', (196, 222, 210), size=1024, contrast=0.25)
+    tint(ph('painted_plaster_wall', 'Diffuse'), f'{out}/plaster_color.jpg', (226, 222, 214), size=1024, contrast=0.2)
+    copy(ph('painted_plaster_wall', 'nor_gl'), f'{out}/plaster_normal.jpg', size=1024)
+    tint(ph('brown_leather', 'Diffuse'), f'{out}/leather_color.jpg', (24, 22, 22), size=1024, contrast=1.0)
+    copy(ph('brown_leather', 'nor_gl'), f'{out}/leather_normal.jpg', size=512)
+    tint(ph('velour_velvet', 'Diffuse'), f'{out}/velvet_color.jpg', (58, 112, 140), size=512, contrast=0.9)
+    tint(ph('velour_velvet', 'Diffuse'), f'{out}/tray_color.jpg', (30, 44, 86), size=512, contrast=0.9)
+    # the photo wall: 16 framed snapshots in one atlas (4 x 4), each two or three figures posing arm in arm before a
+    # bright party backdrop, a white border round the print
+    A = 1024; c_ = A // 4; P = Image.new('RGB', (A, A), (240, 238, 232)); d = ImageDraw.Draw(P)
+    backs = [(150, 40, 50), (30, 60, 120), (200, 170, 90), (60, 110, 80), (120, 120, 130), (180, 90, 40), (40, 40, 50), (210, 200, 190),
+             (90, 40, 110), (160, 30, 30), (20, 90, 140), (200, 120, 140), (70, 70, 60), (230, 210, 120), (110, 160, 190), (50, 30, 20)]
+    skins = [(224, 180, 150), (190, 140, 110), (120, 80, 60), (80, 52, 40), (210, 165, 135)]
+    suits = [(20, 20, 24), (230, 230, 230), (40, 50, 90), (120, 20, 30), (200, 190, 170), (30, 90, 50), (240, 240, 245)]
+    for k in range(16):
+        x0, y0 = (k % 4) * c_, (k // 4) * c_; m = 14
+        d.rectangle([x0 + m, y0 + m, x0 + c_ - m, y0 + c_ - m], fill=backs[k])
+        for j in range(int(rng.integers(5, 12))):                                       # bokeh and party lights
+            bx, by, r = x0 + m + rng.integers(0, c_ - 2 * m), y0 + m + rng.integers(0, c_ // 2), int(rng.integers(4, 14))
+            d.ellipse([bx - r, by - r, bx + r, by + r], fill=tuple(int(min(255, v * 1.5 + 40)) for v in backs[k]))
+        n = int(rng.integers(2, 4)); w = (c_ - 2 * m) / (n + 0.6)
+        for j in range(n):
+            cx = x0 + m + w * (j + 0.8); top = y0 + m + c_ * rng.uniform(0.22, 0.32); sk = skins[int(rng.integers(len(skins)))]
+            su = suits[int(rng.integers(len(suits)))]
+            d.rounded_rectangle([cx - w * 0.42, top + w * 0.42, cx + w * 0.42, y0 + c_ - m], radius=int(w * 0.25), fill=su)
+            d.ellipse([cx - w * 0.2, top, cx + w * 0.2, top + w * 0.48], fill=sk)
+            d.pieslice([cx - w * 0.22, top - w * 0.04, cx + w * 0.22, top + w * 0.3], 180, 360, fill=(30, 22, 18) if rng.random() < 0.7 else (120, 110, 100))
+    a = np.asarray(P.filter(ImageFilter.GaussianBlur(1.1)), np.float32) / 255
+    _save(srgb_to_lin(a), f'{out}/photos_color.jpg')
+    # the chains hung behind the cases: gold and pearl strands on a lilac-lit back (u across, v down)
+    W_, H_ = 1024, 1024; I = np.ones((H_, W_, 3), np.float32) * lin((212, 186, 222))
+    for x in range(4, W_, 9):
+        gold = rng.random() < 0.75; col = lin((214, 170, 80)) if gold else lin((236, 232, 222))
+        drop = int(H_ * rng.uniform(0.55, 0.98)); wd = 3 if gold else 4
+        v = np.arange(drop)[:, None]; shade = (0.75 + 0.25 * np.sin(v * (1.3 if gold else 0.9) + x))
+        I[:drop, x:x + wd] = col[None, None] * shade[..., None]
+    _save(I, f'{out}/chains_color.jpg')
+    # the letters 'KMH' in silver on the cases' pink frieze (u across, v up)
+    F = Image.new('RGB', (1024, 256), (228, 200, 210)); d = ImageDraw.Draw(F)
+    try: font = ImageFont.truetype('georgiab.ttf', 150)
+    except OSError: font = ImageFont.truetype('arialbd.ttf', 150)
+    d.text((512, 128), 'KMH', fill=(150, 150, 160), font=font, anchor='mm')
+    d.text((516, 132), 'KMH', fill=(96, 96, 108), font=font, anchor='mm')
+    d.text((510, 126), 'KMH', fill=(198, 198, 208), font=font, anchor='mm')
+    _save(srgb_to_lin(np.asarray(F, np.float32) / 255), f'{out}/kmh_color.jpg')
+    # the vestibule door's sign: a white card, 'WILL RETURN', a clock face with red hands
+    C = Image.new('RGB', (256, 320), (236, 236, 236)); d = ImageDraw.Draw(C)
+    d.rectangle([6, 6, 249, 313], outline=(30, 60, 150), width=8)
+    try: f2 = ImageFont.truetype('arialbd.ttf', 34)
+    except OSError: f2 = ImageFont.load_default()
+    d.text((128, 46), 'WILL RETURN', fill=(30, 40, 120), font=f2, anchor='mm')
+    d.ellipse([38, 86, 218, 266], fill=(250, 250, 250), outline=(30, 60, 150), width=8)
+    for k in range(12):
+        a_ = k * math.pi / 6; d.line([128 + 70 * math.sin(a_), 176 - 70 * math.cos(a_), 128 + 80 * math.sin(a_), 176 - 80 * math.cos(a_)], fill=(20, 20, 20), width=5)
+    d.line([128, 176, 128 + 50, 176 + 20], fill=(200, 30, 30), width=8); d.line([128, 176, 128 - 15, 176 - 60], fill=(200, 30, 30), width=8)
+    _save(srgb_to_lin(np.asarray(C, np.float32) / 255), f'{out}/sign_color.jpg')
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

@@ -57,7 +57,7 @@ const LIST: Title[] = [
   { slug: 'the-green-mile', kind: 'film', rank: 7, title: 'The Green Mile', year: 1999, imdb: { id: 'tt0120689' }, scene: 'E Block', room: 'the-green-mile' },
   { slug: 'shutter-island', kind: 'film', rank: 8, title: 'Shutter Island', year: 2010, imdb: { id: 'tt1130884' } },
   { slug: 'the-big-lebowski', kind: 'film', rank: 9, title: 'The Big Lebowski', year: 1998, imdb: { id: 'tt0118715' }, scene: 'Hollywood Star Lanes', room: 'the-big-lebowski' },
-  { slug: 'uncut-gems', kind: 'film', rank: 10, title: 'Uncut Gems', year: 2019, imdb: { id: 'tt5727208' } },
+  { slug: 'uncut-gems', kind: 'film', rank: 10, title: 'Uncut Gems', year: 2019, imdb: { id: 'tt5727208' }, scene: "Howard's showroom", room: 'uncut-gems' },
   { slug: 'mulholland-drive', kind: 'film', rank: 11, title: 'Mulholland Drive', year: 2001, imdb: { id: 'tt0166924' } },
   { slug: 'vertigo', kind: 'film', rank: 12, title: 'Vertigo', year: 1958, imdb: { id: 'tt0052357' } },
   { slug: 'la-la-land', kind: 'film', rank: 13, title: 'La La Land', year: 2016, imdb: { id: 'tt3783958' } },

@@ -2290,5 +2290,107 @@ def rear_window():
     save(h, 'lisa', 'f006_head_color.tga')
 
 
+def uncut_gems():
+    """Game seven at KMH (costumes by Miyako Bellizzi). Howard (Male_Adult_06, under the sculpted head) in a black
+    embossed-velour bomber zipped to the chest over a black tee, black trousers and shoes, a gold chain with a
+    pendant, a gold watch; Arno (Male_Adult_08) in a pale sage band-collar shirt, its long sleeves, charcoal trousers,
+    a gold watch; Phil (Business_Male_06) in a pale yellow striped shirt open at the neck over a white tee, dark grey
+    trousers; Nico (Male_Adult_14) in a maroon shirt, dark trousers, his head shaved."""
+    rng = np.random.default_rng(2012)
+    pat = _gt_pat
+    fill = lambda b, B, mask, colour, pattern=None, **kw: _gt_fill(b, B, mask, colour, pattern, **{'grow': 22, **kw})
+
+    def lower(b, B, r, trousers, belt, pattern=None, shoes=(16, 16, 18)):
+        z = np.nan_to_num(B.z)
+        legs = r['thighs'] | B.where(r['calves'] & (z > 0.09)) | B.where(r['torso'] & (z <= belt))
+        b = fill(b, B, legs, trousers, pattern, k=0.55, flatten=2)
+        feet = r['feet'] | B.where(r['calves'] & (z <= 0.09))
+        return fill(b, B, feet, shoes, k=0.5, flatten=1, grow=6), legs
+
+    def watch(b, B, r, colour=(196, 156, 70)):
+        ax = np.abs(np.nan_to_num(B.x)); wr = B.J['Bip01 L Hand'][0]
+        band = B.where(r['arms'] & (B.x > 0) & (np.abs(ax - (wr - 0.035)) < 0.014))
+        return fill(b, B, band, colour, k=0.3, flatten=0, grow=2)
+
+    # ---- Howard (Male_Adult_06, m011): the bomber over everything to the hips; the tee's neck; the chain and pendant
+    tex = 'm011_body_color.tga'
+    b = load('Male_Adult_06', tex); B = Body(tex); r = _gt_regions(B); neck, pel = r['neck'], r['pel']
+    x, z, y = np.nan_to_num(B.x), np.nan_to_num(B.z), np.nan_to_num(B.y)
+    belt = pel + 0.02
+    jacket = (B.where(r['torso'] & (z > belt)) | r['arms']) & ~r['hands']
+    emboss = np.clip(pat(B, 'floral_jacquard', 0.2, 1.6), 0.62, 1.4)                   # the velour's tone-on-tone pattern
+    b = fill(b, B, jacket, (22, 21, 24), emboss, k=0.6, flatten=4)
+    zip_ = B.where(jacket & (np.abs(x) < 0.006) & (y < -0.04) & (z < neck - 0.12))
+    b = fill(b, B, zip_, (60, 60, 64), k=0.3, flatten=0, grow=1)
+    tee = B.where(r['torso'] & (y < -0.03) & (np.abs(x) < 0.05 * np.clip((z - (neck - 0.12)) / 0.12, 0, 1) + 0.002) & (z > neck - 0.12))
+    b = fill(b, B, tee, (12, 12, 14), k=0.4, flatten=2, grow=2)
+    t = np.clip((neck - z) / 0.17, 0, 1)                                            # the chain: from the neck's sides to a point on the chest
+    chain = B.where(r['torso'] & (y < -0.02) & (np.abs(ax_ := np.abs(x)) - 0.055 * (1 - t) > -0.0035) & (np.abs(ax_ - 0.055 * (1 - t)) < 0.0035) & (z > neck - 0.17) & (z < neck + 0.01))
+    b = fill(b, B, chain, (214, 172, 84), k=0.2, flatten=0, grow=1)
+    pend = B.where(r['torso'] & (y < -0.02) & (np.hypot(x, z - (neck - 0.19)) < 0.014))
+    b = fill(b, B, pend, (226, 186, 96), k=0.2, flatten=0, grow=1)
+    b, legs = lower(b, B, r, (18, 18, 20), belt)
+    H_, S_, V_ = hsv(b)                                                             # the red jacket's edges in the padding, the sneakers' white soles
+    red = (S_ > 0.3) & ((H_ < 25) | (H_ > 330)) & (V_ > 0.06) & ~B.grow(B.where(r['hands']).astype(np.float32), 4).astype(bool)
+    b = recolour(b, soft(red.astype(np.float32), 1.0), (20, 20, 22), contrast=0.6)
+    sole = B.grow(B.where(r['feet'] | (r['calves'] & (z <= 0.09))).astype(np.float32), 8).astype(bool) & (V_ > 0.45)
+    b = recolour(b, soft(sole.astype(np.float32), 1.0), (16, 16, 18), contrast=0.5)
+    b = watch(b, B, r)
+    save(b, 'howard', tex)
+    _flat_normals('Male_Adult_06', 'm011_body_normal.tga', 'howard', B.grow((jacket | legs).astype(np.float32), 4) * 0.6)
+    h = load('Male_Adult_06', 'm011_head_color.tga'); Hd = Body('m011_head_color.tga')
+    h, hm, brow = _gt_head_hair(h, Hd, (20, 16, 14), front=0.06, contrast=0.8)
+    save(h, 'howard', 'm011_head_color.tga')
+
+    # ---- Arno (Male_Adult_08, m014): the sage shirt (tucked in), its band collar; charcoal trousers; the watch
+    tex = 'm014_body_color.tga'
+    b = load('Male_Adult_08', tex); B = Body(tex); r = _gt_regions(B); neck, pel = r['neck'], r['pel']
+    z = np.nan_to_num(B.z); belt = pel + 0.05
+    shirt = (B.where(r['torso'] & (z > belt)) | r['arms']) & ~r['hands']
+    b = fill(b, B, shirt, (178, 198, 180), np.clip(pat(B, 'stretch_poplin', 0.12, 0.6), 0.85, 1.15), k=0.55, flatten=3)
+    placket = B.where(shirt & (np.abs(np.nan_to_num(B.x)) < 0.012) & (np.nan_to_num(B.y) < -0.04) & (z < neck - 0.02))
+    b = fill(b, B, placket, (160, 182, 164), k=0.4, flatten=0, grow=1)
+    b = _gt_clasps(b, B, [0.0], [neck - 0.06 - 0.08 * i for i in range(5)], 0.005, (224, 224, 214))
+    b, legs = lower(b, B, r, (44, 44, 48), belt, np.clip(pat(B, 'rough_linen', 0.14, 0.6), 0.9, 1.1))
+    b = watch(b, B, r)
+    save(b, 'arno', tex)
+    _flat_normals('Male_Adult_08', 'm014_body_normal.tga', 'arno', B.grow((shirt | legs).astype(np.float32), 4) * 0.7)
+    h = load('Male_Adult_08', 'm014_head_color.tga'); Hd = Body('m014_head_color.tga')
+    h, hm, brow = _gt_head_hair(h, Hd, (24, 20, 18), front=0.06, contrast=0.8)
+    save(h, 'arno', 'm014_head_color.tga')
+    _hair_recolour('Male_Adult_08', 'm014_opacity_color.tga', 'arno', 'm014_opacity_color.tga', (26, 22, 20), contrast=1.0, shine=0.9)
+
+    # ---- Phil (Business_Male_06, m025): the yellow striped shirt open at the collar, the white tee in the vee
+    tex = 'm025_body_color.tga'
+    b = load('Business_Male_06', tex); B = Body(tex); r = _gt_regions(B); neck, pel = r['neck'], r['pel']
+    z = np.nan_to_num(B.z); belt = pel + 0.05
+    shirt = (B.where(r['torso'] & (z > belt)) | r['arms']) & ~r['hands']
+    st = _stripes(B, 0.016, [(0.0, 0.18, (246, 244, 226)), (0.5, 0.08, (206, 184, 92))], (232, 220, 142))
+    b = _paint(b, soft(B.grow(shirt.astype(np.float32), 12), 0.7), st, k=0.45, flatten=4)
+    vee = B.where((np.abs(B.x) < 0.045 * np.clip((z - (neck - 0.12)) / 0.12, 0, 1)) & (z > neck - 0.12) & (B.y < -0.02)) & r['torso']
+    b = fill(b, B, vee, (232, 230, 222), k=0.4, grow=2)
+    b, legs = lower(b, B, r, (56, 56, 60), belt, np.clip(pat(B, 'rough_linen', 0.14, 0.6), 0.9, 1.1))
+    b = watch(b, B, r, (200, 200, 206))
+    save(b, 'phil', tex)
+    _flat_normals('Business_Male_06', 'm025_body_normal.tga', 'phil', B.grow((shirt | legs).astype(np.float32), 4) * 0.6)
+    h = load('Business_Male_06', 'm025_head_color.tga'); Hd = Body('m025_head_color.tga')
+    h, hm, brow = _gt_head_hair(h, Hd, (142, 130, 108), front=0.07, contrast=0.9)
+    save(h, 'phil', 'm025_head_color.tga')
+
+    # ---- Nico (Male_Adult_14, m012): the maroon shirt, dark trousers; his head shaved
+    tex = 'm012_body_color.tga'
+    b = load('Male_Adult_14', tex); B = Body(tex); r = _gt_regions(B); neck, pel = r['neck'], r['pel']
+    z = np.nan_to_num(B.z); belt = pel + 0.05
+    shirt = (B.where(r['torso'] & (z > belt)) | r['arms']) & ~r['hands']
+    b = fill(b, B, shirt, (64, 18, 26), np.clip(pat(B, 'stretch_poplin', 0.12, 0.6), 0.85, 1.15), k=0.55, flatten=3)
+    vee = B.where((np.abs(B.x) < 0.03 * np.clip((z - (neck - 0.08)) / 0.08, 0, 1)) & (z > neck - 0.08) & (B.y < -0.02)) & r['torso']
+    b = _skin_paint(b, B, vee, rng)
+    b, legs = lower(b, B, r, (30, 30, 34), belt, np.clip(pat(B, 'denim_fabric_04', 0.12, 0.6), 0.9, 1.1))
+    save(b, 'nico', tex)
+    _flat_normals('Male_Adult_14', 'm012_body_normal.tga', 'nico', B.grow((shirt | legs).astype(np.float32), 4) * 0.7)
+    h = load('Male_Adult_14', 'm012_head_color.tga'); Hd = Body('m012_head_color.tga')
+    hb = _bald(h, Hd, shine=0.2); save(np.where(np.isfinite(hb), hb, h), 'nico', 'm012_head_color.tga')
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()

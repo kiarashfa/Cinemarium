@@ -29,6 +29,7 @@ export const ROOMS: Record<string, RoomLoader> = {
   'pulp-fiction': baked('pulp-fiction'),
   'the-green-mile': baked('the-green-mile'),
   'rear-window': baked('rear-window'),
+  'uncut-gems': baked('uncut-gems', () => import('./gems-screen').then(m => m.gemsScreen)),
 };
 
 const cache = new Map<string, Promise<Room>>();
