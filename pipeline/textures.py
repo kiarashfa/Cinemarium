@@ -1470,6 +1470,33 @@ def uncut_gems(out):
     _save(srgb_to_lin(np.asarray(C, np.float32) / 255), f'{out}/sign_color.jpg')
 
 
+def twin_peaks(out):
+    """The Red Room as dreamt in 1990: scarlet velvet drapes; the zigzag floor, cocoa and cream bands across the room;
+    black crushed velvet on the club chairs, a figured damask in it; the chairs' bent wood bands; white marble."""
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png')
+    lin = lambda c: srgb_to_lin(np.array(c, np.float32) / 255)
+    tint(ph('velour_velvet', 'Diffuse'), f'{out}/drape_color.jpg', (142, 10, 18), size=1024, contrast=0.8)
+    copy(ph('velour_velvet', 'nor_gl'), f'{out}/drape_normal.jpg', size=1024)
+    # the floor: one tile of 3.2 m (four zigs of 0.8 m across, ten bands of 0.32 m deep), drawn at twice the size
+    # and brought down (the bands' edges smooth), a faint mottle and wear over the paint
+    T, S = 3.2, 2048; n = S * 2
+    u = (np.arange(n, dtype=np.float32) + 0.5) / n * T
+    U, V = np.meshgrid(u, u)
+    P, A, Wb = 0.8, 0.34, 0.32
+    tri = A * 2 * np.abs((U / P) % 1.0 - 0.5)
+    band = np.floor((V - tri) / Wb).astype(np.int32) % 2
+    m = np.asarray(Image.fromarray((band * 255).astype(np.uint8)).resize((S, S), Image.LANCZOS), np.float32) / 255
+    cream, cocoa = lin((214, 190, 156)), lin((70, 44, 31))
+    mott = 0.95 + 0.1 * _noise(S, 40, 7)[..., None]
+    wear = 1.0 + 0.05 * (_noise(S, 6, 8)[..., None] - 0.5)
+    _save((cocoa[None, None] * (1 - m[..., None]) + cream[None, None] * m[..., None]) * mott * wear, f'{out}/floor_color.jpg')
+    # the chairs: near-black crushed velvet, a damask figure showing in its pile
+    tint(ph('quatrefoil_jacquard_fabric', 'Diffuse'), f'{out}/chair_color.jpg', (30, 25, 28), size=1024, contrast=1.5)
+    copy(ph('velour_velvet', 'nor_gl'), f'{out}/chair_normal.jpg', size=1024)
+    tint(ph('rosewood_veneer1', 'Diffuse'), f'{out}/band_color.jpg', (122, 64, 32), size=1024, contrast=1.1)
+    tint(ph('marble_01', 'Diffuse'), f'{out}/marble_color.jpg', (226, 222, 214), size=1024, contrast=0.5)
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

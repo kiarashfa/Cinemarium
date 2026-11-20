@@ -425,6 +425,23 @@ ROOMS['uncut-gems'] = async () => {
   for (const m of ['potted_plant_02', 'wall_clock', 'security_camera_01']) await polyhaven(m, '1k', 'gltf');
 };
 
+ROOMS['twin-peaks'] = async () => {
+  // the agent (Business_Male_01: the suit), Laura (Female_Adult_15), the man from another place (Male_Adult_06,
+  // re-proportioned) and the giant (Male_Adult_12), under sculpted heads
+  for (const a of ['Professions/Business_Male_01', 'Adults/Female_Adult_15', 'Adults/Male_Adult_06', 'Adults/Male_Adult_12']) await avatar(a);
+  const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+  for (const c of ['m_sit_chair_breathe_01', 'm_sit_chair_idle_relaxed_01', 'm_sit_chair_idle_neutral_01', 'm_sit_chair_gestic_shrug_01', 'f_sit_chair_breathe_01',
+    'f_sit_chair_idle_touch_face', 'm_idle_breathe_01', 'f_idle_breathe_01', 'm_gestic_talk_neutral_02', 'm_dancing_cool']) await clip(S, c);
+  for (const c of ['m_walk_slow_01', 'f_walk_slow_01']) await clip(XY, c);
+  for (const c of ['m_sit_down_chair_01', 'm_sit_stand_up_chair_01', 'f_sit_down_chair_01', 'f_sit_stand_up_chair_01']) await clip(XYZ, c);
+  // the drapes, the chairs' velvet and damask, their wooden bands, marble; the people's cloth
+  for (const t of ['velour_velvet', 'quatrefoil_jacquard_fabric', 'rosewood_veneer1', 'marble_01', 'poly_wool_herringbone', 'stretch_poplin',
+    'floral_jacquard']) await polyhaven(t, '2k', 'tex');
+  sketchfab('venus_de_milo_smk.glb', 'https://sketchfab.com/3d-models/venus-de-milo-statuestexturingchallenge-smk-2983d92ac4e744f485492580ca7629f2 (by SMK – National Gallery of Denmark)', 'CC0 1.0');
+  sketchfab('cooper_yugengen.glb', 'https://sketchfab.com/3d-models/agent-dale-cooper-40dea6f8cd5c474abcb6c42f966c221d (by yugengen)', 'CC BY 4.0');
+  sketchfab('laura_yugengen.glb', 'https://sketchfab.com/3d-models/laura-palmer-760d7537ce2548e9a9c62483a3dd1aa7 (by yugengen)', 'CC BY 4.0');
+};
+
 const room = process.argv[2];
 if (!ROOMS[room]) { console.error('usage: node pipeline/fetch.mjs <' + Object.keys(ROOMS).join('|') + '>'); process.exit(1); }
 await ROOMS[room]();

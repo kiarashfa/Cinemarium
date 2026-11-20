@@ -218,6 +218,7 @@ export async function bakedRoom(id: string, screen?: Screen): Promise<Room> {
     body.traverse(o => {
       const m = o as THREE.SkinnedMesh; if (!m.isMesh) return;
       m.frustumCulled = false;
+      m.userData.ignoreFit = true;     // its bounds are the rest pose (arms out where it stands), not where it moves
       const src = m.material as THREE.MeshStandardMaterial;
       const mat = new THREE.MeshPhysicalNodeMaterial();
       for (const k of COPY) { const v = (src as any)[k]; if (v === undefined) continue; const cur = (mat as any)[k]; if (cur?.copy && (v?.isColor || v?.isVector2)) cur.copy(v); else (mat as any)[k] = v; }

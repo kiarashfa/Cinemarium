@@ -2392,5 +2392,92 @@ def uncut_gems():
     hb = _bald(h, Hd, shine=0.2); save(np.where(np.isfinite(hb), hb, h), 'nico', 'm012_head_color.tga')
 
 
+def twin_peaks():
+    """The Red Room in the agent's dream (1990; costumes by Patricia Norris). Dale (Business_Male_01, under the
+    sculpted head) in a black suit, white shirt, the red tie; Laura (Female_Adult_15, under the sculpted head) in a long
+    black velvet dress with long sleeves and a deep V, a brooch at its point (the skirt is modelled); the man from
+    another place (Male_Adult_06, re-proportioned) in a red suit over a red shirt open at the collar, black shoes, his
+    hair dark and combed back; the giant (Male_Adult_12) in a dark grey suit, white shirt, black bow tie, grey hair."""
+    rng = np.random.default_rng(1990)
+    pat = _gt_pat
+    fill = lambda b, B, mask, colour, pattern=None, **kw: _gt_fill(b, B, mask, colour, pattern, **{'grow': 22, **kw})
+
+    def shoes(b, B, r, colour=(14, 14, 16)):
+        feet = r['feet'] | B.where(r['calves'] & (B.z <= 0.09))
+        return fill(b, B, feet, colour, k=0.5, flatten=1, grow=6)
+
+    # ---- Dale (Business_Male_01, m005): the suit black; the shirt left white; the red tie kept, a deeper red
+    b = load('Business_Male_01', 'm005_body_color.tga'); B = Body('m005_body_color.tga'); r = _gt_regions(B)
+    H, S, V = hsv(b)
+    red = (S > 0.4) & ((H < 25) | (H > 330)) & (V > 0.12) & ~B.grow(B.where(r['hands']).astype(np.float32), 6).astype(bool)   # the tie, not the hands
+    b = recolour(b, soft(red.astype(np.float32), 1.2), (132, 20, 26), contrast=0.9)
+    suit = (r['torso'] | r['arms'] | r['thighs'] | r['calves']) & ~r['hands'] & ~B.where((V > 0.55) & (S < 0.15)) & ~red
+    b = recolour(b, B.grow(suit.astype(np.float32), 4) * 0.5, (20, 20, 22), contrast=0.8)
+    b = shoes(b, B, r)
+    save(b, 'dale', 'm005_body_color.tga')
+
+    # ---- Laura (Female_Adult_15, f018): black velvet from the neck to the wrists and the feet, a deep V to the brooch
+    b = load('Female_Adult_15', 'f018_body_color.tga'); B = Body('f018_body_color.tga'); r = _gt_regions(B)
+    dress = (r['torso'] | r['arms'] | r['thighs'] | r['calves'] | r['feet']) & ~r['hands']
+    open_ = np.clip((B.z - (r['neck'] - 0.2)) / 0.16, 0, 1) * 0.06
+    vee = B.where((np.abs(B.x) < open_) & (B.z > r['neck'] - 0.2) & (B.y < 0))
+    H_, S_, V_ = hsv(b)
+    bare = (H_ < 40) & (S_ > 0.22) & (V_ > 0.3)
+    collar = B.where((B.z > r['neck'] - 0.06) & ~bare & ~r['hands'])
+    velvet = np.clip(pat(B, 'velour_velvet', 0.2, 0.9), 0.7, 1.35)
+    b = fill(b, B, (dress | collar) & ~vee, (16, 13, 16), velvet, k=0.55, flatten=4)
+    cuffs = B.where(r['hands'] & ~bare)                                     # the blouse's cuffs at the wrists: the velvet sleeve's
+    b = fill(b, B, cuffs, (16, 13, 16), velvet, k=0.55, flatten=4, grow=2)
+    match = np.array([1.0, 0.98, 0.97], np.float32)                         # her skin as the sculpted face has it
+    b = _skin_paint(b, B, vee, rng, warm=tuple(match))
+    brooch = B.where(r['torso'] & (B.y < 0) & (np.hypot(B.x, B.z - (r['neck'] - 0.215)) < 0.022))
+    b = fill(b, B, brooch, (176, 166, 150), pat(B, 'floral_jacquard', 0.04, 1.6), k=0.2, flatten=0, grow=2)
+    hs = B.where(r['hands'] & bare)[..., None]; b = np.clip(b * np.where(hs, match[None, None, :], 1.0), 0, 1)
+    save(b, 'laura', 'f018_body_color.tga')
+    h = load('Female_Adult_15', 'f018_head_color.tga')
+    save(np.clip(h * np.array([0.98, 1.05, 1.14], np.float32)[None, None, :], 0, 1), 'laura', 'f018_head_color.tga')
+    _flat_normals('Female_Adult_15', 'f018_body_normal.tga', 'laura', B.grow(dress.astype(np.float32), 4) * 0.9)
+    vv_ = _gt_cloth('velour_velvet')
+    save(np.array([16, 13, 16], np.float32)[None, None] / 255 * np.clip(vv_ ** 0.9, 0.7, 1.35)[..., None], 'laura', 'gown.tga')
+
+    # ---- the man from another place (Male_Adult_06, m011): the red suit over the red shirt, its collar open
+    b = load('Male_Adult_06', 'm011_body_color.tga'); B = Body('m011_body_color.tga'); r = _gt_regions(B); neck, pel = r['neck'], r['pel']
+    x, z, y = np.nan_to_num(B.x), np.nan_to_num(B.z), np.nan_to_num(B.y)
+    suit = (r['torso'] | r['arms'] | r['thighs'] | B.where(r['calves'] & (z > 0.09))) & ~r['hands']
+    b = fill(b, B, suit, (150, 22, 26), np.clip(pat(B, 'poly_wool_herringbone', 0.16, 0.6), 0.85, 1.15), k=0.55, flatten=4)
+    shirt = B.where(r['torso'] & (y < -0.02) & (np.abs(x) < 0.07 * np.clip((z - (neck - 0.2)) / 0.2, 0, 1) + 0.002) & (z > neck - 0.2))
+    b = fill(b, B, shirt, (124, 16, 22), np.clip(pat(B, 'stretch_poplin', 0.12, 0.6), 0.85, 1.15), k=0.45, flatten=2, grow=2)
+    lapel = B.where(r['torso'] & (y < -0.02) & (z > neck - 0.26) & (z < neck - 0.02) &
+                    (np.abs(np.abs(x) - (0.004 + 0.1 * np.clip((z - (neck - 0.26)) / 0.24, 0, 1))) < 0.005))     # the jacket's lapel edges, shadowed
+    b = fill(b, B, lapel, (84, 10, 14), k=0.3, flatten=0, grow=1)
+    b = _gt_clasps(b, B, [0.0], [neck - 0.31, neck - 0.4], 0.009, colour=(70, 10, 12))
+    hem = B.where(r['torso'] & (np.abs(z - (pel - 0.06)) < 0.004))
+    b = fill(b, B, hem, (96, 12, 16), k=0.3, flatten=0, grow=1)
+    throat = B.where(r['torso'] & (y < -0.02) & (np.abs(x) < 0.03 * np.clip((z - (neck - 0.07)) / 0.07, 0, 1)) & (z > neck - 0.07))
+    b = _skin_paint(b, B, throat, rng)
+    b = shoes(b, B, r)
+    save(b, 'arm', 'm011_body_color.tga')
+    _flat_normals('Male_Adult_06', 'm011_body_normal.tga', 'arm', B.grow(suit.astype(np.float32), 4) * 0.7)
+    h = load('Male_Adult_06', 'm011_head_color.tga'); Hd = Body('m011_head_color.tga')
+    h, hm, brow = _gt_head_hair(h, Hd, (22, 18, 16), front=0.07, contrast=0.8)
+    save(h, 'arm', 'm011_head_color.tga')
+
+    # ---- the giant (Male_Adult_12, m007): the dark grey suit, a white shirt front, the black bow tie
+    b = load('Male_Adult_12', 'm007_body_color.tga'); B = Body('m007_body_color.tga'); r = _gt_regions(B); neck = r['neck']
+    x, z, y = np.nan_to_num(B.x), np.nan_to_num(B.z), np.nan_to_num(B.y)
+    suit = (r['torso'] | r['arms'] | r['thighs'] | B.where(r['calves'] & (z > 0.09))) & ~r['hands']
+    b = fill(b, B, suit, (38, 38, 42), np.clip(pat(B, 'poly_wool_herringbone', 0.16, 0.6), 0.85, 1.15), k=0.55, flatten=4)
+    front = B.where(r['torso'] & (y < -0.02) & (np.abs(x) < 0.07 * np.clip((z - (neck - 0.26)) / 0.22, 0, 1) + 0.002) & (z > neck - 0.26))
+    b = fill(b, B, front, (226, 226, 220), k=0.45, flatten=2, grow=2)
+    bow = B.where(r['torso'] & (y < -0.02) & (np.abs(z - (neck - 0.035)) < 0.011 + 0.25 * np.abs(x)) & (np.abs(x) < 0.042))
+    b = fill(b, B, bow, (12, 12, 14), k=0.3, flatten=0, grow=1)
+    b = shoes(b, B, r)
+    save(b, 'giant', 'm007_body_color.tga')
+    _flat_normals('Male_Adult_12', 'm007_body_normal.tga', 'giant', B.grow(suit.astype(np.float32), 4) * 0.7)
+    h = load('Male_Adult_12', 'm007_head_color.tga'); Hd = Body('m007_head_color.tga')
+    h, hm, brow = _gt_head_hair(h, Hd, (128, 124, 118), front=0.08, contrast=0.8)
+    save(h, 'giant', 'm007_head_color.tga')
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()

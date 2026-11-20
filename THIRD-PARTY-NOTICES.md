@@ -152,7 +152,25 @@ Licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and obtained 
   [Tripo Studio](https://studio.tripo3d.ai) from stills of the film, then simplified, cut to the head and neck, their
   crowns closed where the stills cut them off, and set on Rocketbox bodies. Nico wears his Rocketbox avatar's own head.
 
+## The Red Room: CC BY 4.0
+
+Licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). They furnish and people the Twin Peaks room.
+
+- ["Agent Dale Cooper"](https://sketchfab.com/3d-models/agent-dale-cooper-40dea6f8cd5c474abcb6c42f966c221d) by
+  [yugengen](https://sketchfab.com/yugengen). Changes: its head only, simplified, given a neck, its colour re-projected,
+  and set on a Rocketbox body (see above).
+- ["Laura Palmer"](https://sketchfab.com/3d-models/laura-palmer-760d7537ce2548e9a9c62483a3dd1aa7) by
+  [yugengen](https://sketchfab.com/yugengen). Changes: simplified, its up-do pressed down to the skull under modelled
+  long hair, cut below the neck and set on a Rocketbox body (see above).
+- The heads of the man from another place and of the giant were made with [Tripo Studio](https://studio.tripo3d.ai)
+  from stills, then simplified, opened under the neck and set on Rocketbox bodies; the first's colour corrected.
+
 ## Public domain
+
+- ["Venus de Milo #StatuesTexturingChallenge [SMK]"](https://sketchfab.com/3d-models/venus-de-milo-statuestexturingchallenge-smk-2983d92ac4e744f485492580ca7629f2)
+  by [SMK – National Gallery of Denmark](https://sketchfab.com/smkmuseum), a scan of a plaster cast, dedicated to the public
+  domain ([CC0](https://creativecommons.org/publicdomain/zero/1.0/)). Changes: simplified, made white marble, set on a
+  plinth in the Twin Peaks room.
 
 - The Constitution of the United States (1787), page one: the U.S. National Archives' scan, via
   [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Constitution_of_the_United_States,_page_1.jpg); in the

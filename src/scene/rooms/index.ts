@@ -30,6 +30,7 @@ export const ROOMS: Record<string, RoomLoader> = {
   'the-green-mile': baked('the-green-mile'),
   'rear-window': baked('rear-window'),
   'uncut-gems': baked('uncut-gems', () => import('./gems-screen').then(m => m.gemsScreen)),
+  'twin-peaks': baked('twin-peaks'),
 };
 
 const cache = new Map<string, Promise<Room>>();

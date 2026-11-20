@@ -29,7 +29,7 @@ const LIST: Title[] = [
   // series: the ten in the club (ranks 1-10), then ten honourable mentions
   { slug: 'breaking-bad', kind: 'series', rank: 1, title: 'Breaking Bad', year: 2008, imdb: { id: 'tt0903747' }, scene: "Saul Goodman's office", room: 'breaking-bad' },
   { slug: 'the-sopranos', kind: 'series', rank: 2, title: 'The Sopranos', year: 1999, imdb: { id: 'tt0141842' }, scene: "Dr. Melfi's office", room: 'the-sopranos' },
-  { slug: 'twin-peaks', kind: 'series', rank: 3, title: 'Twin Peaks', year: 1990, imdb: { id: 'tt0098936' } },
+  { slug: 'twin-peaks', kind: 'series', rank: 3, title: 'Twin Peaks', year: 1990, imdb: { id: 'tt0098936' }, scene: 'The Red Room', room: 'twin-peaks' },
   { slug: 'lost', kind: 'series', rank: 4, title: 'LOST', year: 2004, imdb: { id: 'tt0411008' }, scene: 'The Swan station', room: 'lost' },
   { slug: 'seinfeld', kind: 'series', rank: 5, title: 'Seinfeld', year: 1989, imdb: { id: 'tt0098904' }, scene: "Jerry's apartment, 5A", room: 'seinfeld' },
   { slug: 'house-md', kind: 'series', rank: 6, title: 'House M.D.', year: 2004, imdb: { id: 'tt0412142' } },

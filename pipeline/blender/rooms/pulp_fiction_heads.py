@@ -23,6 +23,16 @@ HEADS = {
     'phil': dict(src=os.path.join(cine.CACHE, 'tripo', 'phil_meshopt.glb'), ratio=0.03, turn=-90 + 10, regrade=((178, 140, 120), 0.9),
                  crop=(-0.21, -0.11, 0.0, 0.18, 0.01), crown=(0.075, (126, 116, 98)), neck=(0.19, -0.6)),
     'nico': dict(src=os.path.join(cine.CACHE, 'tripo', 'nico_meshopt.glb'), ratio=0.03, turn=-90),
+    # Twin Peaks: fans' models (yugengen, CC BY). Cooper is a whole figure: his head kept, a neck made under it. Laura
+    # is a prom bust: the up-do, its bun and the curls at her temples pressed down onto the skull (long hair goes over).
+    'dale': dict(src=os.path.join(cine.CACHE, 'sketchfab', 'cooper_yugengen.glb'), ratio=1.0, regrade=((200, 150, 125), 0.0), crop=(1.24, 1.40, -0.012, 0.205, 1.563), neck=(0.14, 1.0)),
+    'laura': dict(src=os.path.join(cine.CACHE, 'sketchfab', 'laura_yugengen.glb'), ratio=0.7,
+                  squash=dict(c=(-0.087, 0.07, 0.30), r=(0.36, 0.45, 0.44), face=(-0.16, 0.52), floor=-0.1)),
+    # the man from another place and the giant: from stills, made in Tripo Studio (the first graded red by the room)
+    'arm': dict(src=os.path.join(cine.CACHE, 'tripo', 'arm_meshopt.glb'), ratio=0.03, turn=-90, regrade=((176, 134, 116), 0.85),
+                crop=(-0.50, -0.18, 0.0, 9.0, -0.03), neck=(0.25, -0.95)),
+    'giant': dict(src=os.path.join(cine.CACHE, 'tripo', 'giant_meshopt.glb'), ratio=0.03, turn=-90, regrade=((200, 160, 150), 0.0), uncap=0.03,
+                  crop=(-9.0, -9.0, 0.0, 9.0, 0.03), neck=(0.25, -0.95)),
 }
 SIZE = 2048
 
@@ -35,6 +45,16 @@ def _crop_and_crown(hi, h):
     bm = bmesh.new(); bm.from_mesh(hi.data)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)                 # the import splits vertices at UV seams
     ys = [v.co.y for v in bm.verts]; y0, y1 = min(ys), max(ys)
+    if h.get('uncap'):                                                      # a closed sculpt: the flat cap the generator put under its neck taken off
+        down = [f for f in bm.faces if f.normal.z < -0.85]
+        if down:
+            n = sum((f.normal * f.calc_area() for f in down), Vector()).normalized()
+            big = max(down, key=lambda f: f.calc_area() if f.normal.dot(n) > 0.995 else 0.0); d0 = big.calc_center_median().dot(n)
+            band = h['uncap'] if not isinstance(h['uncap'], bool) else 0.0     # and a band of skin above it: a clean edge to carry a neck from
+            cap = [f for f in bm.faces if f.calc_center_median().dot(n) > d0 - 0.012 - band]
+            bmesh.ops.delete(bm, geom=cap, context='FACES')
+            bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
+            cine.log('uncapped', len(cap), 'faces')
     if h.get('crop'):
         chin, nape, xc, hw, eye = h['crop']
         dead = []
@@ -44,6 +64,17 @@ def _crop_and_crown(hi, h):
         bmesh.ops.delete(bm, geom=dead, context='FACES')
         bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context='VERTS')
         cine.log('cropped', len(dead), 'faces')
+    sq = h.get('squash')
+    if sq:                                                                  # an up-do pressed down onto the skull: every hair vertex outside an
+        c, r = Vector(sq['c']), Vector(sq['r'])                             # ellipsoid (the skull under the hair) is brought onto it, the face left
+        fy, fz = sq['face']                                                 # (in front of y = fy, below z = fz); no holes, the cards cover it
+        n = 0
+        for v in bm.verts:
+            p = v.co
+            if p.z < sq['floor'] or (p.y < fy and p.z < fz): continue
+            d = Vector(((p.x - c.x) / r.x, (p.y - c.y) / r.y, (p.z - c.z) / r.z)); k = d.length
+            if k > 1.0: v.co = c + (p - c) / k; n += 1
+        cine.log('squashed', n, 'vertices onto the skull')
     if h.get('crown'):
         H, colour = h['crown']
         ups = sorted(f.calc_center_median().z for f in bm.faces if f.normal.z > 0.97)
@@ -189,7 +220,7 @@ def main(who):
     if h.get('roll'):                                                     # a head tilted to one side in its still: its eyes brought level
         bpy.context.view_layer.update(); hi.matrix_world = Matrix.Rotation(math.radians(h['roll']), 4, 'Y') @ hi.matrix_world
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-    if h.get('crop') or h.get('crown') or h.get('neck'): _crop_and_crown(hi, h)
+    if h.get('crop') or h.get('crown') or h.get('neck') or h.get('squash') or h.get('uncap'): _crop_and_crown(hi, h)
     lo = hi.copy(); lo.data = hi.data.copy(); lo.name = f'{who}_head'; sc.collection.objects.link(lo)
     bpy.context.view_layer.objects.active = lo
     bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.mesh.remove_doubles(threshold=1e-5); bpy.ops.object.mode_set(mode='OBJECT')
