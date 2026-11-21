@@ -1497,6 +1497,156 @@ def twin_peaks(out):
     tint(ph('marble_01', 'Diffuse'), f'{out}/marble_color.jpg', (226, 222, 214), size=1024, contrast=0.5)
 
 
+def mr_robot(out):
+    """The arcade on the night of the hack: a worn concrete floor; the roll-shutter wall with the old painted CONEY
+    letters; skee-ball lanes (maple boards, the target's rings, the lit backglass); the signs (GAMES in three neons,
+    TICKETS banners, the CONCESSION board, TICKET CENTER, NO SMOKING); the 00 machine's face; the prize cases'
+    shelves; slot and cabinet faces; the two screens on the hackers' table."""
+    from PIL import ImageDraw, ImageFont
+    ph = lambda i, m: os.path.join(CACHE, 'polyhaven', i, f'{m}.png' if os.path.exists(os.path.join(CACHE, 'polyhaven', i, f'{m}.png')) else f'{m}.jpg')
+    def font(name, size):
+        for n in (name, 'arialbd.ttf'):
+            try: return ImageFont.truetype(n, size)
+            except OSError: pass
+        return ImageFont.load_default()
+    rng = np.random.default_rng(59)
+    # the floor: worn concrete, dark and dirty, sealer gone in the walkways
+    tint(ph('worn_concrete_floor', 'Diffuse'), f'{out}/floor_color.jpg', (64, 61, 58), size=2048, contrast=0.55)
+    copy(ph('worn_concrete_floor', 'nor_gl'), f'{out}/floor_normal.jpg', size=1024)
+    copy(ph('worn_concrete_floor', 'Rough'), f'{out}/floor_rough.jpg', size=1024, mode='L')
+    # the shutters and the corrugated wall: painted metal, faded
+    tint(ph('painted_metal_shutter', 'Diffuse'), f'{out}/shutter_color.jpg', (118, 122, 124), size=1024, contrast=0.9)
+    copy(ph('painted_metal_shutter', 'nor_gl'), f'{out}/shutter_normal.jpg', size=1024)
+    tint(ph('corrugated_iron_02', 'Diffuse'), f'{out}/iron_color.jpg', (92, 96, 98), size=1024, contrast=0.9)
+    copy(ph('corrugated_iron_02', 'nor_gl'), f'{out}/iron_normal.jpg', size=1024)
+    # the old CONEY letters painted on the corrugated wall (a 4 x 2 m panel), chipped
+    W_, H_ = 2048, 1024
+    base = np.asarray(Image.open(f'{out}/iron_color.jpg').resize((1024, 1024)), np.float32) / 255
+    base = np.tile(base, (1, 2, 1))[:, :W_]
+    P = Image.new('L', (W_, H_), 0); d = ImageDraw.Draw(P)
+    d.text((W_ // 2, H_ // 2 + 40), 'CONEY', fill=255, font=font('impact.ttf', 640), anchor='mm')
+    m = np.asarray(P, np.float32) / 255 * (_noise(1024, 3, 5)[:, :].repeat(2, 1)[:, :W_] > 0.28)
+    paint = np.array([196, 160, 52], np.float32) / 255 * (0.8 + 0.3 * base.mean(-1, keepdims=True))
+    out_ = base * (1 - m[..., None]) + paint * m[..., None]
+    Image.fromarray((np.clip(out_, 0, 1) * 255).astype(np.uint8)).save(f'{out}/coney_color.jpg', quality=92)
+    # the walls: painted block, a dark aubergine; the ceiling (bounce only)
+    tint(ph('painted_concrete', 'Diffuse'), f'{out}/wall_color.jpg', (46, 36, 44), size=1024, contrast=0.6)
+    copy(ph('painted_concrete', 'nor_gl'), f'{out}/wall_normal.jpg', size=1024)
+    tint(ph('plywood', 'Diffuse'), f'{out}/lane_color.jpg', (196, 158, 104), size=1024, contrast=0.8)
+    tint(ph('wood_table_worn', 'Diffuse'), f'{out}/table_color.jpg', (40, 34, 30), size=1024, contrast=0.8)
+
+    def neon(draw, xy, text, f, colour, glow=10):
+        """Neon tubes drawn as text: a soft wide glow, the tube, its white-hot core."""
+        L = Image.new('RGB', draw.im.size if hasattr(draw, 'im') else (1, 1), (0, 0, 0))
+        return L
+
+    def neon_board(size, lines, bg=(8, 6, 10), out_name=None):
+        """A sign board of neon lines [(text, font, size, colour, y)]: the glow blurred under the tube; written as the
+        colour map (also the emission map)."""
+        img = Image.new('RGB', size, bg)
+        glow = Image.new('RGB', size, (0, 0, 0)); g = ImageDraw.Draw(glow)
+        tube = Image.new('RGB', size, (0, 0, 0)); t = ImageDraw.Draw(tube)
+        for text, fn, fs, col, y in lines:
+            F = font(fn, fs)
+            g.text((size[0] // 2, y), text, font=F, fill=col, anchor='mm', stroke_width=fs // 9, stroke_fill=col)
+            t.text((size[0] // 2, y), text, font=F, fill=(0, 0, 0), anchor='mm', stroke_width=max(2, fs // 22), stroke_fill=tuple(min(255, int(c * 0.6 + 110)) for c in col))
+        gl = np.asarray(glow.filter(ImageFilter.GaussianBlur(size[1] / 40)), np.float32) * 1.3
+        tb = np.asarray(tube, np.float32)
+        o = np.clip(np.asarray(img, np.float32) + gl * 0.55 + tb, 0, 255)
+        Image.fromarray(o.astype(np.uint8)).save(f'{out}/{out_name}', quality=92)
+    neon_board((1024, 640), [('GAMES', 'impact.ttf', 190, (255, 40, 60), 130), ('GAMES', 'impact.ttf', 170, (196, 60, 255), 320),
+                             ('GAMES', 'impact.ttf', 150, (40, 230, 170), 495)], out_name='sign_games.jpg')
+    neon_board((1024, 384), [('Tickets', 'BRUSHSCI.TTF', 240, (255, 214, 40), 190)], bg=(150, 14, 20), out_name='sign_tickets.jpg')
+    # CONCESSION: a white light box, black letters, a little horse and rider at the left
+    C = Image.new('RGB', (2048, 256), (236, 236, 228)); d = ImageDraw.Draw(C)
+    d.text((1100, 128), 'CONCESSION', fill=(18, 18, 20), font=font('impact.ttf', 200), anchor='mm')
+    d.ellipse((90, 40, 260, 210), outline=(18, 18, 20), width=10); d.polygon([(130, 170), (170, 80), (220, 100), (200, 175)], fill=(18, 18, 20))
+    C.save(f'{out}/sign_concession.jpg', quality=92)
+    T = Image.new('RGB', (1024, 384), (24, 18, 40)); d = ImageDraw.Draw(T)
+    d.rounded_rectangle((20, 20, 1004, 364), 40, outline=(240, 210, 60), width=14)
+    d.text((512, 150), 'TICKET', fill=(255, 226, 90), font=font('BRUSHSCI.TTF', 170), anchor='mm', stroke_width=4, stroke_fill=(150, 40, 20))
+    d.text((512, 290), 'CENTER', fill=(255, 255, 255), font=font('impact.ttf', 120), anchor='mm')
+    T.save(f'{out}/sign_ticketcenter.jpg', quality=92)
+    N = Image.new('RGB', (512, 256), (236, 232, 226)); d = ImageDraw.Draw(N)
+    d.rectangle((6, 6, 506, 250), outline=(180, 20, 24), width=10)
+    d.text((256, 90), 'NO', fill=(180, 20, 24), font=font('arialbd.ttf', 90), anchor='mm'); d.text((256, 180), 'SMOKING', fill=(180, 20, 24), font=font('arialbd.ttf', 80), anchor='mm')
+    N.save(f'{out}/sign_nosmoking.jpg', quality=90)
+    # a skee-ball lane's target, seen from the player: the white board, the yellow rings, the black holes and numbers
+    S = 1024; Tg = Image.new('RGB', (S, S), (232, 226, 210)); d = ImageDraw.Draw(Tg)
+    cx, cy = S // 2, int(S * 0.62)
+    for r, c in ((470, (240, 196, 40)), (430, (232, 226, 210)), (340, (240, 196, 40)), (300, (232, 226, 210)), (220, (240, 196, 40)), (180, (232, 226, 210)),
+                 (110, (240, 196, 40)), (74, (16, 16, 18))):
+        d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=c)
+    for (dx, dy) in ((-320, -330), (320, -330)):
+        d.ellipse((cx + dx - 56, cy + dy - 56, cx + dx + 56, cy + dy + 56), fill=(16, 16, 18))
+    F = font('impact.ttf', 60)
+    for txt, y in (('10', 450), ('20', 320), ('30', 200), ('40', 92)):
+        d.text((cx, cy + y - 20 if y > 100 else cy - 160), txt, fill=(170, 24, 28), font=F, anchor='mm')
+    Tg.save(f'{out}/lane_target.jpg', quality=92)
+    # the backglass over each lane, lit: THUNDER BALL in red and yellow on a pale ground, stars, the score
+    Bg = Image.new('RGB', (1024, 512), (238, 232, 214)); d = ImageDraw.Draw(Bg)
+    d.text((512, 70), '* FUN FOR ALL! *', fill=(196, 30, 36), font=font('BRUSHSCI.TTF', 70), anchor='mm')
+    d.text((512, 200), 'THUNDER BALL', fill=(214, 150, 20), font=font('impact.ttf', 150), anchor='mm', stroke_width=6, stroke_fill=(30, 40, 120))
+    d.rectangle((362, 300, 662, 420), fill=(14, 12, 12)); d.text((512, 360), '888 8', fill=(240, 30, 30), font=font('consolab.ttf', 92), anchor='mm')
+    for k in range(10): x = 40 + 105 * k; d.regular_polygon((x, 470, 18), 5, fill=(40, 60, 170))
+    Bg.save(f'{out}/lane_backglass.jpg', quality=92)
+    # the 00 machine's face: red, two big rings with white rims and lamps, an ADC-ish name across the top
+    O = Image.new('RGB', (1024, 1024), (150, 18, 22)); d = ImageDraw.Draw(O)
+    d.text((512, 150), 'A.D.C.', fill=(250, 214, 60), font=font('impact.ttf', 210), anchor='mm', stroke_width=8, stroke_fill=(60, 10, 10))
+    for cx_ in (300, 724):
+        d.ellipse((cx_ - 200, 360, cx_ + 200, 760), fill=(240, 236, 228)); d.ellipse((cx_ - 168, 392, cx_ + 168, 728), fill=(120, 14, 18))
+        d.ellipse((cx_ - 60, 500, cx_ + 60, 620), fill=(30, 6, 8))
+        for k in range(16):
+            a = k / 16 * 6.283; d.ellipse((cx_ + 184 * np.cos(a) - 10, 560 + 184 * np.sin(a) - 10, cx_ + 184 * np.cos(a) + 10, 560 + 184 * np.sin(a) + 10), fill=(255, 236, 170))
+    d.rectangle((120, 840, 904, 980), fill=(20, 16, 16)); d.text((512, 910), 'WIN TICKETS', fill=(250, 214, 60), font=font('impact.ttf', 90), anchor='mm')
+    O.save(f'{out}/machine_00.jpg', quality=92)
+    # the prize cases behind the counter's glass: shelves of plush, toys and candy, in colour, lit from above
+    A = 1024; Pz = Image.new('RGB', (A * 2, A), (30, 26, 30)); d = ImageDraw.Draw(Pz)
+    for s_, y0 in enumerate((40, 360, 690)):
+        d.rectangle((0, y0 + 280, A * 2, y0 + 300), fill=(190, 186, 176))
+        x = 10
+        while x < A * 2 - 60:
+            w = int(rng.integers(40, 120)); h = int(rng.integers(80, 260)); c = tuple(int(v) for v in rng.integers(40, 255, 3))
+            if rng.random() < 0.5: d.ellipse((x, y0 + 280 - h, x + w, y0 + 280), fill=c)
+            else: d.rounded_rectangle((x, y0 + 280 - h, x + w, y0 + 280), 12, fill=c)
+            x += w + int(rng.integers(4, 20))
+    Pz.save(f'{out}/prizes.jpg', quality=90)
+    # slot machines' and cabinets' faces (lit: emission), the change machine
+    for k, (title, col) in enumerate((('JACKPOT WINS', (210, 40, 60)), ('LUCKY 7', (40, 90, 200)), ('TRIPLE', (230, 150, 20)))):
+        Sl = Image.new('RGB', (512, 1024), col); d = ImageDraw.Draw(Sl)
+        d.text((256, 120), title, fill=(255, 240, 140), font=font('impact.ttf', 74), anchor='mm', stroke_width=4, stroke_fill=(20, 10, 10))
+        d.rectangle((60, 300, 452, 520), fill=(244, 240, 230))
+        for j, sym in enumerate(('7', 'BAR', '7')): d.text((125 + j * 131, 410), sym, fill=(200, 20, 30), font=font('impact.ttf', 80), anchor='mm')
+        d.rectangle((60, 600, 452, 900), fill=tuple(int(c * 0.5) for c in col)); d.text((256, 750), '$ $ $', fill=(255, 220, 90), font=font('impact.ttf', 90), anchor='mm')
+        Sl.save(f'{out}/slot_{k}.jpg', quality=90)
+    for k, (title, col) in enumerate((('SUPER ATTACK', (30, 30, 120)), ('ROAD RACER', (20, 110, 60)), ('STAR BLASTER', (110, 20, 110)), ('HOCKEY', (160, 20, 30)))):
+        Cb = Image.new('RGB', (512, 1024), (12, 12, 14)); d = ImageDraw.Draw(Cb)
+        d.rectangle((0, 0, 512, 200), fill=col); d.text((256, 100), title, fill=(255, 230, 90), font=font('impact.ttf', 70), anchor='mm', stroke_width=4, stroke_fill=(0, 0, 0))
+        d.rectangle((50, 260, 462, 600), fill=tuple(int(c * 0.6 + 20) for c in col))
+        for j in range(30):
+            p_ = rng.integers(60, 440, 2); s_ = rng.integers(10, 40)
+            d.rectangle((int(p_[0]), int(p_[1]), int(p_[0] + s_), int(p_[1] + s_)), fill=tuple(int(v) for v in rng.integers(80, 255, 3)))
+        Cb.save(f'{out}/cabinet_{k}.jpg', quality=90)
+    Ch = Image.new('RGB', (512, 1024), (40, 90, 170)); d = ImageDraw.Draw(Ch)
+    d.rectangle((40, 360, 472, 470), fill=(236, 236, 236)); d.text((256, 415), 'CHANGE', fill=(30, 60, 140), font=font('impact.ttf', 90), anchor='mm')
+    d.rectangle((150, 140, 362, 300), fill=(20, 20, 24)); d.text((256, 220), '$1 $5 $10 $20', fill=(120, 240, 120), font=font('consolab.ttf', 30), anchor='mm')
+    Ch.save(f'{out}/change.jpg', quality=90)
+    # the two screens on the hackers' table: the desktop's pale cyan and the terminal running the encryption
+    Dk = Image.new('RGB', (1024, 640), (120, 214, 222)); d = ImageDraw.Draw(Dk)
+    a_ = np.asarray(Dk, np.float32); yy = np.linspace(0, 1, 640)[:, None, None]
+    a_ = a_ * (0.85 + 0.25 * yy) + 18 * (_noise(1024, 40, 9)[:640, :, None] - 0.5)
+    Dk = Image.fromarray(np.clip(a_, 0, 255).astype(np.uint8)); d = ImageDraw.Draw(Dk)
+    for j in range(6): d.rectangle((20, 30 + j * 80, 70, 80 + j * 80), fill=(236, 240, 244))
+    Dk.save(f'{out}/screen_desktop.jpg', quality=92)
+    Tm = Dk.copy(); d = ImageDraw.Draw(Tm)
+    d.rectangle((150, 60, 760, 560), fill=(46, 50, 56)); d.rectangle((150, 60, 760, 84), fill=(200, 204, 210))
+    F = font('consola.ttf', 22); lines = ['Executing FunSociety', 'Loading Source of Entropy', '##################    COMPLETE', '', 'Generating Keys',
+                                          '##################    COMPLETE', '', 'Locating target files.', 'Beginning crypto operations',
+                                          'Encrypting /bin', 'Encrypting /boot', 'Encrypting /dev', 'Encrypting /etc', 'Encrypting /home', '_']
+    for j, ln in enumerate(lines): d.text((166, 96 + j * 30), ln, fill=(222, 226, 222), font=F)
+    Tm.save(f'{out}/screen_terminal.jpg', quality=92)
+
+
 if __name__ == '__main__':
     room = sys.argv[1]
     out = os.path.join(ROOT, 'pipeline', 'out', 'textures', room); os.makedirs(out, exist_ok=True)

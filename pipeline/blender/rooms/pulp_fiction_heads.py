@@ -33,6 +33,14 @@ HEADS = {
                 crop=(-0.50, -0.18, 0.0, 9.0, -0.03), neck=(0.25, -0.95)),
     'giant': dict(src=os.path.join(cine.CACHE, 'tripo', 'giant_meshopt.glb'), ratio=0.03, turn=-90, regrade=((200, 160, 150), 0.0), uncap=0.03,
                   crop=(-9.0, -9.0, 0.0, 9.0, 0.03), neck=(0.25, -0.95)),
+    # Mr. Robot: from the actors' cast portraits, made in Tripo Studio (Mr. Robot's and Tyrell's closed heads, Elliot's a
+    # bust in his hoodie)
+    'robot': dict(src=os.path.join(cine.CACHE, 'tripo', 'mr_9b32_meshopt.glb'), ratio=0.03, turn=-90, regrade=((190, 150, 130), 0.0), uncap=0.03,
+                  crop=(-9.0, -9.0, 0.0, 9.0, 0.0), neck=(0.24, -0.85)),
+    'tyrell': dict(src=os.path.join(cine.CACHE, 'tripo', 'mr_d4b6_meshopt.glb'), ratio=0.03, turn=-90, regrade=((200, 155, 132), 0.3),
+                   crop=(-0.43, -0.33, 0.0, 9.0, 0.0), neck=(0.24, -0.85)),          # its base slants (lowest under the chin): cut just above it
+    'elliot': dict(src=os.path.join(cine.CACHE, 'tripo', 'mr_8e6c_meshopt.glb'), ratio=0.03, turn=-90, regrade=((176, 132, 110), 0.85),   # a grey-graded promo: given his skin
+                   crop=(-0.17, -0.09, 0.0, 0.15, 0.115), neck=(0.105, -0.55)),
 }
 SIZE = 2048
 

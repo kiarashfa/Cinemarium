@@ -442,6 +442,26 @@ ROOMS['twin-peaks'] = async () => {
   sketchfab('laura_yugengen.glb', 'https://sketchfab.com/3d-models/laura-palmer-760d7537ce2548e9a9c62483a3dd1aa7 (by yugengen)', 'CC BY 4.0');
 };
 
+ROOMS['mr-robot'] = async () => {
+  // Elliot (Male_Adult_20: the zipped hoodie), Mr. Robot (Male_Adult_06: the work jacket), Tyrell (Business_Male_01:
+  // the suit), each under a sculpted head
+  for (const a of ['Adults/Male_Adult_20', 'Adults/Male_Adult_06', 'Professions/Business_Male_01']) await avatar(a);
+  const S = 'all_animations_max_motextr_static', XY = 'all_animations_max_motextr_xy', XYZ = 'all_animations_max_motextr_xyz';
+  for (const c of ['m_idle_neutral_01', 'm_idle_neutral_02', 'm_idle_breathe_01', 'm_idle_nervous_01', 'm_idle_angry_01', 'm_idle_waiting_01',
+    'm_gestic_talk_neutral_01', 'm_gestic_talk_neutral_02', 'm_gestic_talk_excited_01', 'm_gestic_talk_nervous_01', 'm_gestic_talk_cool',
+    'm_gestic_talk_self_assured_01', 'm_gestic_listen_neutral_01', 'm_gestic_listen_nervous_01', 'm_gestic_shrug_01', 'm_work_table',
+    'm_sit_table_breathe_01', 'm_sit_table_idle_neutral_01', 'm_sit_chair_breathe_01']) await clip(S, c);
+  for (const c of ['m_walk_neutral_01', 'm_walk_slow_01', 'm_walk_cool_01']) await clip(XY, c);
+  for (const c of ['m_sit_down_chair_01', 'm_sit_stand_up_chair_01', 'm_sit_down_table_left', 'm_sit_stand_up_table_left', 'm_turn_left_90',
+    'm_turn_right_90', 'm_turn_left_180', 'm_turn_right_180']) await clip(XYZ, c);
+  // the arcade: a worn floor, roll shutters and corrugated iron, the drop ceiling, painted block, plywood; the people's cloth
+  for (const t of ['worn_concrete_floor', 'old_linoleum_flooring_01', 'painted_metal_shutter', 'rusty_metal_shutter', 'corrugated_iron_02',
+    'ceiling_interior', 'painted_concrete', 'plywood', 'wood_table_worn', 'denim_fabric_04', 'poly_wool_herringbone', 'stretch_poplin',
+    'cotton_jersey']) await polyhaven(t, '2k', 'tex');
+  for (const m of ['service_pistol', 'mounted_fluorescent_lights', 'metal_office_desk', 'classic_laptop', 'cardboard_box_01', 'metal_trash_can',
+    'korean_fire_extinguisher_01', 'modular_electric_cables', 'plastic_crate_01']) await polyhaven(m, '1k', 'gltf');
+};
+
 const room = process.argv[2];
 if (!ROOMS[room]) { console.error('usage: node pipeline/fetch.mjs <' + Object.keys(ROOMS).join('|') + '>'); process.exit(1); }
 await ROOMS[room]();

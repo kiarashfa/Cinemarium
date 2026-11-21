@@ -2479,5 +2479,113 @@ def twin_peaks():
     save(h, 'giant', 'm007_head_color.tga')
 
 
+def _tartan(B, size):
+    """A flannel's plaid on the body: a brown ground, broad bottle-green bands both ways (darker where they cross), a
+    faded blue overcheck and a thin pale line."""
+    x, z = np.nan_to_num(B.x), np.nan_to_num(B.z)
+    u, v = (x / size) % 1, (z / size) % 1
+    def band(t, c, w): return smooth(w, w * 0.6, np.abs(t - c))
+    g = (band(u, 0.3, 0.16) + band(v, 0.3, 0.16)) * 0.5
+    bl = np.maximum(band(u, 0.75, 0.05), band(v, 0.75, 0.05))
+    pale = np.maximum(band(u, 0.55, 0.012), band(v, 0.55, 0.012))
+    ground, green, blue, light = (np.array(c, np.float32)[None, None] / 255 for c in ((78, 54, 38), (34, 56, 42), (86, 100, 124), (176, 166, 140)))
+    col = ground * (1 - g[..., None]) + green * g[..., None]
+    col = col * (1 - 0.7 * bl[..., None]) + blue * 0.7 * bl[..., None]
+    return col * (1 - 0.6 * pale[..., None]) + light * 0.6 * pale[..., None]
+
+
+def mr_robot():
+    """The night of the hack at the arcade (S3, 2017). Elliot (Male_Adult_20, under the sculpted head) in his black
+    zip hoodie zipped to the chest over a black tee, near-black jeans, black sneakers; Mr. Robot (Male_Adult_06, under
+    the sculpted head) in the dark brown canvas work jacket, open, the oval shop patch on its left breast, a plaid
+    flannel shirt (brown, bottle green, a faded blue) over a grey tee, dark trousers, brown boots; Tyrell
+    (Business_Male_01, under the sculpted head) in a charcoal suit, a pale blue shirt, a silver-grey figured tie, a white
+    pocket square."""
+    rng = np.random.default_rng(2017)
+    pat = _gt_pat
+    fill = lambda b, B, mask, colour, pattern=None, **kw: _gt_fill(b, B, mask, colour, pattern, **{'grow': 22, **kw})
+
+    def lower(b, B, r, trousers, belt, pattern=None, shoes=(16, 16, 18)):
+        z = np.nan_to_num(B.z)
+        legs = r['thighs'] | B.where(r['calves'] & (z > 0.09)) | B.where(r['torso'] & (z <= belt))
+        b = fill(b, B, legs, trousers, pattern, k=0.55, flatten=2)
+        feet = r['feet'] | B.where(r['calves'] & (z <= 0.09))
+        return fill(b, B, feet, shoes, k=0.5, flatten=1, grow=6), legs
+
+    # ---- Elliot (Male_Adult_20, m027): the hoodie over everything to the hips, its zip, the tee at the throat
+    tex = 'm027_body_color.tga'
+    b = load('Male_Adult_20', tex); B = Body(tex); r = _gt_regions(B); neck, pel = r['neck'], r['pel']
+    x, z, y = np.nan_to_num(B.x), np.nan_to_num(B.z), np.nan_to_num(B.y)
+    belt = pel - 0.02
+    hoodie = (B.where(r['torso'] & (z > belt)) | r['arms'] | B.where(B.part('Neck', 'Head') & (z < neck + 0.06) & ~r['hands'])) & ~r['hands']
+    knit = np.clip(pat(B, 'cotton_jersey', 0.12, 0.8), 0.8, 1.25)
+    b = fill(b, B, hoodie, (24, 24, 27), knit, k=0.6, flatten=3)
+    zip_ = B.where(hoodie & (np.abs(x) < 0.005) & (y < -0.04) & (z < neck - 0.1))
+    b = fill(b, B, zip_, (70, 70, 74), k=0.3, flatten=0, grow=1)
+    tee = B.where(r['torso'] & (y < -0.03) & (np.abs(x) < 0.04 * np.clip((z - (neck - 0.1)) / 0.1, 0, 1) + 0.002) & (z > neck - 0.1))
+    b = fill(b, B, tee, (14, 14, 16), k=0.4, flatten=2, grow=2)
+    b, legs = lower(b, B, r, (30, 31, 35), belt, np.clip(pat(B, 'denim_fabric_04', 0.12, 0.6), 0.88, 1.12), shoes=(18, 18, 20))
+    H_, S_, V_ = hsv(b)                                                     # the roses' and the jeans' colours gone from the padding
+    hands = B.grow(B.where(r['hands']).astype(np.float32), 4).astype(bool)
+    stray = (S_ > 0.25) & ~hands & ~B.where(B.part('Head'))
+    b = recolour(b, soft(stray.astype(np.float32), 1.0), (24, 24, 27), contrast=0.6)
+    save(b, 'elliot', tex)
+    _flat_normals('Male_Adult_20', 'm027_body_normal.tga', 'elliot', B.grow((hoodie | legs).astype(np.float32), 4) * 0.5)
+
+    # ---- Mr. Robot (Male_Adult_06, m011): the jacket open over the flannel, the flannel open over the tee
+    tex = 'm011_body_color.tga'
+    b = load('Male_Adult_06', tex); B = Body(tex); r = _gt_regions(B); neck, pel = r['neck'], r['pel']
+    x, z, y = np.nan_to_num(B.x), np.nan_to_num(B.z), np.nan_to_num(B.y)
+    belt = pel + 0.0
+    upper = (B.where(r['torso'] & (z > belt - 0.06)) | r['arms']) & ~r['hands']
+    canvas = np.clip(pat(B, 'rough_linen', 0.1, 0.9), 0.82, 1.2)
+    b = fill(b, B, upper, (52, 40, 31), canvas, k=0.6, flatten=4)                  # the jacket: dark brown duck canvas
+    # the opening down the front: the flannel shows between the jacket's edges, wider toward the collar
+    open_ = 0.045 + 0.05 * np.clip((z - (neck - 0.3)) / 0.26, 0, 1)
+    flannel = B.where(r['torso'] & (y < -0.02) & (np.abs(x) < open_) & (z > belt - 0.04) & (z < neck + 0.01))
+    plaid = _tartan(B, 0.08)
+    b = _paint(b, soft(B.grow(flannel.astype(np.float32), 2), 0.7), plaid, k=0.45, flatten=3)
+    tee = B.where(flannel & (np.abs(x) < 0.03 + 0.03 * np.clip((z - (neck - 0.22)) / 0.2, 0, 1)) & (z > neck - 0.22))
+    b = fill(b, B, tee, (88, 88, 92), k=0.45, flatten=2, grow=2)
+    edge = B.where(r['torso'] & (y < -0.02) & (np.abs(np.abs(x) - open_) < 0.006) & (z > belt - 0.04) & (z < neck - 0.02))
+    b = fill(b, B, edge, (34, 26, 20), k=0.3, flatten=0, grow=1)                  # the jacket's front edges in shadow
+    cuffs = B.where(r['arms'] & (np.abs(x) > np.abs(B.J['Bip01 L Hand'][0]) - 0.07))
+    b = fill(b, B, cuffs, (46, 35, 27), canvas, k=0.5, flatten=2, grow=2)
+    # the patch: an off-white oval on the left breast, a dark border, two dark lines of lettering
+    px, pz = 0.105, neck - 0.15
+    oval = B.where(r['torso'] & (y < -0.03) & (((x - px) / 0.045) ** 2 + ((z - pz) / 0.028) ** 2 < 1))
+    b = fill(b, B, oval, (214, 208, 192), k=0.25, flatten=0, grow=1)
+    ring = B.where(oval & (((x - px) / 0.045) ** 2 + ((z - pz) / 0.028) ** 2 > 0.72))
+    b = fill(b, B, ring, (40, 40, 44), k=0.2, flatten=0, grow=0)
+    for dz in (0.008, -0.006):
+        line = B.where(oval & (np.abs(z - (pz + dz)) < 0.0028) & (np.abs(x - px) < 0.026) & ((np.floor((x - px) / 0.004) % 2) == 0))
+        b = fill(b, B, line, (52, 52, 58), k=0.2, flatten=0, grow=0)
+    b, legs = lower(b, B, r, (38, 34, 32), belt - 0.06, np.clip(pat(B, 'denim_fabric_04', 0.12, 0.6), 0.9, 1.1), shoes=(54, 38, 26))
+    H_, S_, V_ = hsv(b)
+    red = (S_ > 0.3) & ((H_ < 25) | (H_ > 330)) & (V_ > 0.06) & ~B.grow(B.where(r['hands']).astype(np.float32), 4).astype(bool)
+    b = recolour(b, soft(red.astype(np.float32), 1.0), (48, 37, 29), contrast=0.6)
+    save(b, 'robot', tex)
+    _flat_normals('Male_Adult_06', 'm011_body_normal.tga', 'robot', B.grow((upper | legs).astype(np.float32), 4) * 0.5)
+
+    # ---- Tyrell (Business_Male_01, m005): the suit charcoal, the shirt pale blue, the tie silver-grey, a pocket square
+    tex = 'm005_body_color.tga'
+    b = load('Business_Male_01', tex); B = Body(tex); r = _gt_regions(B); neck = r['neck']
+    x, z, y = np.nan_to_num(B.x), np.nan_to_num(B.z), np.nan_to_num(B.y)
+    H, S, V = hsv(b)
+    tie_ = (S > 0.4) & ((H < 25) | (H > 330)) & (V > 0.12) & ~B.grow(B.where(r['hands']).astype(np.float32), 6).astype(bool)
+    figured = np.clip(pat(B, 'floral_jacquard', 0.05, 1.4), 0.7, 1.3)
+    b = fill(b, B, tie_, (150, 152, 158), figured, k=0.6, flatten=0, grow=2)
+    shirt = B.where((V > 0.55) & (S < 0.15) & (r['torso'] | r['arms']) & ~r['hands'])
+    b = fill(b, B, shirt, (206, 216, 230), np.clip(pat(B, 'stretch_poplin', 0.12, 0.6), 0.9, 1.1), k=0.5, flatten=2, grow=3)
+    suit = (r['torso'] | r['arms'] | r['thighs'] | r['calves']) & ~r['hands'] & ~shirt & ~tie_
+    b = fill(b, B, suit, (34, 35, 39), np.clip(pat(B, 'poly_wool_herringbone', 0.14, 0.6), 0.88, 1.12), k=0.55, flatten=4, grow=4)
+    sq = B.where(r['torso'] & (y < -0.03) & (np.abs(x + 0.11) < 0.018) & (np.abs(z - (neck - 0.17)) < 0.008))
+    b = fill(b, B, sq, (226, 226, 222), k=0.3, flatten=0, grow=1)
+    feet = r['feet'] | B.where(r['calves'] & (z <= 0.09))
+    b = fill(b, B, feet, (14, 14, 16), k=0.5, flatten=1, grow=6)
+    save(b, 'tyrell', tex)
+    _flat_normals('Business_Male_01', 'm005_body_normal.tga', 'tyrell', B.grow(suit.astype(np.float32), 4) * 0.5)
+
+
 if __name__ == '__main__':
     globals()[sys.argv[1].replace('-', '_')]()
